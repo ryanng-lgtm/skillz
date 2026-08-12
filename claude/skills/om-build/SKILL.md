@@ -1,9 +1,38 @@
 ---
 name: om-build
-description: Use when the installed `om` binary is stale and `om upgrade` cannot fetch a release — the openmarket-releases repo 404s, the asset download fails, or a local source change has to reach the running daemon. Covers the GUI-embedded source build and the swap onto the live install. Trigger: /om-build [--no-gui]
+description: Use when an OM Chat GUI has to be built from source and put in front of Ryan — the daemon-embedded `/rooms` GUI when `om upgrade` cannot fetch a release (openmarket-releases 404s) or a local change has to reach the running daemon, or the hosted `/chat/` cloud fork when it has to be built, validated, and served locally. Covers both targets and the swap onto the live install. Trigger: /om-build [--hosted|--cloud] [--no-gui]
 ---
 
-# om-build — build `om` from source and move the running daemon onto it
+# om-build — build an OM Chat GUI from source
+
+Two different products live behind this skill. Pick the target before doing
+anything; they share no build, no artifact shape, and no verification.
+
+| Flag | Source repo | Artifact | Where it shows up | Touches the `om` binary |
+|---|---|---|---|---|
+| `--hosted` (default) | `openmarket-chat` | `assets/rooms.js` + `rooms.css` + `index.html`, embedded into `om` | `http://127.0.0.1:31337/rooms#/` | yes — recompiles and swaps it |
+| `--cloud` | `openmarket-chat-cloud` | fingerprinted `assets/chat-<hash>.js` at base `/chat/` | a local server you start, at `/chat/` | never |
+
+Ryan's names, which read backwards if you assume "hosted" means the SaaS:
+`--hosted` is the daemon **hosting** the GUI at `/rooms`; `--cloud` is the
+`/chat/` fork. No flag means `--hosted`.
+
+**Never mix them in one run.** `--cloud` never writes `~/.local/bin/om`, never
+runs `om service restart`, and never stages anything into the monorepo.
+`--hosted` never touches the cloud repo. `--no-gui` means nothing under
+`--cloud`.
+
+**Announce at start:** "Using om-build to build and install om from source"
+(`--hosted`) or "Using om-build to build and serve the cloud /chat/ fork"
+(`--cloud`).
+
+If either fork's copy of a file in `tools/parity-manifest.json` was edited,
+run `bun tools/sync-shared.ts --diff` before building. It is the only
+cross-fork alarm that exists; both forks can be green while drifting.
+
+---
+
+## `--hosted` — daemon `/rooms` at 127.0.0.1:31337
 
 `om upgrade` no longer works for standalone installs. It downloads from
 `github.com/openmarket-xyz/openmarket-releases`
@@ -15,14 +44,12 @@ no `Authorization` header, and neither module reads `GITHUB_TOKEN` / `GH_TOKEN`.
 the repo goes public again, a source build is the upgrade path.
 
 The build itself is one command. The part that is easy to get wrong is the rooms
-GUI: it is **not** built from this repo, and a plain source build serves the
+GUI: it is **not** built from the monorepo, and a plain source build serves the
 placeholder shell at `/rooms` (`packages/cli/src/dashboard/rooms-gui.ts:1-32`) —
 which looks exactly like the GUI broke. Steps 1, 2 and 6 reproduce locally what
 `.github/workflows/release.yml:196-240` does in CI.
 
-**Announce at start:** "Using om-build to build and install om from source."
-
-## Hard rules
+### Hard rules
 
 - **The staged GUI assets are never committed.** They are a working-tree
   overwrite of committed stubs. Restore them in step 6 — including when the
@@ -40,8 +67,6 @@ which looks exactly like the GUI broke. Steps 1, 2 and 6 reproduce locally what
   print the version you expect. Never swap a binary you have not run.
 - **Never sudo.** A bin dir that needs root is a signal to stop and ask, not to
   escalate.
-
-## Steps
 
 ### 0. Preflight
 
@@ -69,6 +94,10 @@ cause of "I upgraded and `om --version` didn't change": on Ryan's machine
 `/opt/homebrew/bin/om` is an older Cellar install shadowed behind it.
 
 If the target is a Cellar path, stop — see the hard rule.
+
+A local-main build usually does **not** change the version string. Say so up
+front, or the report reads as a no-op: the honest proof is the asset stamp in
+step 7, not `om --version`.
 
 ### 1. Build the rooms GUI bundle
 
@@ -101,6 +130,9 @@ bun run build
 `bun install` needs the granular npm token in `~/.npmrc` while
 `@openmarket/rooms-client` is private. If the install 404s, do not switch
 registries or accounts — use the link flow above, which bypasses npm.
+
+Note the `stamp-asset-versions OK: assets pinned to ?v=<stamp>` line the build
+prints. That stamp is what proves the swap landed in step 7.
 
 Verify the five files the embed slots need:
 
@@ -167,6 +199,7 @@ OM_HOME=/tmp/om-gui-verify OM_BIND=127.0.0.1:31999 ./packages/cli/dist/om run &
 sleep 8
 curl -s http://127.0.0.1:31999/rooms/ | grep -q OM_ROOMS_GUI_DIR \
   && echo "PLACEHOLDER — the embed did not take" || echo "real GUI embedded"
+curl -s http://127.0.0.1:31999/rooms/ | grep -o 'rooms\.js?v=[a-f0-9]*'   # must match step 1's stamp
 pkill -f "dist/om run"; rm -rf /tmp/om-gui-verify
 ```
 
@@ -204,33 +237,187 @@ om service status
 curl -s http://127.0.0.1:31337/healthz | head -c 200      # the DAEMON's version, not the CLI's
 curl -s http://127.0.0.1:31337/rooms/ | grep -q OM_ROOMS_GUI_DIR \
   && echo "live daemon serving PLACEHOLDER" || echo "live daemon serving real GUI"
+curl -s http://127.0.0.1:31337/rooms/ | grep -o 'rooms\.js?v=[a-f0-9]*'
 ```
 
-`/healthz` is the authoritative check: `om --version` reports the binary your
-shell resolved, which can differ from the one the supervisor is running.
+`/healthz` is the authoritative version check: `om --version` reports the binary
+your shell resolved, which can differ from the one the supervisor is running.
 (There is no `om system status` CLI verb — `system_status` is an MCP tool name.)
+The served `?v=` stamp is the authoritative *GUI* check, and the only one that
+moves when the version does not.
 
-Report: version before → after, which binary path was replaced, whether the GUI
-is embedded or placeholder, daemon restart result, worktree state, and anything
-left for Ryan (a shadowed `om` still first on PATH, a skipped GUI, a failed
-restart).
+Report: version before → after, the asset stamp, which binary path was replaced,
+whether the GUI is embedded or placeholder, daemon restart result, worktree
+state, and anything left for Ryan (a shadowed `om` still first on PATH, a
+skipped GUI, a failed restart).
 
-## Traps
+### Traps (`--hosted`)
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `om --version` unchanged after install | a different `om` is first on PATH | `which -a om`; replace the one that wins, or fix PATH order |
+| `om --version` unchanged after install | either a different `om` is first on PATH, or local main simply never bumped the version | `which -a om`; then confirm via the `?v=` stamp, not the version |
 | `/rooms` shows an install-instructions page | stubs were compiled in | redo steps 1-3; check the stub marker gate in step 2 |
 | Daemon still on the old version | binary swapped, daemon not restarted | `om service restart` |
 | `bun install` 404s in openmarket-chat | `@openmarket/rooms-client` is private on npm | link from the monorepo (`rooms-client:link`), never a different registry |
 | GUI builds but behaves oddly against the daemon | rooms-client era mismatch | compare versions in step 1; link to source |
 | Huge diff / 14 MB file in `git status` | staged GUI assets not restored | `git checkout packages/cli/assets/rooms-gui/` |
+| `OM_ROOMS_GUI_DIR` set but the daemon ignores it | the launchd plist has no `EnvironmentVariables` key, so the supervised daemon never sees your shell's env; and the watch-and-re-read path is source-only (`setRoomsGuiHotReload(isDevExecPath())`, `rooms-routes.ts:95`) | it is a hand-run-daemon tool, not a shortcut around the embed — do the compile |
 | `cannot upgrade: process.execPath is ...` from `om upgrade` | you ran the source entrypoint, not a compiled binary | expected — that guard is `upgrade-core.ts:424` |
 
-## The real fix
+### The real fix (`--hosted` only)
 
-This skill is a workaround. The durable repair is teaching the updater to
+This target is a workaround. The durable repair is teaching the updater to
 authenticate: an `OM_GITHUB_TOKEN` → `Authorization: Bearer` header in the two
 `prodDeps` fetchers plus `fetchLatestVersion`, and swapping the
 latest-release redirect probe for the REST API (the redirect trick only resolves
-on public repos). Mention it when this skill runs more than once.
+on public repos). Mention it when this target runs more than once.
+
+---
+
+## `--cloud` — hosted `/chat/` fork, served locally
+
+`openmarket-chat-cloud` is the hosted browser product at
+`https://openmarket.xyz/chat/`. This target builds it, validates it, and puts it
+in front of Ryan on a local port. It is **not** an upgrade path for anything and
+it never goes near the daemon.
+
+### Hard rules
+
+- **Never deploy, push, or publish an image.** Deployment is GitOps and
+  controller-owned (`docs/CLOUD_HOSTING.md`): Reflectful + ArgoCD apply
+  `charts/openmarket-chat-cloud`. No manual `kubectl`, no `helm install`, no
+  image push without Ryan's explicit per-instance OK.
+- **Never commit `dist/`.** The cloud repo's policy forbids committing generated
+  output, dependencies, credentials, or local endpoint overrides.
+- **A cloud bundle can never be embedded in the daemon.** It builds at base
+  `/chat/` with code-split `assets/chat-<hash>.js`; `/rooms` accepts only
+  `index.html` + `assets/rooms.js` + `assets/rooms.css`, for both the embed and
+  the `OM_ROOMS_GUI_DIR` loader (`rooms-gui.ts:296-303`). If Ryan wants a GUI at
+  `/rooms`, that is `--hosted`. Making the cloud fork embeddable is a build-mode
+  change in the cloud repo, not a flag.
+- **Never add a serving API key to the gateway.** The gateway forwards the
+  user's bearer token only; the market sidecar mints guest keys per user. A
+  shared serving key must never exist.
+
+### 0. Preflight
+
+```bash
+cd ~/Documents/GitLab/openmarket-chat-cloud
+git status --short
+git rev-parse --abbrev-ref HEAD && git log -1 --oneline
+bun tools/sync-shared.ts --diff        # drift vs the openmarket-chat twin
+```
+
+`main` must stay deployable; feature work belongs on a branch.
+
+### 1. Install and build
+
+pnpm is the contract here, not bun — `package.json` pins
+`packageManager: pnpm@10.22.0`, and `AGENTS.md` specifies a frozen install.
+A `bun.lock` also exists; ignore it for installs.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm run build            # vite build + worker build + sw build
+pnpm run check:dist       # node tools/check-dist.mjs
+```
+
+Expected: `check-dist OK: cloud artifact is fingerprinted, source-map free, and
+daemon-agent free`. That check is the boundary guard — it fails if daemon-only
+endpoints or `/rooms/` packaging leak into the cloud distribution.
+
+Verify the artifact is fingerprinted and rooted at `/chat/`:
+
+```bash
+grep -o 'assets/chat-[A-Za-z0-9_-]*\.js' dist/index.html | head -3
+ls dist                   # index.html, assets/, icons/, manifest.webmanifest, sw.js
+```
+
+### 2. Serve it locally
+
+Three rigs; pick by what Ryan needs to see. All of them need a port — check
+`~/WebstormProjects/PORTS.md` first if it exists (it did not as of 2026-08-12),
+otherwise stay off 8097 (the repo's strict dev port) and 31337 (the daemon).
+
+**A. Static preview of the artifact you just built** — layout, shell, visual work:
+
+```bash
+pnpm exec vite preview --port 8098 --strictPort
+# open http://localhost:8098/chat/
+```
+
+`vite preview` binds `[::1]` **only**: `curl http://127.0.0.1:8098/` refuses the
+connection while `localhost` works. Use `localhost`, or pass `--host 127.0.0.1`.
+Deep links resolve (`/chat/rooms` → 200, SPA fallback).
+
+No gateway is present in this rig, so `/chat/api/*`, `/chat/ws/rooms`, and
+`/api/v1/auth-v2` are unproxied — login and live data will fail. That is
+expected, not a regression.
+
+**B. Dev server with proxies** — iterating on source:
+
+```bash
+pnpm run dev              # vite on 8097, strictPort, base /chat/
+```
+
+It proxies `/api/v1` → `localhost:3000` and `/chat/api/rooms` →
+`localhost:3002`; those backends must be running or you get the same auth
+failures as rig A.
+
+**C. Gateway parity** — closest to production, when the nginx behavior itself is
+what is in question:
+
+```bash
+docker build -t om-chat-cloud .
+docker run --rm -p 8081:8080 \
+  -e CHAT_SERVICE=<host:port> -e ROOMS_WS_SERVICE=<host:port> \
+  -e THARAMINE_SERVICE=<host:port> -e AUTH_SERVICE=<host:port> \
+  om-chat-cloud
+# open http://localhost:8081/chat/
+```
+
+Only those four names are substituted into the template
+(`NGINX_ENVSUBST_FILTER` in the Dockerfile); anything else in the config stays
+literal. Unknown gateway paths return 404 by design.
+
+Kill whatever you started when you are done, and say in the report that it is
+gone.
+
+### 3. Full gate before claiming the work is done
+
+`AGENTS.md` names six, and all six are expected before "complete":
+
+```bash
+pnpm install --frozen-lockfile
+pnpm run lint
+pnpm run typecheck
+pnpm run build
+pnpm run check:dist
+bun test
+```
+
+Add the chart validation when anything under `charts/` or `deploy/` changed:
+
+```bash
+helm lint charts/openmarket-chat-cloud
+helm template openmarket-chat-cloud charts/openmarket-chat-cloud \
+  --namespace pub --values charts/openmarket-chat-cloud/values.production.yaml
+```
+
+### 4. Report
+
+Branch and HEAD, the entry hash from `dist/index.html`, which rigs were started
+and on which ports, whether each still runs or was killed, `check:dist` and
+gate results, parity drift from step 0, and anything left for Ryan. Never
+report a deploy — this target does not do one.
+
+### Traps (`--cloud`)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `curl 127.0.0.1:<port>` refuses but the log says it is serving | `vite preview` binds `[::1]` only | use `localhost`, or `--host 127.0.0.1` |
+| Login fails / no rooms load in preview | rig A has no gateway; API and WS paths are unproxied | rig B with backends up, or rig C |
+| `pnpm install --frozen-lockfile` complains about the pnpm version | `packageManager` pins 10.22.0; PATH pnpm may be older (9.15.9 on this box, which builds fine) | `corepack pnpm install --frozen-lockfile`, or proceed if it installs cleanly |
+| Tempted to `bun install` because `bun.lock` is there | both lockfiles are committed; the build contract is pnpm | pnpm for install/lint/typecheck/build; bun only for `bun test` |
+| Build output has no `rooms.js` | correct — this fork emits `assets/chat-<hash>.js` at base `/chat/` | if `/rooms` is the goal, run `--hosted` |
+| Shared file changed but the twin did not move | `test/shared-parity.test.ts` only checks a fork against its own manifest | `bun tools/sync-shared.ts --diff`, then `--refresh` here and a plain sync in the twin |
