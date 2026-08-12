@@ -1,0 +1,18 @@
+.DS_Store
+
+# sync bookkeeping — local to each machine
+.sync.log
+.sync.lock/
+.sync-conflict
+.sync-hold
+
+# never track credentials or per-machine state, even if copied in by mistake
+auth.json
+.credentials.json
+settings.json
+settings.local.json
+config.toml
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+history.jsonl

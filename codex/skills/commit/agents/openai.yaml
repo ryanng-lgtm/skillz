@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit"
+  short_description: "Commit staged git changes only"
+  default_prompt: "Use $commit to commit the currently staged changes."

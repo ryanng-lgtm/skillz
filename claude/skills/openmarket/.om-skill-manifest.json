@@ -1,0 +1,19 @@
+{
+  "installedFiles": [
+    "SKILL.md",
+    "alerts.md",
+    "orders.md",
+    "metrics.md",
+    "marketplace.md",
+    "chart-actions.md",
+    "chart-actions-tool-drawing.md",
+    "news.md",
+    "connect-source.md",
+    "event-watches.md",
+    "research.md",
+    "signal.md",
+    "strategy.md",
+    "rooms-docs.md",
+    "secrets.md"
+  ]
+}
