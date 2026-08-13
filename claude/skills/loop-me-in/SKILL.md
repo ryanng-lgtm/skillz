@@ -136,11 +136,13 @@ Below 40 words there was nothing worth interrupting for; over 100 nobody reads i
 
 | Plan shape | Trigger | Why |
 |---|---|---|
-| Multiple phases/tasks, each with its own verification | `/loop` with no interval | Self-paces, which is what a build → sweep → fix cycle needs; survives a phase failing without losing the rest |
-| One fix with a single verifiable done-condition | `/goal <condition>` | Runs until the goal is met or the turn cap is hit |
-| Recurring work, or work that must outlive the session | `/schedule` | Runs in the cloud rather than this terminal |
+| Multiple phases/tasks, each with its own verification | `/loop <one sentence naming the work>` — no interval | Omitting the interval puts `/loop` in self-paced mode, which is what a build → sweep → fix cycle needs. An interval (`/loop 5m …`) re-fires the same prompt on a timer instead, which is wrong for phased work. |
+| One fix with a single verifiable done-condition | `/goal <condition>, stop after <n> tries` | An evaluator model checks the criteria each turn, and the cap is part of the command. **Confirm `/goal` is in this session's skill list before writing it into a paste line** — it isn't installed everywhere. Where it's absent, use the `/loop` form with the success condition and try cap stated in the brief instead. |
+| Recurring work, or work that must outlive this machine | `/schedule` | Runs as a cloud routine on a cron schedule (research preview), so a closed laptop doesn't end it |
 | Small enough to just do | None — say so | Not everything needs a loop; the simplest thing that works wins |
 | Phases that each need a human decision | None — say so | A loop that stops every phase to ask is worse than a checklist |
+
+**`/loop` runs on this machine.** Sleep, shutdown, or a closed lid stops it mid-phase, which for an overnight run means waking up to a half-applied plan and a leaked browser. Say so in the brief when the run is expected to go long: either the machine stays awake, or the work belongs in `/schedule`.
 
 **Always give the brief a turn cap or phase count.** An unbounded loop burns tokens on work nobody is reading. State the ceiling and what to do on hitting it: report, don't continue.
 
