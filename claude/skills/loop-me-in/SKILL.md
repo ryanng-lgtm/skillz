@@ -243,11 +243,14 @@ on, the command gate, and what "done" looks like.
 One phase = one commit = one reviewable unit.
 
 ## Gates
-Three commands per repo — attempt tier (one test file plus typecheck), phase
-tier (that file plus its importers' suites), wave tier (the full repo gate).
-Which number each is checked against, and how long the wave tier takes, so a
-slow suite isn't mistaken for a hang. The browser gate is the sweep, and it is
-green only when every acceptance row reads landed with evidence attached.
+Three scoped commands per repo — attempt tier (one test file plus typecheck),
+phase tier (that file plus its importers' suites), wave tier (the union of the
+wave's phase tiers plus lint, typecheck, build, dist check). The full suite is
+not a tier: it runs once at phase 0 for the baseline, and thereafter only as a
+logged escalation when a failure will not localize. State which number each
+tier is checked against, and how long the full suite takes so it is never
+mistaken for a hang. The browser gate is the sweep, and it is green only when
+every acceptance row reads landed with evidence attached.
 
 ## Open questions — resolve or report
 Every unknown the plan flags, carried over verbatim in substance. Mark which
