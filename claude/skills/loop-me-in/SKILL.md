@@ -131,6 +131,7 @@ Below 40 words there was nothing worth interrupting for; over 100 nobody reads i
 - **Route to the right topic.** Where the work belongs to a topic, list them with `room_topic_list` and confirm the posting tool's schema advertises the topic field before assuming it takes one. Creating a topic needs `contribute` on the room — knock for it while writing the brief. If more than one channel is in scope, the brief names each destination against the phases it covers.
 - **`room_post` posts as the bot. `om room say` posts as Ryan.** Say which.
 - **It may only claim what was verified.** Backend work a browser cannot show, and any fix whose link to the original report is still an open question, must be worded honestly or left out.
+- **It names the findings log path.** The word ceiling is what keeps the post readable; the path is what keeps the detail reachable. One line, and everything the sweeps saw is a click away.
 - **A blocked run still posts** — what landed, what failed, that the rest is halted. Same budget.
 - **Authorise exactly these posts** in the safety rules, so "post" does not read as permission to push or publish.
 
