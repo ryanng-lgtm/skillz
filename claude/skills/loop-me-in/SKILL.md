@@ -193,7 +193,7 @@ Every brief ends with one post to OM Chat, unless the work is unshippable or the
 - **The post is what replaces Ryan watching.** It carries the verdict per phase, what is still red, and the gaps recorded but deliberately not fixed. A post that only says "done" makes the whole loop unfalsifiable.
 - **Resolve the destination, don't transcribe it.** Call `session_grants` (read-only, no consent side effects) and use the resource string it reports; `room_post` wants that canonical name, not a display title. Currently that is `82eae63a1bd3` (`#chat`, space `openmarket`) with `read` + `post`. Confirm rather than assume — a missing `post` grant means the run stalls at 3am waiting for consent.
 - **`room_post` posts as the bot. `om room say` posts as Ryan.** Say which.
-- **Shape: a simplified `/mr-markdown` summary — one title line, at most 4 bullets, 100 words total. Tell the brief to count them**; a cap stated without counting produces a message well under it.
+- **Shape, in this order:** one title line; one line per phase reading `P<n> <name> — landed | red (<why>)`; then at most 4 bullets for what a reader still needs to know — gaps recorded but not fixed, anything awaiting a decision. 150 words total. **Tell the brief to count them**; a cap stated without counting produces a message well under it.
 - **It may only claim what was verified.** Backend work a browser cannot show, and any fix whose link to the original report is still an open question, must be worded honestly or left out.
 - **A blocked run still posts** — what landed, what failed, that the rest is halted.
 - **Authorise exactly this one outward-facing action** in the safety rules, so "post" does not read as permission to push or publish.
