@@ -87,7 +87,7 @@ command gate instead.
 ## 5. Sweep agent
 
 ```sh
-timeout 900 codex exec \
+with_timeout 900 codex exec \
   -C "$WORKTREE" \
   -m gpt-5.6-sol \
   -c model_reasoning_effort="high" \
@@ -102,7 +102,7 @@ timeout 900 codex exec \
 network by default and CDP on `127.0.0.1:9222` counts as network. Without it the sweep
 reports a connection error that reads like a broken app.
 
-`timeout` is required. A codex run that hangs at 3am costs the whole night.
+`with_timeout` is required. A codex run that hangs at 3am costs the whole night.
 
 The sweep prompt carries: the app URL, the `$CD` path and its `--help` hint, the phase's
 acceptance rows, the sentinel, the scope fence, and this output contract:
