@@ -98,7 +98,7 @@ start_chrome() {
     about:blank >"$RUN_DIR/chrome.log" 2>&1 &
   echo $! > "$RUN_DIR/chrome.pid"
   for _ in $(seq 30); do curl -sf -o /dev/null \
-    "http://127.0.0.1:$CDP_PORT/json/version" && return 0; perl -e 'select undef,undef,undef,0.5'; done
+    "http://127.0.0.1:$CDP_PORT/json/version" && return 0; sleep 0.5; done
   return 1
 }
 
