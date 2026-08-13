@@ -57,6 +57,7 @@ Paste line: /loop <one sentence naming the work>
 ## Ground truth
 Repos and worktrees (path, branch, base, clean?), the spec-of-record path,
 what already landed (commit shas), what is deliberately NOT in scope.
+One branch per repo, one worktree for the whole run.
 
 ## Environment traps
 One line each. Install commands that break things. Files that must be
