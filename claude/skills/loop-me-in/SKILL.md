@@ -104,16 +104,19 @@ the same kind, work that would widen scope.
 - **Pilot before the long run.** Tell the brief to execute phase 1 and report before continuing, when the plan is large or the repo is unfamiliar.
 - **Feed lessons back.** If the run discovers a trap, it belongs in the plan's Environment traps for next time — fixing the instance without recording it means the next run pays again.
 
-### If the user wants wave reports
+### The completion post — include by default
 
-Unattended runs are silent by default, so a progress channel is often worth it. When asked for one:
+Every brief ends with one post to OM Chat, unless the work is unshippable or the user says not to. An unattended run is otherwise silent, and silence reads as progress.
 
-- **Verify the destination before writing the brief**, don't transcribe what the user said. Chat IDs are not always room names — `room_post` wants a canonical room name, and an ID may be a grant resource or a topic. Call `session_grants` (read-only, no consent side effects) and use the resource string it reports.
-- **Confirm the capability exists.** No `post` grant means the run will stall mid-wave asking for consent; say so now rather than letting it discover that at 3am.
-- **Define what a wave IS** in commits and gates — "wave complete" must mean *committed and green*, or the run reports work that doesn't hold up.
-- **Cap the length and say to count.** A word limit stated without "count them" produces 60-word messages.
-- **A blocked wave still posts.** Silence reads as progress; that is the failure mode worth designing out.
-- **Never let a post claim what the run cannot verify.** If a check is manual, the message says so explicitly.
+- **Fires once, after everything has landed AND been verified in the real product** — not after the last commit. Where a GUI is involved that means driving it with `/om-chat-web`; give the brief a row per phase naming the click and the expected result, or "verified" degrades into "clicked around".
+- **Resolve the destination, don't transcribe it.** Call `session_grants` (read-only, no consent side effects) and use the resource string it reports; `room_post` wants that canonical name, not a display title. Currently that is `82eae63a1bd3` (`#chat`, space `openmarket`) with `read` + `post`. Confirm rather than assume — a missing `post` grant means the run stalls at 3am waiting for consent.
+- **`room_post` posts as the bot. `om room say` posts as Ryan.** Say which.
+- **Shape: a simplified `/mr-markdown` summary — one title line, at most 4 bullets, 100 words total. Tell the brief to count them**; a cap stated without counting produces a message well under it.
+- **It may only claim what was verified.** Backend work a browser cannot show, and any fix whose link to the original report is still an open question, must be worded honestly or left out.
+- **A blocked run still posts** — what landed, what failed, that the rest is halted.
+- **Authorise exactly this one outward-facing action** in the safety rules, so "post" does not read as permission to push or publish.
+
+Per-wave progress reports are a variant: only when asked, and "wave complete" must mean committed *and* green.
 
 ## Common mistakes
 
