@@ -154,13 +154,47 @@ The sentinel is a string that exists **only** after this phase's change — a ne
 phase with no observable sentinel has no browser verification: say so, and give it a
 command gate instead.
 
-## 4. Sweep agent
+## 4. Reasoning effort — matched to the job, escalated on failure
+
+**`~/.codex/config.toml` sets `model_reasoning_effort = "xhigh"` globally.** Every agent
+that does not override it runs at xhigh, including a sweep whose whole job is to click
+four things and report what it saw. Always pass the flag explicitly.
+
+```sh
+effort_for() {   # effort_for <role> <attempt>
+  case "$1:$2" in
+    sweep:1)  echo low     ;;   # acceptance rows name a selector and expected text: a checklist
+    sweep:2)  echo medium  ;;   # something didn't land — look harder
+    sweep:3)  echo high    ;;   # last look before the cap, and the one Ryan reads
+    fix:1)    echo medium  ;;   # named gap, file guess in hand, stated verification command
+    fix:2)    echo high    ;;
+    diagnose) echo xhigh   ;;   # see below
+    *)        echo medium  ;;
+  esac
+}
+```
+
+Two adjustments on top of the ladder:
+
+- **Behavioural acceptance rows start one rung higher.** "The panel reflows without
+  clipping at 768px" is a judgement; "`[data-testid=save]` is enabled" is a lookup. Where
+  a phase's rows are the former, start its sweeps at `medium`.
+- **Fixes touching shared state, async ordering, or three-plus files start at `high`.**
+  A one-string edit does not.
+
+**There is no `fix:3`.** Two failures of the same class mean the model of the problem is
+wrong, so the third attempt changes job rather than effort: a `diagnose` agent at `xhigh`,
+`--sandbox read-only`, whose output is a root cause and a verdict on whether the plan's
+premise still holds. It writes no code. The phase then stops red with that explanation in
+the findings log, which is worth more than a fourth patch.
+
+## 5. Sweep agent
 
 ```sh
 with_timeout 900 codex exec \
   -C "$WORKTREE" \
   -m gpt-5.6-sol \
-  -c model_reasoning_effort="high" \
+  -c model_reasoning_effort="$(effort_for sweep "$ATTEMPT")" \
   -c sandbox_workspace_write.network_access=true \
   --sandbox workspace-write \
   --add-dir "$RUN_DIR" \
