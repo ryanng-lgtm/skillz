@@ -177,7 +177,14 @@ defined here and used on every long-running command.
 ## Process ledger
 Empty table the run fills in as it spawns things: what, port, PID, started,
 started-or-reused. Plus the heartbeat to run between phases, and the teardown
-block that runs on success, failure, and abort alike.
+block that runs on success, failure, and abort alike — which kills processes
+and deletes nothing.
+
+## Findings log
+The evidence directory's absolute path, beside this brief in the plans vault.
+The append block the run runs after every sweep, pass or fail. What each entry
+carries: phase and attempt, identity verdict, acceptance rows, regressions,
+in-scope gaps, out-of-scope findings, and the screenshot and console-log paths.
 
 ## Phases
 Numbered. Each carries: the change, the files, the sentinel that proves it
