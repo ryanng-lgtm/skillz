@@ -288,6 +288,9 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 | Evidence written to `/tmp`, or a teardown that deletes it | The night's only proof is gone before it's read |
 | Out-of-scope findings that live only in the post | The word cap eats them; the bugs the sweep found are lost |
 | A findings log that records only failed sweeps | No way to tell which phase broke something that used to pass |
+| Compressing the post or the findings log | Tokens saved by making the only output Ryan reads useless |
+| A sweep prompt that lets codex narrate | Pays for three paragraphs of preamble on every phase, every attempt |
+| Telling an agent to "go read the spec" instead of quoting it | Re-reads files the brief already contains, at full price, per agent |
 
 ## Red flags
 
