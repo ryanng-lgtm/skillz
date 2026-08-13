@@ -186,8 +186,39 @@ OUT-OF-SCOPE: <seen, left alone> | none
 BLOCKED: <the single question that needs a human> | none
 ```
 
-Screenshots go to `$RUN_DIR`: `$CD screenshot --full-page --output "$RUN_DIR/p$N-<row>.png"`.
-Console and network for the same window: `$CD logs --duration-ms 2000 --include-network`.
+Evidence the sweep prompt must write, not just describe:
+
+```sh
+$CD screenshot --full-page --output "$RUN_DIR/p$N-<row>.png"
+$CD logs --duration-ms 2000 --include-network > "$RUN_DIR/p$N-console.log" 2>&1
+```
+
+A console error paraphrased into the verdict cannot be debugged three days later. The raw
+capture is cheap; write it every sweep, pass or fail.
+
+## 5. Findings log — append after every sweep
+
+The per-sweep files answer "what happened in phase 3". The findings log answers "what did
+last night find", which is the question actually asked the next morning.
+
+```sh
+{
+  echo "## P$N attempt $ATTEMPT — <phase name>"
+  echo "identity: $(sed -n 's/^IDENTITY: //p' "$RUN_DIR/sweep-p$N.md")"
+  sed -n '/^ACCEPTANCE:/,/^REGRESSIONS:/p' "$RUN_DIR/sweep-p$N.md"
+  sed -n '/^REGRESSIONS:/,$p'              "$RUN_DIR/sweep-p$N.md"
+  echo "evidence: $RUN_DIR/p$N-*.png, $RUN_DIR/p$N-console.log"
+  echo
+} >> "$FINDINGS"
+```
+
+Every sweep appends — including the ones that passed, and including void sweeps, whose
+entry reads `identity: fail` and explains why nothing was verified. A findings log that
+only records failures cannot show that phase 2 was green before phase 5 broke it.
+
+**`OUT-OF-SCOPE` entries are the reason this file exists.** They are the bugs the run
+found and was told not to fix; the completion post has 40–100 words and will not carry
+them. The log is where they wait for Ryan.
 
 ## 5. Fix agent
 
