@@ -251,6 +251,11 @@ Every brief reports to OM Chat over the `openmarket-chat` MCP tools, unless the 
 | No time box on codex or browser commands | One hang costs the entire unattended window |
 | Writing `timeout 900 …` in the brief | No such binary on macOS; every phase dies on `command not found` |
 | No process ledger or teardown | Chrome and dev servers pile up until the machine chokes; nothing visibly fails |
+| Launching a browser per phase or per sweep | Instances pile up under memory pressure and buy no extra verification |
+| Treating "the CDP port answers" as a working browser | Sweeps run against a dead renderer and report false negatives all night |
+| Relaunching the browser until it works | Forty headless Chromes by morning, nothing verified |
+| Killing a foreign process holding the port | Takes down Ryan's browser, or another session's dev server |
+| Tearing down a process the run reused rather than started | Kills something that predates the run and outlives it |
 | `pkill -f chrome` in the teardown block | Kills Ryan's own browser and everything he had open |
 | Writing the post from memory instead of `/mr-markdown` | Claims drift from the diff that actually landed |
 | Posting mid-plan on a bundled `ivtg-*` fix set | Partial claims about fixes whose siblings are still red |
