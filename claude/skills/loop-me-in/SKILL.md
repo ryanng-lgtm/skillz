@@ -77,9 +77,8 @@ Every unknown the plan flags, carried over verbatim in substance. Mark which
 must be answered BEFORE a phase runs, and which just ride into the final
 report. Never let one be silently assumed away.
 
-## Wave reporting (only if the user asked for it)
-Where to post, what counts as a wave, the word cap, and the rule that a
-blocked wave still reports.
+## Completion post
+Destination, when it fires, the word cap, and what it may not claim.
 
 ## Commit and safety rules
 What may be committed, by whom. What needs explicit human OK: pushes,
@@ -101,6 +100,7 @@ the same kind, work that would widen scope.
 - **Decisions already made go in as decisions**, not options. A brief that reopens a settled question wastes the run.
 - **Scope fences are explicit.** Say what must NOT be touched; that is where autonomous runs do their damage.
 - **Verification is quantitative.** A command plus an expected number, not "looks right". If a check is manual today, say so — a check the run can't perform is a stop condition, not a phase.
+- **One worktree per repo, one branch, for the whole run.** Say it explicitly and forbid `git worktree add` and per-phase checkouts. Phases stack as commits on one branch. A fresh session will otherwise isolate a phase and build against a tree missing the earlier phases' changes — which fails quietly, not loudly. Name the phase pairs that touch the same file, so the ordering constraint is visible.
 - **Pilot before the long run.** Tell the brief to execute phase 1 and report before continuing, when the plan is large or the repo is unfamiliar.
 - **Feed lessons back.** If the run discovers a trap, it belongs in the plan's Environment traps for next time — fixing the instance without recording it means the next run pays again.
 
