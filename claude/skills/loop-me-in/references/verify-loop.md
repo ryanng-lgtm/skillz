@@ -337,14 +337,21 @@ gate_phase() {       # tens of seconds — runs once, when gate_attempt goes gre
   bun test $(printf '%s\n' $files | sort -u) && bun run typecheck
 }
 
-gate_wave() {        # minutes — wave boundaries and phase 0 only
-  with_timeout 900 bash -c 'bun run lint && bun run typecheck && bun run build \
-    && bun tools/check-dist.ts && bun test'
+gate_wave() {        # wave boundary — the wave's own tests, NOT the whole suite
+  local files=""
+  for m in $WAVE_MODULES; do files="$files $(tests_touching "$m")"; done
+  # shellcheck disable=SC2086
+  with_timeout 900 bash -c "bun run lint && bun run typecheck && bun run build \
+    && bun tools/check-dist.ts && bun test $(printf '%s\n' $files | sort -u | tr '\n' ' ')"
 }
 ```
 
-Each phase in the brief names its `PHASE_TEST_FILE` and `PHASE_MODULE`, so no tier has to
-be guessed at 3am.
+Lint, typecheck, build and the dist check stay at the wave boundary because they are fast.
+It is the test runner that is expensive, so the wave tier runs the union of its own phases'
+tests rather than everything in the repo.
+
+Each phase in the brief names its `PHASE_TEST_FILE` and `PHASE_MODULE`, and each wave its
+`WAVE_MODULES`, so no tier has to be guessed at 3am.
 
 ### Reproducing one failure
 
@@ -358,13 +365,31 @@ bun test "$PHASE_TEST_FILE" -t "<the failing test name>"
 Minutes per attempt disappear here. A fix loop that re-runs a 224-second suite to see one
 assertion fail spends the night in the test runner.
 
+### Escalation — the only two full-suite runs
+
+```sh
+gate_full() {        # minutes. Log WHY before calling this.
+  echo "## ESCALATION $(printf '%s' "$1") — full suite" >> "$FINDINGS"
+  with_timeout 900 bun test
+}
+```
+
+1. **Phase 0**, once, to capture the baseline. Without it no later number is interpretable.
+2. **When a failure will not localize** — the phase tier comes back green while the sweep
+   still reports a regression, or the fix loop cannot find where a failure originates.
+
+That is the whole list. Not per attempt, not per phase, not per wave, not "to be safe".
+Every escalation run writes its reason to the findings log first and is named in the
+report, so the one expensive run of the night is always accountable.
+
 ### Which baseline each tier is checked against
 
 | Tier | Green means |
 |---|---|
 | attempt | the named test file passes, typecheck clean |
 | phase | that file and every importer's suite pass, typecheck clean |
-| wave | the full-suite baseline captured at phase 0, with zero new failures and no new failing suite names |
+| wave | the union of the wave's phase tiers passes, plus lint, typecheck, build, dist check |
+| escalation | the phase-0 full-suite baseline, with zero new failures and no new failing suite names |
 
 A targeted run cannot be compared against a full-suite count. Recording "green" for a
 subset against a whole-repo baseline is how a broken repo reads as a passing one.
