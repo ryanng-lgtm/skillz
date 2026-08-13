@@ -24,7 +24,7 @@ Everything between those is the run's job, commits on its own branch included. A
 
 - A `/ivtg` fix plan, a `superpowers:writing-plans` plan, or any dated plan in the vault is approved and ready to execute.
 - You want to hand execution to a session you won't babysit.
-- Symptoms that you need this: the plan says "then fix it" without naming the branch; it assumes a tool that 404s; it was written before three decisions that have since been made.
+- Symptoms that you need this: the plan says "then fix it" without naming the branch; it assumes a tool that 404s; it was written before three decisions that have since been made; the last run kept pulling you back in to confirm whether a change had actually landed.
 
 **Don't use for:** a plan still under discussion (run `/demuddy` first), or a one-line change you'd just do.
 

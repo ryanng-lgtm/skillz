@@ -7,6 +7,24 @@ fails the stand-alone test.
 Placeholders: `$RUN_DIR` (scratch for this run), `$WORKTREE`, `$APP_URL`, `$PORT`,
 `$CD` = `~/.claude/skills/chrome-devtools/references/chrome-devtools`.
 
+## 0. `with_timeout` — macOS has no `timeout`
+
+Neither `timeout` nor `gtimeout` is on this machine (no GNU coreutils). A brief that
+writes `timeout 900 codex exec …` dies on `command not found` at the first phase. Define
+this once, near the top of the brief, and use it for every long-running command:
+
+```sh
+with_timeout() {  # with_timeout <seconds> <command...>
+  perl -e 'alarm shift; exec @ARGV' "$@"
+}
+```
+
+`/usr/bin/perl` ships with macOS, and a pending `alarm` survives `exec`, so the command
+itself takes the SIGALRM. Timed-out runs exit 142.
+
+SIGALRM reaches only the process that was launched — a timed-out `codex exec` can leave
+children behind, so run the heartbeat (section 8) after any 142.
+
 ## 1. Pick the harness
 
 | Target | Harness | Why |
