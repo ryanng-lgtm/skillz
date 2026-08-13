@@ -86,6 +86,24 @@ The sweep returns a fixed shape — verdict per acceptance row with the evidence
 
 **Every codex run and every browser command is time-boxed.** A hung agent costs the whole night. macOS has no `timeout` binary — the brief defines a `with_timeout` helper instead (`references/verify-loop.md`, section 0), or the first phase dies on `command not found`.
 
+### Targeted gates, not full sweeps
+
+A full suite belongs at a wave boundary, not in a loop. Run one that takes 224 seconds on every phase and every retry, and fourteen phases at three attempts spend two and a half hours running tests that were already green — most of it re-proving code the phase never touched.
+
+Three tiers, and the brief states which command belongs to each:
+
+| Tier | Scope | When |
+|---|---|---|
+| **Attempt** | The one test file covering the change, plus `typecheck` | Every build inside the fix loop |
+| **Phase** | That file plus the suites of modules importing the changed file | Once, when the attempt gate goes green |
+| **Wave** | The repo's full gate — lint, typecheck, build, dist check, whole suite | Once per wave, and once at phase 0 for the baseline |
+
+The phase tier is what makes this safe: a single test file misses the breakage a change causes in its consumers, and the full suite is not the only way to catch that. Find the importers, run their tests, and the coverage of a full sweep arrives at a fraction of the cost.
+
+**Error scans are targeted too.** When a sweep returns a gap, re-run that one case — not the suite that contains it. The failing case's own command goes in the sweep's output, so the fix loop never has to guess and never has to widen.
+
+**Baseline numbers come from the wave tier.** A targeted run cannot be compared against "7084 pass, 59 fail"; its green is "these N tests pass". The brief says which number each gate is checked against, or a passing targeted run gets misread as a passing repo.
+
 ### The findings log
 
 **Every sweep appends to it, and the evidence outlives the run.** Screenshots, raw console and network captures, per-sweep verdicts, and the appended log all live in one directory beside the brief in the plans vault — never in `/tmp`, which a reboot clears. Teardown kills processes; it never deletes that directory.
