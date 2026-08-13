@@ -214,6 +214,14 @@ Per-wave progress reports are a variant: only when asked, and "wave complete" mu
 | Dropping the plan's unknowns | Run "fixes" a bug the report was never about, and closes it |
 | Building from a stale copy of the plan | Implements a superseded fix; the cite that was corrected is the one it follows |
 | Writing the brief into the repo | Plan docs get committed, against house rules |
+| Sweeping without the build-identity gate | "Verified" against a stale bundle or a second server on the same port |
+| A phase with no sentinel | The sweep can't distinguish landed from cached; every verdict is a guess |
+| Ending a phase at "ask Ryan if it looks right" | The one thing this brief exists to remove |
+| No attempt cap on the fix/re-sweep cycle | Patches forever against a wrong model of the bug |
+| Fixing out-of-scope bugs the sweep surfaced | Unattended scope creep, in a diff nobody watched grow |
+| No `timeout` on codex or browser commands | One hang costs the entire unattended window |
+| No process ledger or teardown | Chrome and dev servers pile up until the machine chokes; nothing visibly fails |
+| `pkill -f chrome` in the teardown block | Kills Ryan's own browser and everything he had open |
 
 ## Red flags
 
