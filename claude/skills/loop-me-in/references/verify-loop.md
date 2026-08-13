@@ -295,7 +295,7 @@ with_timeout 1800 codex exec \
   "$(cat "$RUN_DIR/diagnose-prompt-p$N.md")"
 ```
 
-## 8. Loop control
+## 8. Loop control and gate tiers
 
 ```
 build → identity gate → sweep → all rows landed and no in-scope regressions? → commit, next phase
@@ -308,6 +308,66 @@ red, and move to the next phase that does not depend on it.
 
 One codex agent at a time — sweep or fix, never both, never two phases in parallel. Two
 `codex exec` runs plus a browser tree is where an unattended night turns into swap.
+
+### Which gate runs when
+
+The full suite runs at wave boundaries and at phase 0. It never runs inside the fix loop.
+
+```sh
+# tests that exercise a module, directly or through its consumers
+tests_touching() {   # tests_touching channel-todos
+  grep -rl -- "$1" test 2>/dev/null | grep -E '\.test\.tsx?$' | sort -u
+}
+
+# source files importing a module — their tests are the phase tier
+importers_of() {     # importers_of channel-todos
+  grep -rlE "from \"[./][^\"]*$1\"" src 2>/dev/null | sort -u
+}
+
+gate_attempt() {     # seconds — runs on every build inside the fix loop
+  bun test "$PHASE_TEST_FILE" && bun run typecheck
+}
+
+gate_phase() {       # tens of seconds — runs once, when gate_attempt goes green
+  local files; files=$(tests_touching "$PHASE_MODULE")
+  for imp in $(importers_of "$PHASE_MODULE"); do
+    files="$files $(tests_touching "$(basename "$imp" | sed 's/\.[jt]sx\?$//')")"
+  done
+  # shellcheck disable=SC2086
+  bun test $(printf '%s\n' $files | sort -u) && bun run typecheck
+}
+
+gate_wave() {        # minutes — wave boundaries and phase 0 only
+  with_timeout 900 bash -c 'bun run lint && bun run typecheck && bun run build \
+    && bun tools/check-dist.ts && bun test'
+}
+```
+
+Each phase in the brief names its `PHASE_TEST_FILE` and `PHASE_MODULE`, so no tier has to
+be guessed at 3am.
+
+### Reproducing one failure
+
+The sweep's `GAPS` line carries the failing case's own command. Re-run **that**, never the
+suite that contains it:
+
+```sh
+bun test "$PHASE_TEST_FILE" -t "<the failing test name>"
+```
+
+Minutes per attempt disappear here. A fix loop that re-runs a 224-second suite to see one
+assertion fail spends the night in the test runner.
+
+### Which baseline each tier is checked against
+
+| Tier | Green means |
+|---|---|
+| attempt | the named test file passes, typecheck clean |
+| phase | that file and every importer's suite pass, typecheck clean |
+| wave | the full-suite baseline captured at phase 0, with zero new failures and no new failing suite names |
+
+A targeted run cannot be compared against a full-suite count. Recording "green" for a
+subset against a whole-repo baseline is how a broken repo reads as a passing one.
 
 ## 9. Heartbeat — between every phase
 
