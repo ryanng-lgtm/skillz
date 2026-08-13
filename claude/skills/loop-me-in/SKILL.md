@@ -152,7 +152,8 @@ must be answered BEFORE a phase runs, and which just ride into the final
 report. Never let one be silently assumed away.
 
 ## Completion post
-Destination, when it fires, the word cap, and what it may not claim.
+Destination, when it fires, the shape (title line, verdict line per phase, up
+to 4 bullets, 150 words), and what it may not claim.
 
 ## Commit and safety rules
 Authorised without asking: commits on the run's own branch, the verify sweeps,
@@ -228,3 +229,6 @@ Per-wave progress reports are a variant: only when asked, and "wave complete" mu
 - You're about to write "as discussed" or "as above" — the fresh session has neither.
 - You can't name the branch. Stop and resolve it; don't write "the feature branch".
 - The brief has no stop conditions. Every unattended run needs an exit that isn't "finish anyway".
+- You're about to write "verify visually" or "check with Ryan that it renders" — name the sentinel, the selector, and the expected text instead.
+- You can't say which string proves a phase landed. That phase has no verification yet, whatever the brief claims.
+- A process gets started in the brief and never appears again. Ledger it, or it survives the run.
