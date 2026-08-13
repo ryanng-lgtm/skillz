@@ -43,7 +43,7 @@ Everything between those is the run's job, commits on its own branch included. A
 7. **Write the brief to `~/.claude/plans/YYYY-MM-DD/<source-name>-run.md`** — resolve that symlink and say the real path in your report, so a wrong target is caught immediately. Never into a repo; plan files are not committed.
 
    **Vault trap:** an iCloud-nested duplicate of the plans vault can exist (`…/Obsidian/Obsidian/Claude Plans` beside the real `…/Obsidian/Claude Plans`), and the source plan may be handed to you as a path inside the *duplicate*. Do not infer the destination from where the source file sits, and do not infer it from the symlink alone. If both directories exist, name both and ask which is live before writing.
-7. **Report the path and the paste line.** That's the deliverable.
+8. **Report the path and the paste line.** That's the deliverable.
 
 ## The verify loop
 
@@ -222,8 +222,8 @@ Every brief reports to OM Chat over the `openmarket-chat` MCP tools, unless the 
 40–100 words is the working range for the consolidated post. Below 40 there was nothing worth interrupting for; over 100 nobody reads it.
 
 - **A post never precedes its sweep.** Green means every acceptance row came back landed with evidence, on a sweep whose identity gate passed. A phase that hit the attempt cap is named as still red, not omitted.
-- **Resolve the destination, don't transcribe it.** Call `session_grants` (read-only, no consent side effects) and use the resource string it reports; `room_post` wants that canonical name, not a display title. Currently that is `82eae63a1bd3` (`#chat`, space `openmarket`) with `read` + `post`. Confirm rather than assume — a missing `post` grant means the run stalls at 3am waiting for consent.
-- **Route to the right channel and topic.** Where the work belongs to a topic, list them with `room_topic_list` and confirm the posting tool's schema advertises the topic field before assuming it takes one. Creating a topic needs `contribute` on the room — knock for it while writing the brief, not at 3am. If more than one channel is in scope, the brief names each destination against the phases it covers.
+- **The destination comes from the user, the resource string comes from the server.** Ask them to paste the channel and topic (procedure step 5); never infer it from the plan's subject. Then confirm it with `session_grants` (read-only, no consent side effects) and write the canonical resource string into the brief — `room_post` wants that, not a display title. `82eae63a1bd3` (`#chat`, space `openmarket`) is the usual default when they don't name one. A missing `post` grant means the run stalls at 3am waiting for consent, so verify the capability while writing.
+- **Route to the right topic.** Where the work belongs to a topic, list them with `room_topic_list` and confirm the posting tool's schema advertises the topic field before assuming it takes one. Creating a topic needs `contribute` on the room — knock for it while writing the brief, not at 3am. If more than one channel is in scope, the brief names each destination against the phases it covers.
 - **`room_post` posts as the bot. `om room say` posts as Ryan.** Say which.
 - **It may only claim what was verified.** Backend work a browser cannot show, and any fix whose link to the original report is still an open question, must be worded honestly or left out.
 - **A blocked run still posts** — what landed, what failed, that the rest is halted. Same budget.
