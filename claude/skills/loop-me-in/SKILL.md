@@ -176,7 +176,11 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 - **Name the known flakes.** Otherwise the run treats one as a real failure and starts patching.
 - **Decisions already made go in as decisions**, not options. A brief that reopens a settled question wastes the run.
 - **Scope fences are explicit.** Say what must NOT be touched; that is where autonomous runs do their damage.
-- **Verification is quantitative.** A command plus an expected number, not "looks right". If a check is manual today, say so — a check the run can't perform is a stop condition, not a phase.
+- **Verification is quantitative.** A command plus an expected number, not "looks right". A check the run genuinely cannot perform — hardware, a third-party account, a human judgement call — is a stop condition, not a phase. "Ryan will look at it" is not one of those.
+- **Every phase names its sentinel.** Without a string that only exists after the change, the sweep cannot tell a landed change from a cached bundle.
+- **The sweep reports gaps, the run fixes them, the sweep runs again.** Bugs found during a sweep are the loop's input, not a footnote in the final report — with the scope fence deciding which get fixed now and which get recorded.
+- **Every spawned process is in the ledger, and teardown is unconditional.** Chrome and dev servers leak silently: nothing fails, they just sit there eating memory until the machine is unusable.
+- **Heartbeat between phases.** A dead dev server, a detached CDP endpoint, or a codex run past its timeout turns the rest of the night into no-ops that look like progress.
 - **One worktree per repo, one branch, for the whole run.** Say it explicitly and forbid `git worktree add` and per-phase checkouts. Phases stack as commits on one branch. A fresh session will otherwise isolate a phase and build against a tree missing the earlier phases' changes — which fails quietly, not loudly. Name the phase pairs that touch the same file, so the ordering constraint is visible.
 - **Pilot before the long run.** Tell the brief to execute phase 1 and report before continuing, when the plan is large or the repo is unfamiliar.
 - **Feed lessons back.** If the run discovers a trap, it belongs in the plan's Environment traps for next time — fixing the instance without recording it means the next run pays again.
