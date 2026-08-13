@@ -1,6 +1,6 @@
 ---
 name: loop-me-in
-description: Use when a fix plan, spec, or design doc needs to become a file that a fresh session can execute unattended — "make this runnable", "turn this plan into a loop", "so I can paste it and let it rip". Trigger: /loop-me-in [path].
+description: Use when a fix plan, spec, or design doc needs to become a file that a fresh session can execute unattended and prove its own changes landed — "make this runnable", "turn this plan into a loop", "so I can paste it and let it rip". Trigger: /loop-me-in [path].
 ---
 
 # loop-me-in — a plan in, a self-driving brief out
@@ -10,6 +10,15 @@ description: Use when a fix plan, spec, or design doc needs to become a file tha
 A plan is written for a reader who already has the context. A runnable brief is written for a session that has none: fresh window, no transcript, no memory of which worktree, which trap, which decision was already settled.
 
 **Core principle: the output must survive being pasted into an empty session.** Anything the plan leaves implicit — the repo, the branch, the environment trap that eats an hour — has to be on the page, or the run rediscovers it the expensive way.
+
+**Second principle: the brief closes its own loop.** It builds, drives the real product, decides for itself whether the change landed, fixes what it finds, and re-checks — until green or until it hits a stated cap. Ryan is not the verification step.
+
+**There are exactly two human touchpoints in a finished brief:**
+
+1. A **blocking decision** the plan did not settle — a product call, an ambiguity, a question the run cannot answer from the page.
+2. **Deployment** — the cherry-pick, push, merge, or release into main.
+
+Everything between those is the run's job, commits on its own branch included. A brief that ends with "confirm it looks right" has not been converted; it has been reformatted.
 
 ## When to use
 
