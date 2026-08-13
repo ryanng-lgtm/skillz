@@ -82,11 +82,17 @@ build → identity gate → sweep → all acceptance rows landed, no in-scope re
 
 The sweep returns a fixed shape — verdict per acceptance row with the evidence, regressions seen en route, in-scope gaps with a file guess, out-of-scope findings left alone, and the single question that would need a human. The out-of-scope slot is what keeps an unattended run from wandering: those findings get recorded and reported, not fixed.
 
-**Every sweep appends to a findings log, and the evidence outlives the run.** Screenshots, raw console and network captures, per-sweep verdicts, and the appended log all live in one directory beside the brief in the plans vault — never in `/tmp`, which a reboot clears. Teardown kills processes; it never deletes that directory. Passing sweeps get an entry too: a log that records only failures can't show that phase 2 was green before phase 5 broke it. The out-of-scope findings are the reason the file exists — a post capped at 40–100 words will not carry them, and they are exactly what a browser sweep is uniquely good at noticing.
-
 **Cap at 3 sweeps per phase, and the third attempt changes job.** Two failures of the same class mean the model of the problem is wrong, so attempt 3 is not a third patch: it is a read-only diagnosis agent that returns a root cause and a verdict on whether the plan's premise still holds. The phase then stops red with that explanation in the findings log, and the run moves to the next phase that does not depend on it. An explanation is worth more than a fourth patch.
 
 **Every codex run and every browser command is time-boxed.** A hung agent costs the whole night. macOS has no `timeout` binary — the brief defines a `with_timeout` helper instead (`references/verify-loop.md`, section 0), or the first phase dies on `command not found`.
+
+### The findings log
+
+**Every sweep appends to it, and the evidence outlives the run.** Screenshots, raw console and network captures, per-sweep verdicts, and the appended log all live in one directory beside the brief in the plans vault — never in `/tmp`, which a reboot clears. Teardown kills processes; it never deletes that directory.
+
+Passing sweeps get an entry too: a log that records only failures can't show that phase 2 was green before phase 5 broke it. Void sweeps get one reading `identity: fail`, so "nothing was verified" stays distinguishable from "nothing landed".
+
+**Out-of-scope findings are the reason the file exists.** They are the bugs the run found and was told not to fix, they are what a browser sweep is uniquely good at noticing, and a post capped at 40–100 words will not carry them.
 
 ### One browser, proven healthy, reused
 
@@ -105,27 +111,6 @@ Anything the run starts that outlives one command — dev server, Chrome, backgr
 - **Between phases, a heartbeat:** app URL answers, browser passes the smoke test, no `codex exec` still running, no stopped background jobs, and two numbers — the RSS of this run's browser tree and the machine's free memory (`memory_pressure`). Anything stuck is killed and restarted, not waited on.
 - **Recycle on pressure, don't wait for the crash.** Browser tree over ~1.5 GB or system free under 15%: kill it by ledger PID and bring one back. A headless Chrome twenty sweeps deep is not the process it was at phase 1.
 - **Teardown runs on success, failure, and abort.** Kill by ledger PID, then one pattern kill scoped to this run's profile path to reap the renderer children; `pgrep` only to confirm nothing survived. A bare `pkill -f chrome` would take Ryan's own browser with it, and the brief must never contain one.
-
-## Token discipline
-
-An unattended run pays for every word it generates, and most of them are scaffolding nobody reads. The brief's first instruction is `/caveman:caveman full`, which compresses the run's own reasoning and internal writing for the rest of the session.
-
-| Compressed | Left as normal prose |
-|---|---|
-| The run's reasoning, phase notes, todos, tool-call descriptions | The completion post — Ryan reads it |
-| Sweep and fix prompts sent to codex | The findings log — Ryan reads it the next morning |
-| Messages between the run and its agents | Commit messages, MR descriptions, code, comments |
-| Verdict prose in the sweep output contract | Security warnings, and any irreversible-action confirmation |
-
-The plugin's own boundary rule already exempts everything persisted outside chat — commits, docs, third-party messages — so turning it on does not corrupt the post or the log. Say which side of the line each artifact is on anyway; a run that compresses the one message Ryan reads has saved tokens by making the output useless.
-
-**Codex cannot invoke Claude Code skills**, so its prompts carry the compression rules inline instead (`references/verify-loop.md`, section 4). Exact strings survive compression: error text, selectors, file paths, numbers, units, and code are reproduced verbatim, never paraphrased shorter.
-
-Where the real spend is, in order: codex reasoning tokens, re-reading files the brief already quoted, and dumping page content into a verdict.
-
-**Reasoning effort is set per call, never inherited.** `~/.codex/config.toml` sets `model_reasoning_effort = "xhigh"` globally, so an agent without an explicit override runs at xhigh — including a sweep whose entire job is to click four things and report what it saw. The brief carries an `effort_for` helper (`references/verify-loop.md`, section 4) keyed on role and attempt: sweeps open at `low` because precise acceptance rows make them a checklist, fixes open at `medium` because they have a named gap and a file guess, and each failed attempt moves one rung up. Phases whose acceptance rows are behavioural rather than a lookup, and fixes touching shared state or three-plus files, start one rung higher.
-
-Then quote the constraint in the prompt instead of telling the agent to go read it, and reference the console-log path rather than pasting the log.
 
 ## The completion post
 
@@ -152,7 +137,7 @@ Below 40 words there was nothing worth interrupting for; over 100 nobody reads i
 - **Route to the right topic.** Where the work belongs to a topic, list them with `room_topic_list` and confirm the posting tool's schema advertises the topic field before assuming it takes one. Creating a topic needs `contribute` on the room — knock for it while writing the brief. If more than one channel is in scope, the brief names each destination against the phases it covers.
 - **`room_post` posts as the bot. `om room say` posts as Ryan.** Say which.
 - **It may only claim what was verified.** Backend work a browser cannot show, and any fix whose link to the original report is still an open question, must be worded honestly or left out.
-- **It names the findings log path.** The word ceiling is what keeps the post readable; the path is what keeps the detail reachable. One line, and everything the sweeps saw is a click away.
+- **It names the findings log path.** The word ceiling keeps the post readable; the path keeps the detail reachable.
 - **A blocked run still posts** — what landed, what failed, that the rest is halted. Same budget.
 - **Authorise exactly these posts** in the safety rules, so "post" does not read as permission to push or publish.
 
@@ -169,6 +154,25 @@ Below 40 words there was nothing worth interrupting for; over 100 nobody reads i
 **`/loop` runs on this machine.** Sleep, shutdown, or a closed lid stops it mid-phase, which for an overnight run means waking up to a half-applied plan and a leaked browser. Say so in the brief when the run is expected to go long: either the machine stays awake, or the work belongs in `/schedule`.
 
 **Always give the brief a turn cap or phase count.** An unbounded loop burns tokens on work nobody is reading. State the ceiling and what to do on hitting it: report, don't continue.
+
+## Token discipline
+
+An unattended run pays for every word it generates, and most of them are scaffolding nobody reads. The brief's first instruction is `/caveman:caveman full`, which compresses the run's own reasoning and internal writing for the rest of the session.
+
+| Compressed | Left as normal prose |
+|---|---|
+| The run's reasoning, phase notes, todos, tool-call descriptions | The completion post — Ryan reads it |
+| Sweep and fix prompts sent to codex | The findings log — Ryan reads it the next morning |
+| Messages between the run and its agents | Commit messages, MR descriptions, code, comments |
+| Verdict prose in the sweep output contract | Security warnings, and any irreversible-action confirmation |
+
+The plugin's own boundary rule already exempts everything persisted outside chat, so turning it on does not corrupt the post or the log. Say which side of the line each artifact is on anyway; a run that compresses the one message Ryan reads has saved tokens by making the output useless.
+
+**Codex cannot invoke Claude Code skills**, so its prompts carry the compression rules inline instead. Exact strings survive compression: error text, selectors, file paths, numbers, units, and code are reproduced verbatim, never paraphrased shorter.
+
+**Reasoning effort is set per call, never inherited.** `~/.codex/config.toml` sets `model_reasoning_effort = "xhigh"` globally, so an agent without an explicit override runs at xhigh — including a sweep whose entire job is to click four things and report what it saw. The brief carries an `effort_for` helper keyed on role and attempt: mechanical work opens low, each failed attempt moves one rung up, and behavioural acceptance rows or wide-blast-radius fixes start one rung higher. Values and the helper itself: `references/verify-loop.md`, section 4.
+
+The rest of the spend is structural, not stylistic: quote the constraint in the prompt instead of telling the agent to go read it, and reference the console-log path rather than pasting the log.
 
 ## The brief's required shape
 
@@ -194,9 +198,10 @@ their names, so a red suite isn't misread as a regression.
 ## Verification loop
 The harness and its exact commands: how the surface starts (command, claimed
 port, URL), how the browser starts and how it is reused, the smoke test, the
-two-part identity gate, the sweep and fix agent invocations, and the sweep
-output contract. Attempt cap: 3 sweeps per phase. The `with_timeout` helper,
-defined here and used on every long-running command.
+two-part identity gate, the sweep and fix agent invocations, the `effort_for`
+helper, and the sweep output contract. Attempt cap: 3 sweeps per phase, the
+third being diagnosis rather than a fix. The `with_timeout` helper, defined
+here and used on every long-running command.
 
 ## Process ledger
 Empty table the run fills in as it spawns things: what, port, PID, started,
@@ -266,35 +271,29 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 | Mistake | Consequence |
 |---|---|
 | Linking the spec instead of copying its constraints | Fresh session can't see it; invents its own interpretation |
-| Omitting the worktree path | Run edits the checkout another session is using |
-| Not forbidding per-phase worktrees | A later phase builds against a tree missing the earlier ones; fails quietly |
+| Omitting the worktree path, or not forbidding per-phase worktrees | A later phase builds against a tree missing the earlier ones; fails quietly |
 | Building from a stale copy of the plan | Implements a superseded fix; the cite that was corrected is the one it follows |
 | Dropping the plan's unknowns | Run "fixes" a bug the report was never about, and closes it |
 | "Run the tests" with no command or baseline | Any red result reads as catastrophe or gets ignored |
 | No stop conditions | Run guesses on the one question that needed a human |
 | Leaving publish/push/merge unqualified | An unattended run does something outward-facing |
 | Writing the brief into the repo | Plan docs get committed, against house rules |
+| A paste line naming a trigger this session doesn't have | The brief is dead on arrival; nothing runs at all |
 | Sweeping without the build-identity gate | "Verified" against a stale bundle or a second server on the same port |
-| No attempt cap on the fix/re-sweep cycle | Patches forever against a wrong model of the bug |
+| No attempt cap, or a third attempt that patches instead of diagnosing | Patches forever against a wrong model of the bug |
 | Fixing out-of-scope bugs the sweep surfaced | Unattended scope creep, in a diff nobody watched grow |
-| No time box on codex or browser commands | One hang costs the entire unattended window |
-| Writing `timeout 900 …` in the brief | No such binary on macOS; every phase dies on `command not found` |
+| Writing `timeout 900 …`, or no time box at all | No such binary on macOS; and one hang costs the whole window |
 | Treating "the CDP port answers" as a working browser | Sweeps run against a dead renderer and report false negatives all night |
 | Relaunching the browser until it works | Forty headless Chromes by morning, nothing verified |
 | Killing or tearing down a process the run didn't start | Takes down Ryan's browser, or another session's dev server |
 | No teardown, or `pkill -f chrome` as the teardown | Either leaks until the machine chokes, or kills everything he had open |
+| Evidence written to `/tmp`, or a teardown that deletes it | The night's only proof is gone before it's read |
+| A findings log that skips passing sweeps, or omits out-of-scope finds | No way to tell which phase broke what; the bugs the sweep found are lost |
 | Writing the post from memory instead of `/mr-markdown` | Claims drift from the diff that actually landed |
 | Posting mid-plan on a bundled `ivtg-*` fix set | Partial claims about fixes whose siblings are still red |
-| A per-wave post on a wave with nothing substantial | Noise, and the next real report gets skimmed |
-| A post over its ceiling — 100 words bundled, 40 per wave | The loop's only output goes unread |
-| A paste line naming a trigger this session doesn't have | The brief is dead on arrival; nothing runs at all |
-| An overnight `/loop` with no note that it dies with the machine | Half-applied plan and a leaked browser by morning |
-| Evidence written to `/tmp`, or a teardown that deletes it | The night's only proof is gone before it's read |
-| Out-of-scope findings that live only in the post | The word cap eats them; the bugs the sweep found are lost |
-| A findings log that records only failed sweeps | No way to tell which phase broke something that used to pass |
+| A post over its ceiling, or a per-wave post with nothing substantial | The loop's only output goes unread, or the next real one gets skimmed |
 | Compressing the post or the findings log | Tokens saved by making the only output Ryan reads useless |
-| A sweep prompt that lets codex narrate | Pays for three paragraphs of preamble on every phase, every attempt |
-| Telling an agent to "go read the spec" instead of quoting it | Re-reads files the brief already contains, at full price, per agent |
+| A prompt that lets an agent narrate, or points at a file instead of quoting it | Pays for preamble and re-reads on every phase, every attempt |
 
 ## Red flags
 
@@ -305,3 +304,4 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 - You can't say which string proves a phase landed. That phase has no verification yet, whatever the brief claims.
 - A process gets started in the brief and never appears again. Ledger it, or it survives the run.
 - A phase step reads "start the browser". It starts once, before phase 1, and every later phase reuses it.
+- An overnight run with no note about the machine staying awake. `/loop` dies with the lid.
