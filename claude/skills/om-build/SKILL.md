@@ -108,15 +108,40 @@ First check the protocol era matches, or the GUI is built against a different
 wire contract than the daemon:
 
 ```bash
-grep '"version"' ~/Documents/GitLab/openmarket-internal/packages/rooms-client/package.json
 cd ~/Documents/GitLab/openmarket-chat && bun run rooms-client:status
 ```
 
-Same version → proceed. Different → link the GUI to the monorepo source instead
-of the registry copy:
+**Compare the constants, not the package number.** `package.json` says `0.43.0`
+on both the registry copy and the monorepo while their constants differ —
+published `0.43.0` still carries `VERSION = "0.106.0"`, monorepo source carries
+the current release. The package number stopped tracking the protocol era, so
+`grep '"version"' package.json` is the wrong field to read. What matters:
+
+```bash
+grep VERSION ~/Documents/GitLab/openmarket-internal/packages/rooms-client/dist/version.js
+```
+
+That must match the version you are about to install. If it does not, or the
+status line says `registry copy`, link the GUI to the monorepo source:
 
 ```bash
 OM_REPO=~/Documents/GitLab/openmarket-internal bun run rooms-client:link
+```
+
+Stay linked. There is no "unlink once it publishes" milestone while the package
+number is frozen — an unlink hands the GUI constants one or more releases behind
+the daemon it talks to.
+
+**A linked `rooms-client` does NOT rebuild itself when the monorepo moves.**
+`src/version.ts` bumps on every release, so a GUI built against a stale linked
+`dist/` silently carries the previous release's `VERSION` / `RUNNER_VERSION`.
+Nothing warns you. Whenever the monorepo HEAD moved since the last run, check
+and rebuild before building the GUI:
+
+```bash
+git -C ~/Documents/GitLab/openmarket-internal diff --stat <lastHEAD>..HEAD -- packages/rooms-client/src
+cd ~/Documents/GitLab/openmarket-internal/packages/rooms-client && bun run build   # exits 2, still emits — see traps
+grep VERSION dist/version.js
 ```
 
 Then build:
@@ -200,8 +225,21 @@ sleep 8
 curl -s http://127.0.0.1:31999/rooms/ | grep -q OM_ROOMS_GUI_DIR \
   && echo "PLACEHOLDER — the embed did not take" || echo "real GUI embedded"
 curl -s http://127.0.0.1:31999/rooms/ | grep -o 'rooms\.js?v=[a-f0-9]*'   # must match step 1's stamp
-pkill -f "dist/om run"; rm -rf /tmp/om-gui-verify
+
+# Cleanup: kill by PID and PROVE it died. `pkill` returns before the process
+# does, and a survivor keeps holding 31999 — the next run's verify then talks
+# to the OLD binary and cheerfully prints "real GUI embedded". Seen in the wild.
+TESTPID=$(curl -s http://127.0.0.1:31999/healthz | grep -o '"pid":[0-9]*' | cut -d: -f2)
+kill $TESTPID 2>/dev/null; sleep 2
+kill -0 $TESTPID 2>/dev/null && { kill -9 $TESTPID; sleep 1; }
+rm -rf /tmp/om-gui-verify
+pgrep -fl "om run" || echo "no strays"          # NOT "dist/om run" — that pattern
+lsof -nP -iTCP:31999 -sTCP:LISTEN || echo "31999 free"   # cannot see ~/.local/bin/om
 ```
+
+The stray check must match `om run`, not `dist/om run`. The narrow pattern only
+sees the build-path binary, so it reports "none" while a stray standalone `om`
+is still running — a narrower assurance than it sounds like.
 
 ### 5. Install and restart
 
@@ -251,6 +289,20 @@ whether the GUI is embedded or placeholder, daemon restart result, worktree
 state, and anything left for Ryan (a shadowed `om` still first on PATH, a
 skipped GUI, a failed restart).
 
+Also report **any daemon error line seen after the restart, and whether it
+predates this build.** `om service status` shows the most recent error even
+after the daemon recovered from it, so the status line alone cannot tell a
+regression from a pre-existing condition. Check the log's history before
+attributing anything to the swap:
+
+```bash
+grep -c "<the error text>" ~/.openmarket/runner.log     # total ever
+grep "<the error text>" ~/.openmarket/runner.log | head -1   # first occurrence
+```
+
+A count that stops growing after the restart means the new version FIXED it —
+worth reporting as such.
+
 ### Traps (`--hosted`)
 
 | Symptom | Cause | Fix |
@@ -259,7 +311,11 @@ skipped GUI, a failed restart).
 | `/rooms` shows an install-instructions page | stubs were compiled in | redo steps 1-3; check the stub marker gate in step 2 |
 | Daemon still on the old version | binary swapped, daemon not restarted | `om service restart` |
 | `bun install` 404s in openmarket-chat | `@openmarket/rooms-client` is private on npm | link from the monorepo (`rooms-client:link`), never a different registry |
-| GUI builds but behaves oddly against the daemon | rooms-client era mismatch | compare versions in step 1; link to source |
+| GUI builds but behaves oddly against the daemon | rooms-client era mismatch | compare `dist/version.js` constants in step 1 — NOT the package number; link to source |
+| GUI carries the previous release's version constants | linked `rooms-client` `dist/` is stale; it does not rebuild when the monorepo moves | rebuild `packages/rooms-client` before the GUI build (step 1) |
+| `bun run build` in `rooms-client` exits 2 with `TS2835` | three extensionless relative imports in `src/shared/` (`attention.ts:18`, `read-state.ts:16,17`); `tsc` emits anyway | expected today — confirm `dist/` is fresh and continue |
+| Several `om` processes in Activity Monitor | each Claude Code session spawns two `om mcp serve --stdio` children (one `--catalog operator`); they outlive daemon restarts | `ps -o ppid=` — parented by a `claude` PID means not a leak; only PPID 1 is a daemon |
+| `Last error: ... You're reading too fast` after restart | the librarian scans rooms in a burst on startup and trips a read rate limit | pre-existing since 2026-08-09, self-resolves in ~5s; confirm `errors=[]` on the next `[schedule]` line before reporting it |
 | Huge diff / 14 MB file in `git status` | staged GUI assets not restored | `git checkout packages/cli/assets/rooms-gui/` |
 | `OM_ROOMS_GUI_DIR` set but the daemon ignores it | the launchd plist has no `EnvironmentVariables` key, so the supervised daemon never sees your shell's env; and the watch-and-re-read path is source-only (`setRoomsGuiHotReload(isDevExecPath())`, `rooms-routes.ts:95`) | it is a hand-run-daemon tool, not a shortcut around the embed — do the compile |
 | `cannot upgrade: process.execPath is ...` from `om upgrade` | you ran the source entrypoint, not a compiled binary | expected — that guard is `upgrade-core.ts:424` |
