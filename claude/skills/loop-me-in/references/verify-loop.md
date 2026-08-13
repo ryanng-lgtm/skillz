@@ -311,7 +311,7 @@ One codex agent at a time — sweep or fix, never both, never two phases in para
 
 ### Which gate runs when
 
-The full suite runs at wave boundaries and at phase 0. It never runs inside the fix loop.
+Every scheduled gate is scoped. The full suite is not one of them — see "Escalation" below.
 
 ```sh
 # tests that exercise a module, directly or through its consumers
