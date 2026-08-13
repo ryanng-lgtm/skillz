@@ -222,20 +222,9 @@ with_timeout 900 codex exec \
 network by default and CDP on `127.0.0.1:$CDP_PORT` counts as network. Without it the
 sweep reports a connection error that reads like a broken app.
 
-Codex cannot invoke `/caveman:caveman`, so every codex prompt opens with the rules inline:
-
-```
-Style: terse. Drop articles, filler, hedging. Fragments fine. No preamble, no
-narration, no restating the task, no summary paragraph. Reproduce EXACTLY, never
-paraphrased or shortened: error strings, selectors, file paths, numbers, units,
-code. Output the contract block and nothing else.
-```
-
-The contract block below is the whole response. A sweep that also writes three
-paragraphs explaining what it did costs more than the sweep.
-
-The sweep prompt carries: the app URL, the `$CD` path and its `--help` hint, the phase's
-acceptance rows, the sentinel, the scope fence, and this output contract:
+The sweep prompt carries the style preamble from section 4, the app URL, the `$CD` path
+and its `--help` hint, the phase's acceptance rows, the sentinel, the scope fence, and
+this output contract — which is the whole response:
 
 ```
 PHASE: <n>
