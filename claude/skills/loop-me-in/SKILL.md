@@ -189,7 +189,8 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 
 Every brief ends with one post to OM Chat, unless the work is unshippable or the user says not to. An unattended run is otherwise silent, and silence reads as progress.
 
-- **Fires once, after everything has landed AND been verified in the real product** — not after the last commit. Where a GUI is involved that means driving it with `/om-chat-web`; give the brief a row per phase naming the click and the expected result, or "verified" degrades into "clicked around".
+- **Fires once, after the verify loop is green** — not after the last commit. Green means every acceptance row came back landed with evidence, on a sweep whose identity gate passed. A phase that hit the attempt cap is reported as red, not omitted.
+- **The post is what replaces Ryan watching.** It carries the verdict per phase, what is still red, and the gaps recorded but deliberately not fixed. A post that only says "done" makes the whole loop unfalsifiable.
 - **Resolve the destination, don't transcribe it.** Call `session_grants` (read-only, no consent side effects) and use the resource string it reports; `room_post` wants that canonical name, not a display title. Currently that is `82eae63a1bd3` (`#chat`, space `openmarket`) with `read` + `post`. Confirm rather than assume — a missing `post` grant means the run stalls at 3am waiting for consent.
 - **`room_post` posts as the bot. `om room say` posts as Ryan.** Say which.
 - **Shape: a simplified `/mr-markdown` summary — one title line, at most 4 bullets, 100 words total. Tell the brief to count them**; a cap stated without counting produces a message well under it.
