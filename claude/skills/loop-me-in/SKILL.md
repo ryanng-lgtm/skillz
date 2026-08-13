@@ -106,6 +106,23 @@ Anything the run starts that outlives one command — dev server, Chrome, backgr
 - **Recycle on pressure, don't wait for the crash.** Browser tree over ~1.5 GB or system free under 15%: kill it by ledger PID and bring one back. A headless Chrome twenty sweeps deep is not the process it was at phase 1.
 - **Teardown runs on success, failure, and abort.** Kill by ledger PID, then one pattern kill scoped to this run's profile path to reap the renderer children; `pgrep` only to confirm nothing survived. A bare `pkill -f chrome` would take Ryan's own browser with it, and the brief must never contain one.
 
+## Token discipline
+
+An unattended run pays for every word it generates, and most of them are scaffolding nobody reads. The brief's first instruction is `/caveman:caveman full`, which compresses the run's own reasoning and internal writing for the rest of the session.
+
+| Compressed | Left as normal prose |
+|---|---|
+| The run's reasoning, phase notes, todos, tool-call descriptions | The completion post — Ryan reads it |
+| Sweep and fix prompts sent to codex | The findings log — Ryan reads it the next morning |
+| Messages between the run and its agents | Commit messages, MR descriptions, code, comments |
+| Verdict prose in the sweep output contract | Security warnings, and any irreversible-action confirmation |
+
+The plugin's own boundary rule already exempts everything persisted outside chat — commits, docs, third-party messages — so turning it on does not corrupt the post or the log. Say which side of the line each artifact is on anyway; a run that compresses the one message Ryan reads has saved tokens by making the output useless.
+
+**Codex cannot invoke Claude Code skills**, so its prompts carry the compression rules inline instead (`references/verify-loop.md`, section 4). Exact strings survive compression: error text, selectors, file paths, numbers, units, and code are reproduced verbatim, never paraphrased shorter.
+
+Where the real spend is, in order: codex reasoning tokens, re-reading files the brief already quoted, and dumping page content into a verdict. Set `model_reasoning_effort` per agent rather than leaving every sweep on `high`, quote the constraint in the prompt instead of telling the agent to go read it, and reference the console-log path rather than pasting the log.
+
 ## The completion post
 
 Every brief reports to OM Chat over the `openmarket-chat` MCP tools, unless the work is unshippable or the user says not to. An unattended run is otherwise silent, and silence reads as progress.
