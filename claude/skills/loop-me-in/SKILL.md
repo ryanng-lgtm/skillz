@@ -188,18 +188,31 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 
 ### The completion post — include by default
 
-Every brief ends with one post to OM Chat, unless the work is unshippable or the user says not to. An unattended run is otherwise silent, and silence reads as progress.
+Every brief reports to OM Chat over the `openmarket-chat` MCP tools, unless the work is unshippable or the user says not to. An unattended run is otherwise silent, and silence reads as progress.
 
-- **Fires once, after the verify loop is green** — not after the last commit. Green means every acceptance row came back landed with evidence, on a sweep whose identity gate passed. A phase that hit the attempt cap is reported as red, not omitted.
-- **The post is what replaces Ryan watching.** It carries the verdict per phase, what is still red, and the gaps recorded but deliberately not fixed. A post that only says "done" makes the whole loop unfalsifiable.
+**How the run builds the post** — three steps, in this order:
+
+1. Run `/mr-markdown` over the changes made this session — the run's own commits on its branch, not the whole diff against main.
+2. Compress that output to a **bolded one-line title in the form `<thing that changed> now <what it does>`**, followed by at most 4 bullets of detail.
+3. Count the words against the budget below before posting. A cap stated without counting produces a message well over it.
+
+**When it posts, and the word budget:**
+
+| Plan shape | Posts | Budget |
+|---|---|---|
+| Several unrelated fixes bundled in one plan (`ivtg-*`) | once, after every fix has landed and its sweep is green | 100 words, hard ceiling |
+| One large standalone feature | per wave or phase, as each goes green | 40 words, hard ceiling |
+| A wave too small to say anything substantial | not at all — folds into the next wave's report | — |
+
+40–100 words is the working range for the consolidated post. Below 40 there was nothing worth interrupting for; over 100 nobody reads it.
+
+- **A post never precedes its sweep.** Green means every acceptance row came back landed with evidence, on a sweep whose identity gate passed. A phase that hit the attempt cap is named as still red, not omitted.
 - **Resolve the destination, don't transcribe it.** Call `session_grants` (read-only, no consent side effects) and use the resource string it reports; `room_post` wants that canonical name, not a display title. Currently that is `82eae63a1bd3` (`#chat`, space `openmarket`) with `read` + `post`. Confirm rather than assume — a missing `post` grant means the run stalls at 3am waiting for consent.
+- **Route to the right channel and topic.** Where the work belongs to a topic, list them with `room_topic_list` and confirm the posting tool's schema advertises the topic field before assuming it takes one. Creating a topic needs `contribute` on the room — knock for it while writing the brief, not at 3am. If more than one channel is in scope, the brief names each destination against the phases it covers.
 - **`room_post` posts as the bot. `om room say` posts as Ryan.** Say which.
-- **Shape, in this order:** one title line; one line per phase reading `P<n> <name> — landed | red (<why>)`; then at most 4 bullets for what a reader still needs to know — gaps recorded but not fixed, anything awaiting a decision. 150 words total. **Tell the brief to count them**; a cap stated without counting produces a message well under it.
 - **It may only claim what was verified.** Backend work a browser cannot show, and any fix whose link to the original report is still an open question, must be worded honestly or left out.
-- **A blocked run still posts** — what landed, what failed, that the rest is halted.
-- **Authorise exactly this one outward-facing action** in the safety rules, so "post" does not read as permission to push or publish.
-
-Per-wave progress reports are a variant: only when asked, and "wave complete" must mean committed *and* green.
+- **A blocked run still posts** — what landed, what failed, that the rest is halted. Same budget.
+- **Authorise exactly these posts** in the safety rules, so "post" does not read as permission to push or publish.
 
 ## Common mistakes
 
