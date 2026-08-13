@@ -229,8 +229,8 @@ ps -Ao rss=,command= | grep -F -- "--user-data-dir=$PROFILE" \
   | awk '{s+=$1} END {printf "run chrome tree: %d MB\n", s/1024}'
 memory_pressure | awk -F': ' '/free percentage/{print "system free: " $2}'
 
-# stray browsers this run left behind on earlier attempts
-pgrep -fc -- "--user-data-dir=$RUN_DIR"                          # expect exactly one tree
+# process count of this run's browser tree — a jump between phases means tabs are leaking
+pgrep -fc -- "--user-data-dir=$RUN_DIR"
 ```
 
 Rules the numbers drive:
