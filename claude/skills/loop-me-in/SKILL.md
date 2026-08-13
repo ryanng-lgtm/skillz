@@ -86,23 +86,26 @@ The sweep returns a fixed shape — verdict per acceptance row with the evidence
 
 **Every codex run and every browser command is time-boxed.** A hung agent costs the whole night. macOS has no `timeout` binary — the brief defines a `with_timeout` helper instead (`references/verify-loop.md`, section 0), or the first phase dies on `command not found`.
 
-### Targeted gates, not full sweeps
+### Targeted gates. The full suite is a last resort, not a tier.
 
-A full suite belongs at a wave boundary, not in a loop. Run one that takes 224 seconds on every phase and every retry, and fourteen phases at three attempts spend two and a half hours running tests that were already green — most of it re-proving code the phase never touched.
-
-Three tiers, and the brief states which command belongs to each:
+A suite that takes 224 seconds is not a gate — at fourteen phases and three attempts it is two and a half hours of re-proving code the phases never touched. It stays out of the loop entirely, and out of the wave boundary too. Every scheduled gate is scoped to what the change can reach:
 
 | Tier | Scope | When |
 |---|---|---|
 | **Attempt** | The one test file covering the change, plus `typecheck` | Every build inside the fix loop |
 | **Phase** | That file plus the suites of modules importing the changed file | Once, when the attempt gate goes green |
-| **Wave** | The repo's full gate — lint, typecheck, build, dist check, whole suite | Once per wave, and once at phase 0 for the baseline |
+| **Wave** | The union of that wave's phase tiers, plus lint, typecheck, build, dist check | Once per wave |
 
-The phase tier is what makes this safe: a single test file misses the breakage a change causes in its consumers, and the full suite is not the only way to catch that. Find the importers, run their tests, and the coverage of a full sweep arrives at a fraction of the cost.
+The phase tier is what makes the omission safe. A single test file misses what a change breaks in its consumers — but the full suite is not the only instrument that catches it. Find the importers, run their tests, and a sweep's coverage arrives for a fraction of the time. Lint, typecheck and build stay at the wave boundary because they are fast; it is the test runner that is expensive.
 
-**Error scans are targeted too.** When a sweep returns a gap, re-run that one case — not the suite that contains it. The failing case's own command goes in the sweep's output, so the fix loop never has to guess and never has to widen.
+**The full suite runs in exactly two situations:**
 
-**Baseline numbers come from the wave tier.** A targeted run cannot be compared against "7084 pass, 59 fail"; its green is "these N tests pass". The brief says which number each gate is checked against, or a passing targeted run gets misread as a passing repo.
+1. **Once at phase 0**, to capture the baseline. Without it no later number is interpretable, and one run is the price of reading every other run correctly.
+2. **As an escalation, when a failure will not localize** — a phase tier that comes back green while the sweep still reports a regression, or a failure whose origin the fix loop cannot find. Then it is a deliberate act: budgeted with `with_timeout`, logged in the findings log as an escalation with what prompted it, and named in the report. Never a reflex, never "to be safe".
+
+**Error scans are targeted too.** When a sweep returns a gap, re-run that one case — not the suite containing it. The failing case's own command goes in the sweep's output, so the fix loop never has to guess and never has to widen.
+
+**Never check a targeted run against the full-suite baseline.** "215 pass, 0 fail" is not "7084 pass, 59 fail". The brief states which number each tier is checked against, or a green subset gets read as a green repo.
 
 ### The findings log
 
