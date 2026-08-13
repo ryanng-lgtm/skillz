@@ -266,6 +266,9 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 | A post over its ceiling — 100 words bundled, 40 per wave | The loop's only output goes unread |
 | A paste line naming a trigger this session doesn't have | The brief is dead on arrival; nothing runs at all |
 | An overnight `/loop` with no note that it dies with the machine | Half-applied plan and a leaked browser by morning |
+| Evidence written to `/tmp`, or a teardown that deletes it | The night's only proof is gone before it's read |
+| Out-of-scope findings that live only in the post | The word cap eats them; the bugs the sweep found are lost |
+| A findings log that records only failed sweeps | No way to tell which phase broke something that used to pass |
 
 ## Red flags
 
