@@ -85,13 +85,23 @@ The sweep returns a fixed shape — verdict per acceptance row with the evidence
 
 Commands, prompts, the output contract, and the exact codex invocations: `references/verify-loop.md`. **Copy the resolved commands into the brief** — a fresh session will not read that file.
 
-### Process ledger and teardown
+### One browser, proven healthy, reused
 
-Anything the run starts that outlives one command — dev server, Chrome, background codex — is recorded at spawn with its claimed port and PID, in a `## Process ledger` section the run appends to.
+The single most expensive failure mode here is a run that spends the night launching browsers instead of verifying with one.
 
-- **Between phases, a heartbeat:** app URL answers, CDP endpoint answers, no `codex exec` still running, no stopped background jobs. Anything stuck is killed and restarted, not waited on.
-- **Teardown runs on success, failure, and abort.** Kill by ledger PID; `pgrep` only to confirm nothing survived.
-- Chrome gets a dedicated `--user-data-dir` and a claimed debugging port so teardown can be precise. A bare `pkill -f chrome` would take Ryan's own browser with it — the brief must never contain one.
+- **Reuse before starting.** A dev server already on the port whose `cwd` is the worktree gets reused; a Chrome already on the debugging port whose `--user-data-dir` is this run's profile gets reused. Neither is relaunched, and neither is killed. A *foreign* process on either port is never killed either — the dev server case stops the run, the Chrome case steps to the next port via `CHROME_DEVTOOLS_URL`.
+- **A port that answers is not a working browser.** Before the first sweep and at every heartbeat, the browser must pass a functional smoke test: navigate, evaluate, and write a real screenshot file. Those are the three things every sweep depends on, and `/json/version` still answers from a Chrome whose renderer has died.
+- **Two launch attempts for the whole run, then stop.** A relaunch loop ends the night with forty headless Chromes and zero verification. The third failure is a stop condition, not a retry.
+- **One tab, not one per check.** `--new-tab` once at the start, then navigate the same tab. Each extra tab is another renderer process.
+- **One codex agent at a time** — sweep or fix, never both, never two phases in parallel.
+
+### Process ledger, memory, teardown
+
+Anything the run starts that outlives one command — dev server, Chrome, background codex — is recorded at spawn with its claimed port and PID, in a `## Process ledger` section the run appends to. Reused processes are recorded separately, because they must not be torn down.
+
+- **Between phases, a heartbeat:** app URL answers, browser passes the smoke test, no `codex exec` still running, no stopped background jobs, and two numbers — the RSS of this run's browser tree and the machine's free memory (`memory_pressure`).
+- **Recycle on pressure, don't wait for the crash.** Browser tree over ~1.5 GB or system free under 15%: kill it by ledger PID and bring one back. A headless Chrome twenty sweeps deep is not the same process it was at phase 1.
+- **Teardown runs on success, failure, and abort.** Kill by ledger PID, then one pattern kill scoped to this run's profile path to reap the renderer children — `pgrep` only to confirm nothing survived. A bare `pkill -f chrome` would take Ryan's own browser with it; the brief must never contain one.
 
 ## Choosing the trigger
 
