@@ -272,7 +272,7 @@ them. The log is where they wait for Ryan.
 with_timeout 1800 codex exec \
   -C "$WORKTREE" \
   -m gpt-5.6-sol \
-  -c model_reasoning_effort="high" \
+  -c model_reasoning_effort="$(effort_for fix "$ATTEMPT")" \
   --sandbox workspace-write \
   --output-last-message "$RUN_DIR/fix-p$N-a$ATTEMPT.md" \
   "$(cat "$RUN_DIR/fix-prompt-p$N-a$ATTEMPT.md")"
@@ -281,6 +281,18 @@ with_timeout 1800 codex exec \
 The fix prompt carries the sweep's `GAPS` verbatim, the scope fence, and the verification
 command. Codex does not commit and does not stage — the run reviews the diff, then
 `git add` plus the `/commit` skill.
+
+On attempt 3, this becomes the diagnosis agent instead:
+
+```sh
+with_timeout 1800 codex exec \
+  -C "$WORKTREE" \
+  -m gpt-5.6-sol \
+  -c model_reasoning_effort="$(effort_for diagnose)" \
+  --sandbox read-only \
+  --output-last-message "$RUN_DIR/diagnose-p$N.md" \
+  "$(cat "$RUN_DIR/diagnose-prompt-p$N.md")"
+```
 
 ## 7. Loop control
 
