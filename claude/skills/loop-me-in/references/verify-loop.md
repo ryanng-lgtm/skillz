@@ -7,8 +7,18 @@ fails the stand-alone test.
 Which harness to pick, and why the loop is shaped this way, is in `../SKILL.md`. This
 file is the operational half.
 
-Placeholders: `$RUN_DIR` (scratch for this run), `$WORKTREE`, `$APP_URL`, `$PORT`,
-`$CD` = `~/.claude/skills/chrome-devtools/references/chrome-devtools`.
+Placeholders: `$WORKTREE`, `$APP_URL`, `$PORT`,
+`$CD` = `~/.claude/skills/chrome-devtools/references/chrome-devtools`, and:
+
+```sh
+RUN_DIR=~/.claude/plans/<YYYY-MM-DD>/<name>-run-evidence   # NOT /tmp
+FINDINGS="$RUN_DIR/findings.md"
+```
+
+`$RUN_DIR` sits beside the brief in the plans vault, not in a temp directory a reboot
+clears. Sweep verdicts, screenshots, and console logs are the only proof the night's work
+happened; a run that leaves them in `/tmp` has verified nothing you can still read.
+**Teardown kills processes. It never deletes `$RUN_DIR`.**
 
 ## 0. `with_timeout` — macOS has no `timeout`
 
