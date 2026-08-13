@@ -34,8 +34,15 @@ fi
 git diff --quiet && git diff --cached --quiet && [ -z "$(git status --porcelain)" ] && exit 0
 
 # Summarize what moved, for the commit subject.
-changed="$(git status --porcelain | awk '{print $NF}' \
-  | sed -n 's#^\(claude\|codex\)/skills/\([^/]*\)/.*#\2#p' | sort -u | paste -sd', ' -)"
+#
+# `sed -E` is required: `\(a\|b\)` alternation is a GNU extension, and BSD sed
+# (macOS) matches it as the literal text "claude|codex" instead. Every subject
+# read "Sync config from ..." until this was fixed, whatever had changed.
+#
+# `cut -c4-` rather than `awk '{print $NF}'`: porcelain v1 is two status chars,
+# a space, then the path, so this keeps paths containing spaces intact.
+changed="$(git status --porcelain | cut -c4- \
+  | sed -nE 's#^(claude|codex)/skills/([^/]+)/.*#\2#p' | sort -u | paste -sd', ' -)"
 [ -z "$changed" ] && changed="config"
 
 git add -A || { log "git add failed"; exit 1; }
