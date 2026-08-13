@@ -262,7 +262,3 @@ to someone else before the run began and still does.
 **Never run a bare `pkill -f chrome` or `pkill -f node`** — that kills Ryan's own browser
 and unrelated work. The dedicated profile, the claimed port, and the PID ledger exist so
 teardown can be precise.
-
-**Never run a bare `pkill -f chrome` or `pkill -f node`** — that kills Ryan's own browser
-and unrelated work. The dedicated profile, the claimed port, and the PID ledger exist so
-teardown can be precise.
