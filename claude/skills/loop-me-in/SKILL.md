@@ -240,8 +240,10 @@ on, the command gate, and what "done" looks like.
 One phase = one commit = one reviewable unit.
 
 ## Gates
-The exact command line per repo. The known-good baseline (test count, lint
-warning count) so drift is visible. The browser gate is the sweep, and it is
+Three commands per repo — attempt tier (one test file plus typecheck), phase
+tier (that file plus its importers' suites), wave tier (the full repo gate).
+Which number each is checked against, and how long the wave tier takes, so a
+slow suite isn't mistaken for a hang. The browser gate is the sweep, and it is
 green only when every acceptance row reads landed with evidence attached.
 
 ## Open questions — resolve or report
