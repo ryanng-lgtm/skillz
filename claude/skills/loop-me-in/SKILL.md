@@ -241,6 +241,10 @@ Every brief reports to OM Chat over the `openmarket-chat` MCP tools, unless the 
 | Writing `timeout 900 …` in the brief | No such binary on macOS; every phase dies on `command not found` |
 | No process ledger or teardown | Chrome and dev servers pile up until the machine chokes; nothing visibly fails |
 | `pkill -f chrome` in the teardown block | Kills Ryan's own browser and everything he had open |
+| Writing the post from memory instead of `/mr-markdown` | Claims drift from the diff that actually landed |
+| Posting mid-plan on a bundled `ivtg-*` fix set | Partial claims about fixes whose siblings are still red |
+| A per-wave post on a wave with nothing substantial | Noise, and the next real report gets skimmed |
+| A post over its ceiling — 100 words bundled, 40 per wave | The loop's only output goes unread |
 
 ## Red flags
 
