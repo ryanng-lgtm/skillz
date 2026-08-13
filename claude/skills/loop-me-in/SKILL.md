@@ -152,8 +152,12 @@ must be answered BEFORE a phase runs, and which just ride into the final
 report. Never let one be silently assumed away.
 
 ## Completion post
-Destination, when it fires, the shape (title line, verdict line per phase, up
-to 4 bullets, 150 words), and what it may not claim.
+Destination — channel and topic, by canonical resource string, per phase if
+more than one. Cadence: once at the end (bundled fixes) or per wave (large
+feature). The recipe: `/mr-markdown` over this session's commits, compressed
+to a bolded `<thing> now <what>` title plus at most 4 bullets, counted against
+the word ceiling — 100 for a consolidated post, 40 for a per-wave one.
+What it may not claim.
 
 ## Commit and safety rules
 Authorised without asking: commits on the run's own branch, the verify sweeps,
