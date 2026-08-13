@@ -219,13 +219,30 @@ means the model of the problem is wrong, not that a fourth patch is needed.
 ## 8. Heartbeat — between every phase
 
 ```sh
-curl -sf -o /dev/null "$APP_URL"                          || echo "STUCK: dev server down"
-curl -sf -o /dev/null http://127.0.0.1:9222/json/version  || echo "STUCK: chrome down"
-pgrep -f "codex exec" | wc -l                             # expect 0 between phases
-jobs -l                                                    # expect no stopped jobs
+curl -sf -o /dev/null "$APP_URL"                                 || echo "STUCK: dev server down"
+chrome_works                                                     || echo "STUCK: browser unhealthy"
+pgrep -f "codex exec" | wc -l                                    # expect 0 between phases
+jobs -l                                                          # expect no stopped jobs
+
+# memory: this run's browser tree, and the machine
+ps -Ao rss=,command= | grep -F -- "--user-data-dir=$PROFILE" \
+  | awk '{s+=$1} END {printf "run chrome tree: %d MB\n", s/1024}'
+memory_pressure | awk -F': ' '/free percentage/{print "system free: " $2}'
+
+# stray browsers this run left behind on earlier attempts
+pgrep -fc -- "--user-data-dir=$RUN_DIR"                          # expect exactly one tree
 ```
 
-Anything stuck gets killed and restarted, not waited on.
+Rules the numbers drive:
+
+- **Unhealthy browser:** `ensure_chrome` reaps and relaunches once. It does not stack a
+  second instance beside the first.
+- **Run's Chrome tree over ~1.5 GB, or system free under 15%:** recycle the browser
+  between phases — kill by ledger PID, `ensure_chrome` again. Restart is cheap and the
+  identity gate re-runs anyway; a long-lived headless Chrome after twenty sweeps is not.
+- **One codex agent at a time.** Sweep or fix, never both, never two phases in parallel.
+  Two `codex exec` runs plus a browser tree is where an unattended night turns into swap.
+- Anything stuck is killed and restarted, not waited on.
 
 ## 9. Teardown — runs on success, failure, and abort
 
