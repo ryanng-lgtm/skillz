@@ -263,13 +263,9 @@ last night find", which is the question actually asked the next morning.
 } >> "$FINDINGS"
 ```
 
-Every sweep appends — including the ones that passed, and including void sweeps, whose
-entry reads `identity: fail` and explains why nothing was verified. A findings log that
-only records failures cannot show that phase 2 was green before phase 5 broke it.
-
-**`OUT-OF-SCOPE` entries are the reason this file exists.** They are the bugs the run
-found and was told not to fix; the completion post has 40–100 words and will not carry
-them. The log is where they wait for Ryan.
+Append after every sweep — passes included, and void sweeps too, whose entry reads
+`identity: fail` and says why nothing was verified. The `OUT-OF-SCOPE` lines are the ones
+that exist nowhere else: the post's word ceiling will not carry them.
 
 ## 7. Fix agent
 
