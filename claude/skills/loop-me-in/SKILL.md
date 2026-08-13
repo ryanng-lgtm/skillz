@@ -123,13 +123,28 @@ One line each. Install commands that break things. Files that must be
 regenerated rather than edited. Test-harness sharp edges. Known flakes and
 their names, so a red suite isn't misread as a regression.
 
+## Verification loop
+The harness and its exact commands: how the surface starts (command, claimed
+port, URL), how Chrome starts (dedicated profile dir, debugging port), the
+two-part identity gate, the sweep agent invocation, the fix agent invocation,
+and the sweep output contract. Attempt cap: 3 sweeps per phase.
+Every long-running command wrapped in `timeout`.
+
+## Process ledger
+Empty table the run fills in as it spawns things: what, port, PID, started.
+Plus the heartbeat check to run between phases, and the teardown block that
+runs on success, failure, and abort alike.
+
 ## Phases
-Numbered. Each carries: the change, the files, the verification command,
-and what "done" looks like. One phase = one commit = one reviewable unit.
+Numbered. Each carries: the change, the files, the sentinel that proves it
+reached the served output, the acceptance rows the sweep must return a verdict
+on, the command gate, and what "done" looks like.
+One phase = one commit = one reviewable unit.
 
 ## Gates
 The exact command line per repo. The known-good baseline (test count, lint
-warning count) so drift is visible.
+warning count) so drift is visible. The browser gate is the sweep, and it is
+green only when every acceptance row reads landed with evidence attached.
 
 ## Open questions — resolve or report
 Every unknown the plan flags, carried over verbatim in substance. Mark which
