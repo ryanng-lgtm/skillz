@@ -124,7 +124,7 @@ Console and network for the same window: `$CD logs --duration-ms 2000 --include-
 ## 6. Fix agent
 
 ```sh
-timeout 1800 codex exec \
+with_timeout 1800 codex exec \
   -C "$WORKTREE" \
   -m gpt-5.6-sol \
   -c model_reasoning_effort="high" \

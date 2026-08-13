@@ -81,7 +81,7 @@ The sweep returns a fixed shape — verdict per acceptance row with the evidence
 
 **Cap at 3 sweeps per phase.** On the third failure the phase stops, stays red in the report, and the run moves to the next phase that does not depend on it. Two failures of the same class mean the model of the problem is wrong; a fourth patch makes it worse.
 
-**Every codex run and every browser command is wrapped in `timeout`.** A hung agent costs the whole night.
+**Every codex run and every browser command is time-boxed.** A hung agent costs the whole night. macOS has no `timeout` binary — the brief defines a `with_timeout` helper instead (`references/verify-loop.md`, section 0), or the first phase dies on `command not found`.
 
 Commands, prompts, the output contract, and the exact codex invocations: `references/verify-loop.md`. **Copy the resolved commands into the brief** — a fresh session will not read that file.
 
