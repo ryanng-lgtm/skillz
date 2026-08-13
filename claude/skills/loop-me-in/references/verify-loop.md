@@ -36,7 +36,7 @@ with_timeout() {  # with_timeout <seconds> <command...>
 itself takes the SIGALRM. Timed-out runs exit 142.
 
 SIGALRM reaches only the process that was launched — a timed-out `codex exec` can leave
-children behind, so run the heartbeat (section 8) after any 142.
+children behind, so run the heartbeat (section 9) after any 142.
 
 ## 1. The dev server: reuse first, then start
 
@@ -168,7 +168,7 @@ effort_for() {   # effort_for <role> <attempt>
     sweep:3)  echo high    ;;   # last look before the cap, and the one Ryan reads
     fix:1)    echo medium  ;;   # named gap, file guess in hand, stated verification command
     fix:2)    echo high    ;;
-    diagnose) echo xhigh   ;;   # see below
+    diagnose*) echo xhigh  ;;   # see below — matches with or without an attempt number
     *)        echo medium  ;;
   esac
 }
@@ -242,7 +242,7 @@ $CD logs --duration-ms 2000 --include-network > "$RUN_DIR/p$N-console.log" 2>&1
 A console error paraphrased into the verdict cannot be debugged three days later. The raw
 capture is cheap; write it every sweep, pass or fail.
 
-## 5. Findings log — append after every sweep
+## 6. Findings log — append after every sweep
 
 The per-sweep files answer "what happened in phase 3". The findings log answers "what did
 last night find", which is the question actually asked the next morning.
@@ -266,7 +266,7 @@ only records failures cannot show that phase 2 was green before phase 5 broke it
 found and was told not to fix; the completion post has 40–100 words and will not carry
 them. The log is where they wait for Ryan.
 
-## 6. Fix agent
+## 7. Fix agent
 
 ```sh
 with_timeout 1800 codex exec \
@@ -294,7 +294,7 @@ with_timeout 1800 codex exec \
   "$(cat "$RUN_DIR/diagnose-prompt-p$N.md")"
 ```
 
-## 7. Loop control
+## 8. Loop control
 
 ```
 build → identity gate → sweep → all rows landed and no in-scope regressions? → commit, next phase
@@ -308,7 +308,7 @@ red, and move to the next phase that does not depend on it.
 One codex agent at a time — sweep or fix, never both, never two phases in parallel. Two
 `codex exec` runs plus a browser tree is where an unattended night turns into swap.
 
-## 8. Heartbeat — between every phase
+## 9. Heartbeat — between every phase
 
 ```sh
 curl -sf -o /dev/null "$APP_URL"    || echo "STUCK: dev server down"
@@ -332,7 +332,7 @@ pgrep -fc -- "--user-data-dir=$RUN_DIR"
   headless Chrome twenty sweeps deep is not.
 - Anything stuck is killed and restarted, not waited on.
 
-## 9. Teardown — runs on success, failure, and abort
+## 10. Teardown — runs on success, failure, and abort
 
 ```sh
 for f in "$RUN_DIR"/*.pid; do kill "$(cat "$f")" 2>/dev/null; done   # *.pid.reused excluded
