@@ -314,6 +314,10 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 | A post over its ceiling, or a per-wave post with nothing substantial | The loop's only output goes unread, or the next real one gets skimmed |
 | Compressing the post or the findings log | Tokens saved by making the only output Ryan reads useless |
 | A prompt that lets an agent narrate, or points at a file instead of quoting it | Pays for preamble and re-reads on every phase, every attempt |
+| The full suite as the per-phase or per-attempt gate | Hours of re-proving untouched code; the loop spends the night in the test runner |
+| A single test file as the only gate | Misses what the change broke in the modules that import it |
+| Re-running a suite to reproduce one failing case | Minutes per attempt to learn what the sweep already reported |
+| Comparing a targeted run against a full-suite baseline | A green subset reads as a green repo |
 
 ## Red flags
 
