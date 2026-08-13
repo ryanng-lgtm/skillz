@@ -36,7 +36,7 @@ with_timeout() {  # with_timeout <seconds> <command...>
 itself takes the SIGALRM. Timed-out runs exit 142.
 
 SIGALRM reaches only the process that was launched — a timed-out `codex exec` can leave
-children behind, so run the heartbeat (section 7) after any 142.
+children behind, so run the heartbeat (section 8) after any 142.
 
 ## 1. The dev server: reuse first, then start
 
@@ -220,7 +220,7 @@ only records failures cannot show that phase 2 was green before phase 5 broke it
 found and was told not to fix; the completion post has 40–100 words and will not carry
 them. The log is where they wait for Ryan.
 
-## 5. Fix agent
+## 6. Fix agent
 
 ```sh
 with_timeout 1800 codex exec \
@@ -236,7 +236,7 @@ The fix prompt carries the sweep's `GAPS` verbatim, the scope fence, and the ver
 command. Codex does not commit and does not stage — the run reviews the diff, then
 `git add` plus the `/commit` skill.
 
-## 6. Loop control
+## 7. Loop control
 
 ```
 build → identity gate → sweep → all rows landed and no in-scope regressions? → commit, next phase
@@ -250,7 +250,7 @@ red, and move to the next phase that does not depend on it.
 One codex agent at a time — sweep or fix, never both, never two phases in parallel. Two
 `codex exec` runs plus a browser tree is where an unattended night turns into swap.
 
-## 7. Heartbeat — between every phase
+## 8. Heartbeat — between every phase
 
 ```sh
 curl -sf -o /dev/null "$APP_URL"    || echo "STUCK: dev server down"
@@ -274,7 +274,7 @@ pgrep -fc -- "--user-data-dir=$RUN_DIR"
   headless Chrome twenty sweeps deep is not.
 - Anything stuck is killed and restarted, not waited on.
 
-## 8. Teardown — runs on success, failure, and abort
+## 9. Teardown — runs on success, failure, and abort
 
 ```sh
 for f in "$RUN_DIR"/*.pid; do kill "$(cat "$f")" 2>/dev/null; done   # *.pid.reused excluded
