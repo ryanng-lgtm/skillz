@@ -36,33 +36,100 @@ children behind, so run the heartbeat (section 8) after any 142.
 Do **not** use `claude-in-chrome` for unattended runs: it needs per-site permission
 grants and drives Ryan's real Chrome profile, so the run stalls waiting for consent.
 
-## 2. Start the surface, claim the port, record the PID
+## 2. The surface: reuse first, then start
+
+One dev server and one browser for the entire run. Both are started at most once, before
+phase 1 — never per phase, never per sweep.
 
 ```sh
 mkdir -p "$RUN_DIR"
 PORT=5173
-( cd "$WORKTREE" && npm run dev -- --port "$PORT" --strictPort ) \
-  >"$RUN_DIR/dev.log" 2>&1 &
-echo $! > "$RUN_DIR/dev.pid"
+
+ensure_dev_server() {
+  local holder cwd
+  holder=$(lsof -ti tcp:$PORT -sTCP:LISTEN | head -1)
+  if [ -n "$holder" ]; then
+    cwd=$(lsof -a -p "$holder" -d cwd -Fn | sed -n 's/^n//p')
+    if [ "$cwd" = "$WORKTREE" ]; then
+      echo "$holder" > "$RUN_DIR/dev.pid.reused"   # reuse; do NOT kill, do NOT relaunch
+      return 0
+    fi
+    echo "STOP: :$PORT held by a foreign process ($holder, cwd $cwd)"
+    return 1                                        # never kill someone else's server
+  fi
+  ( cd "$WORKTREE" && npm run dev -- --port "$PORT" --strictPort ) \
+    >"$RUN_DIR/dev.log" 2>&1 &
+  echo $! > "$RUN_DIR/dev.pid"
+}
 ```
 
 `--strictPort` (or the equivalent) matters: without it the dev server silently moves to
 the next free port and the sweep verifies whatever was already on `$PORT`.
 
-## 3. Start a dedicated Chrome
+A server the run reused is **not** in the teardown list — killing it takes down whatever
+started it. `dev.pid` gets torn down; `dev.pid.reused` does not.
+
+## 3. Chrome: reuse first, smoke-test, then trust it
 
 ```sh
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --remote-debugging-port=9222 \
-  --user-data-dir="$RUN_DIR/chrome-profile" \
-  --headless=new --no-first-run --no-default-browser-check \
-  about:blank >"$RUN_DIR/chrome.log" 2>&1 &
-echo $! > "$RUN_DIR/chrome.pid"
+CDP_PORT=9222
+PROFILE="$RUN_DIR/chrome-profile"
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+chrome_is_ours() {   # a live CDP endpoint owned by this run's profile
+  local holder
+  holder=$(lsof -ti tcp:$CDP_PORT -sTCP:LISTEN | head -1) || return 1
+  [ -n "$holder" ] || return 1
+  ps -p "$holder" -o command= | grep -qF -- "--user-data-dir=$PROFILE"
+}
+
+chrome_works() {     # functional, not merely listening
+  curl -sf -o /dev/null "http://127.0.0.1:$CDP_PORT/json/version" || return 1
+  $CD navigate --wait-until load "about:blank" >/dev/null 2>&1 || return 1
+  [ "$($CD evaluate '1+1' 2>/dev/null | tr -dc 0-9)" = "2" ] || return 1
+  $CD screenshot --output "$RUN_DIR/smoke.png" >/dev/null 2>&1 || return 1
+  [ -s "$RUN_DIR/smoke.png" ]
+}
+
+start_chrome() {
+  "$CHROME" --remote-debugging-port=$CDP_PORT --user-data-dir="$PROFILE" \
+    --headless=new --no-first-run --no-default-browser-check \
+    --disable-extensions --disable-background-networking \
+    about:blank >"$RUN_DIR/chrome.log" 2>&1 &
+  echo $! > "$RUN_DIR/chrome.pid"
+  for _ in $(seq 30); do curl -sf -o /dev/null \
+    "http://127.0.0.1:$CDP_PORT/json/version" && return 0; perl -e 'select undef,undef,undef,0.5'; done
+  return 1
+}
+
+ensure_chrome() {                       # at most TWO launch attempts for the whole run
+  chrome_is_ours && chrome_works && return 0
+  if lsof -ti tcp:$CDP_PORT -sTCP:LISTEN >/dev/null 2>&1 && ! chrome_is_ours; then
+    CDP_PORT=$((CDP_PORT+1)); export CHROME_DEVTOOLS_URL="http://127.0.0.1:$CDP_PORT"
+  fi                                    # foreign Chrome on the port: step aside, never kill
+  kill "$(cat "$RUN_DIR/chrome.pid" 2>/dev/null)" 2>/dev/null   # ours but broken: reap it
+  start_chrome && chrome_works && return 0
+  kill "$(cat "$RUN_DIR/chrome.pid" 2>/dev/null)" 2>/dev/null
+  start_chrome && chrome_works && return 0
+  echo "STOP: browser will not come up healthy after 2 attempts"; return 1
+}
 ```
 
-Dedicated `--user-data-dir` is not optional. It keeps the run out of Ryan's logged-in
-profile and makes the run's browser identifiable at teardown. Drop `--headless=new` only
-when the app renders differently headless.
+Points that matter:
+
+- **A port that answers is not a working browser.** `/json/version` responds from a
+  Chrome whose renderer has died. The smoke test navigates, evaluates, and writes a real
+  screenshot file — those are the three things every sweep depends on.
+- **Two launch attempts, then stop.** A relaunch loop is how a run ends the night with
+  forty headless Chromes and no verification. The third failure is a stop condition.
+- **Never kill a foreign Chrome on the port** — it may be Ryan's. Step to the next port
+  and set `CHROME_DEVTOOLS_URL`, which the `chrome-devtools` script honours.
+- Dedicated `--user-data-dir` is not optional: it keeps the run out of Ryan's logged-in
+  profile, makes reuse detectable, and makes teardown precise. Drop `--headless=new` only
+  when the app renders differently headless.
+- **Reuse one tab.** Pass `--new-tab` once, at the start; navigate that same tab for every
+  later check. A `--new-tab` per acceptance row leaves dozens of live tabs, each with its
+  own renderer process.
 
 ## 4. Build-identity gate — run before every sweep
 
