@@ -153,6 +153,7 @@ Write these sections, in this order. Each is a slot to fill, not a suggestion.
 ```markdown
 # <Name> — runnable brief
 Paste line: /loop <one sentence naming the work>
+(no interval — self-paced. Runs locally: keep the machine awake.)
 
 ## Ground truth
 Repos and worktrees (path, branch, base, clean?), the spec-of-record path,
@@ -253,6 +254,8 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 | Posting mid-plan on a bundled `ivtg-*` fix set | Partial claims about fixes whose siblings are still red |
 | A per-wave post on a wave with nothing substantial | Noise, and the next real report gets skimmed |
 | A post over its ceiling — 100 words bundled, 40 per wave | The loop's only output goes unread |
+| A paste line naming a trigger this session doesn't have | The brief is dead on arrival; nothing runs at all |
+| An overnight `/loop` with no note that it dies with the machine | Half-applied plan and a leaked browser by morning |
 
 ## Red flags
 
