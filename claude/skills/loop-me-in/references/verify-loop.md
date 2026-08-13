@@ -168,6 +168,8 @@ effort_for() {   # effort_for <role> <attempt>
     sweep:3)  echo high    ;;   # last look before the cap, and the one Ryan reads
     fix:1)    echo medium  ;;   # named gap, file guess in hand, stated verification command
     fix:2)    echo high    ;;
+    fix:3)    echo "effort_for: attempt 3 is the diagnose agent, not a third fix" >&2
+              echo xhigh   ;;   # loud, not a silent fallthrough
     diagnose*) echo xhigh  ;;   # see below — matches with or without an attempt number
     *)        echo medium  ;;
   esac
