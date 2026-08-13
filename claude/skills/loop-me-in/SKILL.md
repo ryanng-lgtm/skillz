@@ -124,6 +124,8 @@ Per-wave progress reports are a variant: only when asked, and "wave complete" mu
 |---|---|
 | Linking the spec instead of copying its constraints | Fresh session can't see it; invents its own interpretation |
 | Omitting the worktree path | Run edits the checkout another session is using |
+| Not forbidding per-phase worktrees | A later phase builds against a tree missing the earlier ones; fails quietly |
+| A post that claims more than the run verified | A green-looking message for work nobody confirmed |
 | "Run the tests" with no command or baseline | Any red result reads as catastrophe or gets ignored |
 | Leaving publish/push/merge unqualified | An unattended run does something outward-facing |
 | No stop conditions | Run guesses on the one question that needed a human |

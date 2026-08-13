@@ -16,3 +16,6 @@ config.toml
 *.sqlite-shm
 *.sqlite-wal
 history.jsonl
+
+# skill dependency trees — reinstalled per machine, never tracked
+node_modules/
