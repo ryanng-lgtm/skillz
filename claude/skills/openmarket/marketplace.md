@@ -53,7 +53,7 @@ Keep inputs to the OM-native sources the SDK exposes (ohlcv, funding, open inter
 ```
 - `params` is an ARRAY of `{name, default, min?, max?}` objects; values reach `init()` positionally in declaration order.
 - `inputSources` is keyed BY INPUT NAME and each input must have a matching entry: `inputs[i].name` == the key. Feed sources need `field`.
-- `source` must be one of: `ohlcv`, `trades`, `funding`, `oi`, `liquidations`, `implied_volatility`, `skew`, `token_supply`, `odds`, `metric` (there is no "market"/"price" source; close prices are `ohlcv`+`close`).
+- `source` must be one of: `ohlcv`, `trades`, `funding`, `oi`, `liquidations`, `implied_volatility`, `skew`, `token_supply`, `odds`, `metric`, `time` (there is no "market"/"price" source; close prices are `ohlcv`+`close`). A `time` input carries the primary bar's open timestamp (sole field `bar_open_sec`, epoch seconds; never the primary input) so a module can do session/calendar math deterministically.
 - A `shape_where`/`color_by` gate must be a DIFFERENT output (usually `"plot": ""` data-only); an output cannot gate or color itself.
 
 **Chart placement basics**, per output: `plot` is one of `line|bar|area|histogram|candle|shape|scatter` (or `""` for data-only), `panel` is `overlay` (price chart) or `lower` (own pane), `unit` (`price`, `%`, else abbreviated) sets the axis format. `wrun_author`'s `display_name` names the package in chart legends and listings.

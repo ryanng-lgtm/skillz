@@ -131,8 +131,8 @@ Polymarket CLOB read-side commands are separate from `om polymarket ...` analyti
   "side": "buy",                           // "buy" | "sell"
   "order_type": "limit",                   // "market" | "limit" (defaults to "market")
   "size": {
-    "mode": "quote",                       // "base" | "quote" | "pct_equity"
-    "value": 250                           // interpretation depends on mode
+    "mode": "quote",                       // "base" | "quote" | "pct_equity" | "position"
+    "value": 250                           // interpretation depends on mode; percent modes take percent points, never 0-1 fractions
   },
   "limit_px": 95000,                       // required when order_type is "limit"
   "reduce_only": false,                    // true → can only close an existing position
@@ -179,13 +179,17 @@ The mode is the single most important field to get right. Get it wrong and you'l
 | *"$100 of BTC"* | `quote` | `100` (USD notional) |
 | *"100 USDT of BTC"* | `quote` | `100` (USDT ≈ USD) |
 | *"0.05 BTC"* | `base` | `0.05` (BTC units) |
-| *"5% of my equity"* | `pct_equity` | `5` (percentage 0–100) |
+| *"5% of my equity"* | `pct_equity` | `5` (percent points) |
 | *"my whole equity"* | `pct_equity` | `100` |
 | *"1% risk"* (with a stop attached) | `pct_equity` | `1` — but flag this is sizing by equity %, NOT by risk-to-stop; if the user wanted risk-sized, ask |
+| *"close half my position"* | `position` | `50` (percent of the open position) |
+| *"close my whole position"* | `position` | `100` — though `base` with the actual size read from `hyperliquid positions` is the preferred full-close form (see above) |
+
+`pct_equity` and `position` values are percent points, never 0–1 fractions: `value: 100` is the whole thing, `value: 1` closes just 1% of a position. Sending `1` to mean "all of it" is the classic mistake — the order fills, silently, at one-hundredth the intended size.
 
 If the user's phrasing is ambiguous (*"buy 100 of BTC"* — 100 what?), ASK via the structured-question tool. Default is `quote` because it's the most common natural-language anchor, but never silently apply it when the user said an unambiguous-but-different number.
 
-Polymarket sizing modes are `shares`, `quote`, `pct_equity`, and `position`. `quote` is pUSD notional; `shares` is outcome-token shares; `pct_equity` reads pUSD balance; `position` closes a percentage of the existing outcome-token position and must be a sell. For `quote` and market orders, use `polymarket_orderbook` / `om polymarket-account orderbook` in the preview so the user sees estimated shares, best bid/ask, and midpoint before approval. The typed-action surface is split by venue to keep Anthropic tool-use happy: call `order_place` for Hyperliquid, `order_place_polymarket` for Polymarket. Same dispatcher, same receipt model, same safety contract (preview-then-confirm before invoking).
+Polymarket sizing modes are `shares`, `quote`, `pct_equity`, and `position`. `quote` is pUSD notional; `shares` is outcome-token shares; `pct_equity` reads pUSD balance; `position` closes a percentage of the existing outcome-token position and must be a sell (same percent points: `50` closes half, `100` closes all). For `quote` and market orders, use `polymarket_orderbook` / `om polymarket-account orderbook` in the preview so the user sees estimated shares, best bid/ask, and midpoint before approval. The typed-action surface is split by venue to keep Anthropic tool-use happy: call `order_place` for Hyperliquid, `order_place_polymarket` for Polymarket. Same dispatcher, same receipt model, same safety contract (preview-then-confirm before invoking).
 
 ### Asset name normalization
 

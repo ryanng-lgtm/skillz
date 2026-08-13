@@ -123,7 +123,7 @@ Use `om event-watch edit <id-or-slug>` to change an existing watch in place (goa
 - `om event-journal` — (bespoke; see narrative above)
 - `om event-journal get` (action: `event_journal_get`) — Return one local event journal Markdown file by slug.
 - `om event-journal list` (action: `event_journal_list`) — List local event journals by slug, including the backing watch id/label when a watch spec still exists.
-- `om event-journal search` (action: `event_journal_search`) — Search local event journal Markdown files by plain substring.
+- `om event-journal search` (action: `event_journal_search`) — Free-text search over the user's WHOLE news/event fire history: accepted stories across all watches and followed feeds (FTS story lines grouped by watch, groups ordered by their top-ranked story, majors first then newest within each; all-time unless `window_hours` narrows it), plus substring matches from the journal Markdown itself (metadata/events/overview), which is what keeps a removed watch's preserved journal and raw-text-only entries reachable.
 
 - `om event-watch` — (bespoke; see narrative above)
 - `om event-watch backfill` (action: `event_watch_backfill`) — Run a historical backfill for an existing (live or paused) or newly-created event watch.

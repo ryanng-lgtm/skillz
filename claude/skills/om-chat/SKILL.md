@@ -35,13 +35,26 @@ can reopen it. Report it; do not retry around it.
 
 ## Getting access: the knock
 
-When a room you need is missing, call `room_grant_request` with the
-resource and the smallest capability that does the job (`read`, `post`,
-`post_as_you`, or `contribute` for structural writes: docs on a space grant,
-topics on a room grant) and a one-line reason. A consent card appears for the
-operator; the ask survives daemon restarts and dedupes. After approval,
-simply retry the denied call. Never widen one room's grant into another
-room or a DM, and never knock for speaking when reading answers the ask.
+When a resource you need is missing, call `room_grant_request` with
+EVERYTHING the task needs in one `resources` array, each entry at the
+smallest capability that does the job (`read`, `post`, `post_as_you`, or
+`contribute` for structural writes: docs on a space grant, topics on a room
+grant), and a one-line reason. Reading a room's content almost always means
+its space library too: room messages are often `om://doc/...` pointers, and
+library docs ride the SPACE grant, not the room's. `room_info` shows the
+`spaceId` before you knock. Bundle both; one knock, one consent card,
+instead of a second interruption minutes later.
+
+The knock blocks on the operator's decision by default (`waitMs`, 50s). On
+`approved`, the grants are already active and echoed back in
+`currentGrants`: retry the denied call and continue the task; never stop to
+ask the operator to say "go". On a `pending` timeout, knock again with the
+same resources: it dedupes onto the pending ask and keeps waiting (that
+re-knock is the parking primitive; do not tight-loop with `waitMs: 0`). On
+`denied`, continue with what you have and do not re-ask unless the task
+changes. The ask survives daemon restarts. Never widen one room's grant
+into another room or a DM, and never knock for speaking when reading
+answers the ask.
 
 ## Reading and searching
 

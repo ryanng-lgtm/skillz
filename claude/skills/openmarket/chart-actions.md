@@ -477,6 +477,12 @@ workflow. In short: **default to `om chart drawing auto`** (it computes anchors 
 use `om chart drawing add --anchor <role>=<epochSec>:<price>` only when the user named exact
 price/time levels (run `om chart drawing schema <tool>` for the roles).
 
+Span tools (LongPosition/ShortPosition/PositionForecast, Rectangle/Ellipse, Price/Date ranges,
+FixedRangeVolumeProfile) get their WIDTH from the anchor time span: anchor target/stop or the
+second corner at least 2 bars AFTER the first anchor, or the shape paints as an invisible
+zero-width sliver (the verb refuses such calls and names the required span). `drawing auto`
+is immune: its computed swing anchors are always time-separated.
+
 ### The user edits the chart too — offer alerts on drawn levels
 
 Live-session manual edits stream to the daemon. `om chart events --workspace <id>` lists them oldest-first; each drawing event's `data.tool.points` carries exact `{ time, price }` anchors. When the user just placed a line/level tool (HorizontalLine, TrendLine, a Fib level they call out) and the conversation touches the chart, offer ONCE to arm a price alert at that level — quote the price, ask, and only create it on a yes (alerts skill). Don't propose alerts for annotation/cosmetic tools (Text, Note, arrows, emoji), and don't repeat the offer if they pass.
