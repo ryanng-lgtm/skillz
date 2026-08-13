@@ -186,11 +186,23 @@ Two adjustments on top of the ladder:
 - **Fixes touching shared state, async ordering, or three-plus files start at `high`.**
   A one-string edit does not.
 
-**There is no `fix:3`.** Two failures of the same class mean the model of the problem is
-wrong, so the third attempt changes job rather than effort: a `diagnose` agent at `xhigh`,
-`--sandbox read-only`, whose output is a root cause and a verdict on whether the plan's
-premise still holds. It writes no code. The phase then stops red with that explanation in
-the findings log, which is worth more than a fourth patch.
+**There is no `fix:3`** — attempt 3 calls the `diagnose` agent (section 7) instead, at
+`xhigh` and `--sandbox read-only`. It returns a root cause and a verdict on whether the
+plan's premise still holds, writes no code, and the phase stops red with that entry in the
+findings log.
+
+Codex cannot invoke `/caveman:caveman`, so every codex prompt opens with the compression
+rules inline:
+
+```
+Style: terse. Drop articles, filler, hedging. Fragments fine. No preamble, no
+narration, no restating the task, no summary paragraph. Reproduce EXACTLY, never
+paraphrased or shortened: error strings, selectors, file paths, numbers, units,
+code. Output the contract block and nothing else.
+```
+
+An agent that also writes three paragraphs explaining what it did costs more than the work
+it did.
 
 ## 5. Sweep agent
 
