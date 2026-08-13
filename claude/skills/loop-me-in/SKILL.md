@@ -174,6 +174,8 @@ Write these sections, in this order. Each is a slot to fill, not a suggestion.
 # <Name> — runnable brief
 Paste line: /loop <one sentence naming the work>
 (no interval — self-paced. Runs locally: keep the machine awake.)
+First action: /caveman:caveman full — internal work only. The completion post,
+the findings log, and commit messages stay normal prose.
 
 ## Ground truth
 Repos and worktrees (path, branch, base, clean?), the spec-of-record path,
