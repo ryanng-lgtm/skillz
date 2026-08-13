@@ -70,10 +70,12 @@ esac
 if [ "$n_skills" -eq 0 ]; then
   scope="config"
 else
+  # `paste -sd', '` would be wrong: -d takes a LIST of delimiters applied
+  # cyclically, so three names join as "a,b c". Join on a comma, then space it.
   if [ "$n_skills" -le 3 ]; then
-    scope="skills($(printf '%s\n' "$skills" | paste -sd', ' -))"
+    scope="skills($(printf '%s\n' "$skills" | paste -sd, - | sed 's/,/, /g'))"
   else
-    scope="skills($(printf '%s\n' "$skills" | head -3 | paste -sd', ' -) +$((n_skills - 3)) more)"
+    scope="skills($(printf '%s\n' "$skills" | head -3 | paste -sd, - | sed 's/,/, /g') +$((n_skills - 3)) more)"
   fi
   [ "$n_other" -gt 0 ] && scope="$scope + config"
 fi
