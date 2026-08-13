@@ -121,7 +121,11 @@ The plugin's own boundary rule already exempts everything persisted outside chat
 
 **Codex cannot invoke Claude Code skills**, so its prompts carry the compression rules inline instead (`references/verify-loop.md`, section 4). Exact strings survive compression: error text, selectors, file paths, numbers, units, and code are reproduced verbatim, never paraphrased shorter.
 
-Where the real spend is, in order: codex reasoning tokens, re-reading files the brief already quoted, and dumping page content into a verdict. Set `model_reasoning_effort` per agent rather than leaving every sweep on `high`, quote the constraint in the prompt instead of telling the agent to go read it, and reference the console-log path rather than pasting the log.
+Where the real spend is, in order: codex reasoning tokens, re-reading files the brief already quoted, and dumping page content into a verdict.
+
+**Reasoning effort is set per call, never inherited.** `~/.codex/config.toml` sets `model_reasoning_effort = "xhigh"` globally, so an agent without an explicit override runs at xhigh — including a sweep whose entire job is to click four things and report what it saw. The brief carries an `effort_for` helper (`references/verify-loop.md`, section 4) keyed on role and attempt: sweeps open at `low` because precise acceptance rows make them a checklist, fixes open at `medium` because they have a named gap and a file guess, and each failed attempt moves one rung up. Phases whose acceptance rows are behavioural rather than a lookup, and fixes touching shared state or three-plus files, start one rung higher.
+
+Then quote the constraint in the prompt instead of telling the agent to go read it, and reference the console-log path rather than pasting the log.
 
 ## The completion post
 
