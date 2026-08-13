@@ -97,7 +97,7 @@ Anything the run starts that outlives one command — dev server, Chrome, backgr
 
 | Plan shape | Trigger | Why |
 |---|---|---|
-| Multiple phases/tasks, each with its own verification | `/loop` | Self-paces on device; survives a phase failing without losing the rest |
+| Multiple phases/tasks, each with its own verification | `/loop` with no interval | Self-paces, which is what a build → sweep → fix cycle needs; survives a phase failing without losing the rest |
 | One fix with a single verifiable done-condition | `/goal <condition>` | Runs until the goal is met or the turn cap is hit |
 | Recurring work, or work that must outlive the session | `/schedule` | Runs in the cloud rather than this terminal |
 | Small enough to just do | None — say so | Not everything needs a loop; the simplest thing that works wins |
