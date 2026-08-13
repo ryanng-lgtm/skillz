@@ -154,7 +154,9 @@ The sentinel is a string that exists **only** after this phase's change — a ne
 phase with no observable sentinel has no browser verification: say so, and give it a
 command gate instead.
 
-## 4. Reasoning effort — matched to the job, escalated on failure
+## 4. Agent configuration — effort, and prompt style
+
+Applies to every codex call in this file: sweep, fix, and diagnose.
 
 **`~/.codex/config.toml` sets `model_reasoning_effort = "xhigh"` globally.** Every agent
 that does not override it runs at xhigh, including a sweep whose whole job is to click
