@@ -141,8 +141,8 @@ failed gate is never recorded as "not landed" — it is recorded as "not verifie
 PID=$(lsof -ti tcp:$PORT -sTCP:LISTEN | head -1)
 lsof -a -p "$PID" -d cwd -Fn | sed -n 's/^n//p'      # must equal $WORKTREE
 
-# (b) the phase's sentinel reaches the served output
-$CD navigate --new-tab --wait-until load "$APP_URL"
+# (b) the phase's sentinel reaches the served output — same tab, every time
+$CD navigate --wait-until load "$APP_URL"
 $CD evaluate 'document.querySelector("[data-testid=\"<sentinel>\"]") !== null'
 ```
 
