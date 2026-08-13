@@ -247,12 +247,21 @@ Rules the numbers drive:
 ## 9. Teardown — runs on success, failure, and abort
 
 ```sh
-for f in "$RUN_DIR"/*.pid; do kill "$(cat "$f")" 2>/dev/null; done
-lsof -ti tcp:$PORT -sTCP:LISTEN | xargs -r kill 2>/dev/null
-pgrep -fl "remote-debugging-port=9222|codex exec|$WORKTREE"   # confirm empty
+for f in "$RUN_DIR"/*.pid; do kill "$(cat "$f")" 2>/dev/null; done   # *.pid.reused excluded
+pkill -f -- "--user-data-dir=$PROFILE" 2>/dev/null                   # this run's chrome tree only
+pgrep -fl -- "--user-data-dir=$RUN_DIR|codex exec"                   # confirm empty
 ```
 
-Kill by recorded PID first; the `pgrep` is a confirmation sweep, not the mechanism.
+Kill by recorded PID first. The one pattern kill that is safe is `--user-data-dir=$PROFILE`,
+because that path exists only for this run — it reaps the renderer children the parent PID
+leaves behind. The `pgrep` is a confirmation sweep, not the mechanism.
+
+Anything the run **reused** rather than started (`*.pid.reused`) is left alone. It belonged
+to someone else before the run began and still does.
+
+**Never run a bare `pkill -f chrome` or `pkill -f node`** — that kills Ryan's own browser
+and unrelated work. The dedicated profile, the claimed port, and the PID ledger exist so
+teardown can be precise.
 
 **Never run a bare `pkill -f chrome` or `pkill -f node`** — that kills Ryan's own browser
 and unrelated work. The dedicated profile, the claimed port, and the PID ledger exist so
