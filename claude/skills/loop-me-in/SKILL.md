@@ -128,7 +128,7 @@ The harness and its exact commands: how the surface starts (command, claimed
 port, URL), how Chrome starts (dedicated profile dir, debugging port), the
 two-part identity gate, the sweep agent invocation, the fix agent invocation,
 and the sweep output contract. Attempt cap: 3 sweeps per phase.
-Every long-running command wrapped in `timeout`.
+The `with_timeout` helper, defined here and used on every long-running command.
 
 ## Process ledger
 Empty table the run fills in as it spawns things: what, port, PID, started.
@@ -220,7 +220,8 @@ Per-wave progress reports are a variant: only when asked, and "wave complete" mu
 | Ending a phase at "ask Ryan if it looks right" | The one thing this brief exists to remove |
 | No attempt cap on the fix/re-sweep cycle | Patches forever against a wrong model of the bug |
 | Fixing out-of-scope bugs the sweep surfaced | Unattended scope creep, in a diff nobody watched grow |
-| No `timeout` on codex or browser commands | One hang costs the entire unattended window |
+| No time box on codex or browser commands | One hang costs the entire unattended window |
+| Writing `timeout 900 …` in the brief | No such binary on macOS; every phase dies on `command not found` |
 | No process ledger or teardown | Chrome and dev servers pile up until the machine chokes; nothing visibly fails |
 | `pkill -f chrome` in the teardown block | Kills Ryan's own browser and everything he had open |
 
