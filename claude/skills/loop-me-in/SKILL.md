@@ -197,7 +197,7 @@ Every brief reports to OM Chat over the `openmarket-chat` MCP tools, unless the 
 **How the run builds the post** — three steps, in this order:
 
 1. Run `/mr-markdown` over the changes made this session — the run's own commits on its branch, not the whole diff against main.
-2. Compress that output to a **bolded one-line title in the form `<thing that changed> now <what it does>`**, followed by at most 4 bullets of detail.
+2. Compress that output to a **bolded one-line title in the form `<thing that changed> now <what it does>`**, followed by at most 4 bullets of detail. Spend the bullets on what a reader has to act on first — anything still red, gaps recorded but deliberately not fixed, anything waiting on a decision — then on the change details.
 3. Count the words against the budget below before posting. A cap stated without counting produces a message well over it.
 
 **When it posts, and the word budget:**
