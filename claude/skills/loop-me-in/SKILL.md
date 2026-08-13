@@ -42,7 +42,56 @@ Everything between those is the run's job, commits on its own branch included. A
 6. **Write the brief to `~/.claude/plans/YYYY-MM-DD/<source-name>-run.md`** — resolve that symlink and say the real path in your report, so a wrong target is caught immediately. Never into a repo; plan files are not committed.
 
    **Vault trap:** an iCloud-nested duplicate of the plans vault can exist (`…/Obsidian/Obsidian/Claude Plans` beside the real `…/Obsidian/Claude Plans`), and the source plan may be handed to you as a path inside the *duplicate*. Do not infer the destination from where the source file sits, and do not infer it from the symlink alone. If both directories exist, name both and ask which is live before writing.
-6. **Report the path and the paste line.** That's the deliverable.
+7. **Report the path and the paste line.** That's the deliverable.
+
+## The verify loop
+
+The brief verifies itself. Manual confirmation is not a phase, not a gate, and not a completion criterion.
+
+### Pick the harness
+
+| Target | Harness | Why |
+|---|---|---|
+| Any web UI served from the worktree | A codex agent driving the `chrome-devtools` CDP script | Headless-capable, scriptable, no interactive consent, works against any localhost surface |
+| The OM Chat GUI | `/om-chat-web` | Already carries `doctor` (is the daemon actually serving the working tree?), saved logins, and a cloud-vs-local pixel-diff report |
+| Backend, CLI, library | A command with an expected value | A browser check that proves nothing is worse than admitting the check is a command |
+
+`claude-in-chrome` is the wrong tool here: per-site permission grants and Ryan's real profile mean the run stalls at 3am waiting for consent.
+
+### The gate that makes it definitive
+
+Every sweep opens with a **build-identity gate**, in two parts:
+
+- the process listening on the app's port has its `cwd` inside this worktree, and
+- a **sentinel** — a string that exists only after this phase's change — reaches the served output.
+
+Both pass or the sweep is void. A void sweep is recorded as *not verified* and the run rebuilds and re-gates; it is never recorded as *not landed*. Without this, a stale bundle or a second dev server on the same port turns "verified" into "clicked around something".
+
+Name a sentinel per phase while writing the brief: a new `data-testid`, a new route, a new label. A phase with no observable sentinel gets a command gate instead, and the brief says so.
+
+### The loop
+
+```
+build → identity gate → sweep → all acceptance rows landed, no in-scope regressions?
+                                  ├─ yes → review diff, commit, next phase
+                                  └─ no  → fix agent → attempt += 1 → back to build
+```
+
+The sweep returns a fixed shape — verdict per acceptance row with the evidence, regressions seen en route, in-scope gaps with a file guess, out-of-scope findings left alone, and the single question that would need a human. The out-of-scope slot is what keeps an unattended run from wandering: findings get recorded and reported, not fixed.
+
+**Cap at 3 sweeps per phase.** On the third failure the phase stops, stays red in the report, and the run moves to the next phase that does not depend on it. Two failures of the same class mean the model of the problem is wrong; a fourth patch makes it worse.
+
+**Every codex run and every browser command is wrapped in `timeout`.** A hung agent costs the whole night.
+
+Commands, prompts, the output contract, and the exact codex invocations: `references/verify-loop.md`. **Copy the resolved commands into the brief** — a fresh session will not read that file.
+
+### Process ledger and teardown
+
+Anything the run starts that outlives one command — dev server, Chrome, background codex — is recorded at spawn with its claimed port and PID, in a `## Process ledger` section the run appends to.
+
+- **Between phases, a heartbeat:** app URL answers, CDP endpoint answers, no `codex exec` still running, no stopped background jobs. Anything stuck is killed and restarted, not waited on.
+- **Teardown runs on success, failure, and abort.** Kill by ledger PID; `pgrep` only to confirm nothing survived.
+- Chrome gets a dedicated `--user-data-dir` and a claimed debugging port so teardown can be precise. A bare `pkill -f chrome` would take Ryan's own browser with it — the brief must never contain one.
 
 ## Choosing the trigger
 
