@@ -155,14 +155,17 @@ report. Never let one be silently assumed away.
 Destination, when it fires, the word cap, and what it may not claim.
 
 ## Commit and safety rules
-What may be committed, by whom. What needs explicit human OK: pushes,
-publishes, releases, merges, migrations against real data, anything
-outward-facing.
+Authorised without asking: commits on the run's own branch, the verify sweeps,
+the completion post. Needs explicit human OK: push, merge, cherry-pick into
+main, publish, release, migrations against real data, anything else
+outward-facing. Codex agents never commit — the run reviews the diff, stages,
+and commits via the `/commit` skill.
 
 ## Stop conditions
 The situations where the run must stop and report instead of deciding:
 ambiguity the plan didn't settle, a product decision, a second failure of
-the same kind, work that would widen scope.
+the same kind, a third failed sweep on one phase, work that would widen scope.
+Everything else: keep going. Do not stop to ask whether it looks right.
 ```
 
 ## Rules for the brief you write
