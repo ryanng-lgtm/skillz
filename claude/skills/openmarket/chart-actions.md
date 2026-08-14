@@ -18,6 +18,10 @@ Commands are grouped by **resource**, not by action verb — same pattern as `ku
 
 The chart is the display plane where your work turns visible. When the user asks to SEE anything (price action around an event, a support/resistance level, market structure, a comparison between symbols), express it ON the chart: set the symbol and interval, add the indicator, draw the level or zone, and confirm with `om chart screenshot` when they ask how it looks. Prefer this over ASCII sketches, text tables of candles, or describing what a chart would show. Two checks before acting: `om chart status` for the active workspace (and whether a human is watching), and the verb map below so a grid ask lands on `om chart layout` first.
 
+**Events on charts are their own lane: `om chart pins`** (action `chart_pins`). It plots event sources (news feeds, custom watches, price-alert fires) onto a chart's event lane as a live view; the doctrine (defaults, the one-question rule, filters, depth, workspace consent) lives in `news.md`'s "Plotting events on charts" section, so read that before plotting events. Do not confuse it with `om chart events` (action `chart_events`), the session-edit stream: that verb READS the human's and peers' recent manual chart edits and plots nothing.
+
+**Workspace policy: frictionless, scratch by default.** A target the user NAMED is used as-is (with the consent language first); something already on screen (`here`) is painted, creating nothing. Everything else ad-hoc lands on a SCRATCH canvas: `chart_pins` mints its own fresh-or-same-view day workspace as one, and a bare fresh canvas is `chart_create` with `scratch: true` and no name (48h sliding TTL relay-side, exempt from the plan workspace count, listed only on the dim scratch shelf, zero residue when the user walks away). Never mint a NAMED workspace unless the user named it, and never promote one on your own: `om chart keep <name>` (action `chart_keep`) is the user's naming act that makes a scratch permanent IN PLACE, same id, same share link; a follow never promotes anything. When a run reports a scratch mint, disclose the expiry once and name the keep verb once.
+
 ## Single-binary setup
 
 Same `om` binary as alerts. The daemon (`om run` foreground or `om service start` background) holds the bridge; the `om chart` subcommands either:
@@ -537,11 +541,12 @@ On-chart text renders as a SINGLE unwrapped line: keep Callout/Text/Note content
 - **Do not assume the `workspace.*` JSON shape.** Pass-through from service. Read what's actually there; don't invent field names.
 - **Do not invent `om chart` subcommands.** Wired verbs:
   - `status`, `events` (the multiplayer session verbs `session say` / `session start` / `session end` exist only when the operator opted in with `OM_CHART_MULTIPLAYER=1`; never suggest them otherwise)
-  - `list`, `create` (new workspace by name + symbol/exchange/interval; find-or-create, so re-running with the same name reuses it), `show`, `refresh`, `screenshot`, `open`
+  - `list`, `create` (new workspace by name + symbol/exchange/interval; find-or-create, so re-running with the same name reuses it), `delete`, `keep` (promote a scratch workspace to permanent), `show`, `refresh`, `screenshot`, `open`
   - `view`, `symbol`, `interval`, `plot-type`, `layout`, `sync`
+  - `pins` (the events lane; doctrine in `news.md`, "Plotting events on charts")
   - `indicator list`, `indicator add`, `indicator remove`, `indicator update`
   - `drawing auto`, `drawing add`, `drawing schema`, `drawing remove`
-  - Anything else (e.g. a workspace delete or a drawing update) doesn't exist — fall back to the chart UI and tell the user honestly.
+  - Anything else (e.g. a drawing update) doesn't exist: fall back to the chart UI and tell the user honestly.
 - **Do not leak schema vocabulary** — `peerId`, `originPeerId`, `STATE_SYNC`, `AGENT_INTENT`, `1008 policy violation`, `runId`, `stepId` — internal terms only.
 - **Always humanize schema enums when surfacing them.**
 
@@ -693,12 +698,14 @@ The wire contract lives in code, not a standalone doc: envelope shapes in `packa
 ## Command reference
 
 - `om chart create` (action: `chart_create`) — Create a chart workspace with a clean template (your name, symbol, exchange, and interval; no inherited indicators), REST direct so it works even when the daemon is down.
+- `om chart delete` (action: `chart_delete`) — PERMANENTLY delete chart workspaces (REST direct through the collab gateway).
 - `om chart events` (action: `chart_events`) — Recent edits on the live session, oldest first, split by author.
 - `om chart indicator add` (action: `chart_indicator_add`) — Add a technical indicator or WRUN marketplace indicator (RSI, MACD, EMA, LIQUIDATIONS, wrun/@scope/name/output, ...) to a chart pane.
 - `om chart indicator list` (action: `chart_indicator_list`) — List every indicator type addable via `chart_indicator_add`: canonical keys, friendly aliases, chart placement, and single-instance rules.
 - `om chart indicator remove` (action: `chart_indicator_remove`) — Remove indicator overlays from a chart pane.
 - `om chart indicator update` (action: `chart_indicator_update`) — Tune an existing indicator's settings.
 - `om chart interval` (action: `chart_interval`) — Change a chart pane's candle interval (1m, 5m, 15m, 1h, 4h, 1d, 1w, ...).
+- `om chart keep` (action: `chart_keep`) — Keep the current scratch chart under a name.
 - `om chart layout` (action: `chart_layout`) — Change the multi-chart layout / grid.
 - `om chart list` (action: `chart_list`) — List workspaces accessible to the configured collab API key (REST direct — works even when the daemon is down).
 - `om chart open` (action: `chart_open`) — Open a workspace's live chart view (openmarket.xyz/chart/<id>?live=true) in a browser on this machine, and optionally wait for a human viewer to join the session.

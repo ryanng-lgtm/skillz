@@ -35,15 +35,20 @@ can reopen it. Report it; do not retry around it.
 
 ## Getting access: the knock
 
-When a resource you need is missing, call `room_grant_request` with
-EVERYTHING the task needs in one `resources` array, each entry at the
-smallest capability that does the job (`read`, `post`, `post_as_you`, or
-`contribute` for structural writes: docs on a space grant, topics on a room
-grant), and a one-line reason. Reading a room's content almost always means
-its space library too: room messages are often `om://doc/...` pointers, and
-library docs ride the SPACE grant, not the room's. `room_info` shows the
-`spaceId` before you knock. Bundle both; one knock, one consent card,
-instead of a second interruption minutes later.
+When a resource you need is missing, call `room_grant_request` ONCE,
+sized to the TASK: one `resources` array carrying every room and space
+the task spans and every capability it implies, plus a one-line reason.
+`read` is the default entry; add `post` (or `post_as_you`) entries up
+front when the ask implies replying or posting autonomously, and
+`contribute` entries when it implies structural writes (docs on a space
+grant, topics on a room grant). Drafting rides the read grant, so a task
+whose messages the operator will send by hand needs no post entry.
+Reading a room's content almost always means its space library too: room
+messages are often `om://doc/...` pointers, and library docs ride the
+SPACE grant, not the room's. `room_info` shows the `spaceId`; a requested
+room whose owning space read is neither granted nor in the ask gets it
+appended automatically. One knock, one consent card, never a ladder of
+single-capability cards.
 
 The knock blocks on the operator's decision by default (`waitMs`, 50s). On
 `approved`, the grants are already active and echoed back in
@@ -53,8 +58,8 @@ same resources: it dedupes onto the pending ask and keeps waiting (that
 re-knock is the parking primitive; do not tight-loop with `waitMs: 0`). On
 `denied`, continue with what you have and do not re-ask unless the task
 changes. The ask survives daemon restarts. Never widen one room's grant
-into another room or a DM, and never knock for speaking when reading
-answers the ask.
+into another room or a DM: bundle capabilities on the rooms the task
+names, never more rooms than it needs.
 
 ## Reading and searching
 
@@ -93,6 +98,11 @@ cursors and never tight-loop.
 - `room_post_as_operator` posts verbatim under the operator's identity.
   Only with the per-room `post_as_you` capability and a deliberate
   operator request. Cooldown, hourly, and consecutive-post limits apply.
+
+An arm ask (`room_grant_request` with an arm entry) is how you request a
+window to reply on your own for the task at hand instead of a standing
+capability: it is time-boxed, the operator sees exactly the scope and the
+duration on one card, and it lapses by itself when the window ends.
 
 For replies and files, use the autonomous rung the operator authorized:
 

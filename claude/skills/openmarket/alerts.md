@@ -151,7 +151,7 @@ Most useful on `open_interest` and `volume`. Also valid on `price`, `delta_abs`,
 | `label` | string, required | Human-readable. `id` auto-allocates as the next positive integer (`1`, `2`, `3`, ...) if omitted. Users refer to alerts by these numbers in conversation. |
 | `fire_mode` | `"once"` or `"recurring"`, optional | `"recurring"` for notification-only alerts; `"once"` when `on_fire.execute` is present, so a buy/sell does not repeat while the condition stays true. To override either default, set the field explicitly. |
 | `expires_at` | ISO 8601 string, optional | After this timestamp the tick loop stops evaluating. **Defaults to never-expires** when the field is omitted (the stored spec will have no `expires_at` field and the tick loop skips the expiration check entirely). To set a finite expiry, send an ISO 8601 string in the JSON spec, or `--expires <value>` on the CLI (accepts a duration like `1h` / `7d` with the unit required, or an ISO timestamp). `"expires_at": null` is also accepted as the explicit "no expiry" sentinel. |
-| `cooldown` | duration string (`1h`, `30m`, `45s`, `7d`), optional | Wall-clock suppression: after firing, suppress re-fires for this duration. Pure wall-clock — going FALSE in between does NOT reset. Max 30d. **Defaults to `"60s"`** when the field is omitted, so a misconfigured level-op `recurring` alert can't spam every tick. To disable, send `"cooldown": null` in the JSON spec (or `--cooldown none` on the CLI). With `fire_mode: "once"` the field is silently ignored (only one fire ever). Edits to `cooldown` preserve fire history (it is a dispatch policy, not a data-identity field). On the CLI: `--cooldown <value>` on create / edit. |
+| `cooldown` | duration string (`1h`, `30m`, `45s`, `7d`), optional | Wall-clock suppression: after firing, suppress re-fires for this duration. Pure wall-clock — going FALSE in between does NOT reset. Max 30d. **Defaults to `"60s"`** when the field is omitted, so a misconfigured level-op `recurring` alert can't spam every tick. To disable, send `"cooldown": null` in the JSON spec (or `--cooldown none` on the CLI). With `fire_mode: "once"` the field is silently ignored (only one fire ever). Edits to `cooldown` preserve fire history (it is a dispatch policy, not a data-identity field). Catch-up evaluation honors cooldown too, measured at each bar's close time rather than the moment the daemon caught up (see [Reliability](#reliability-catch-up-delivery-health)). On the CLI: `--cooldown <value>` on create / edit. |
 | `latency_class` | `"fast"` or `"standard"`, optional | Routing hint. `"standard"` (the implicit default when the field is absent) evaluates on the heartbeat tick — the standard 10s cadence. `"fast"` opts into a push-stream wake: the runner subscribes the alert's leaf to the corresponding OM price stream and evaluates the cross condition the moment a tick arrives, typically within ~100ms. Today fast lane supports single-leaf `price` alerts (`gt` / `lt` / `gte` / `lte` / `eq` / `crosses_above` / `crosses_below`) on any exchange the OM data stream covers. Compound conditions, indicators (RSI / MACD / etc.), and script alerts continue to run on the heartbeat regardless of this field. Cosmetic at edit time (does not re-arm). On the CLI: `--latency standard|fast` on create / edit. |
 | `condition` | Condition tree, required | See above. |
 | `channels` | `string[]`, optional | Per-alert dispatch targets, stored as channel **ids** (rendered by current name). Routing is **literal** — fires go to exactly these channels. Every create surface materializes this at write time: a create without an explicit channel seeds the current default's id, so a normal alert always literally lists where it goes. An **empty** `channels[]` is card-only (the inline om-chat card is the delivery — no push, no agent take). Ids/names that no longer resolve are dropped at fire time. See [Channels](#channels-1) below. |
@@ -167,7 +167,7 @@ A create without `--channel` **seeds** the current default's id (or the lone cha
 
 ## Optional auto-execution
 
-Alerts may include an `on_fire.execute` block. Its presence is the user's authorization for the runner to submit an order when the alert fires; omit the block for notification-only alerts. Two venues are supported: Hyperliquid (paired with `om setup hyperliquid`) and Polymarket CLOB (paired with `om setup polymarket`). The `venue` field in the block selects which one fires. Works on both the compiled binary and source installs — the vault master key lives at `~/.openmarket/vault.key` (mode 0600) with optional `OM_VAULT_KEY` env-var override for CI / ops. Auto-execution only happens on live ticks served by the daemon: if the daemon is offline, there is no catch-up execution.
+Alerts may include an `on_fire.execute` block. Its presence is the user's authorization for the runner to submit an order when the alert fires; omit the block for notification-only alerts. Two venues are supported: Hyperliquid (paired with `om setup hyperliquid`) and Polymarket CLOB (paired with `om setup polymarket`). The `venue` field in the block selects which one fires. Works on both the compiled binary and source installs — the vault master key lives at `~/.openmarket/vault.key` (mode 0600) with optional `OM_VAULT_KEY` env-var override for CI / ops. Auto-execution only happens on live ticks served by the daemon: if the daemon is offline, there is no catch-up execution. A qualifying trigger that landed while the daemon was off is reported in the gap digest as a missed execution trigger (`missed_execution_trigger`); no order is placed, and execution re-arms only on a fresh false-to-true transition observed live (see [Reliability](#reliability-catch-up-delivery-health)).
 
 **Decision rule for the agent:** if the user's phrasing is *"do X when Y"* (a condition triggers the action), author an alert with `on_fire.execute` — this is the right skill. If the user's phrasing is *"do X now"* (no condition, just a one-shot action like a resting bid, a position open, or an exit), switch to the `openmarket-orders` skill and use `om order place` instead. Don't wrap a one-shot intent in a synthetic always-true alert — it's slower and pollutes the alert list. The decision is by *user intent*, not by JSON shape: the same `execute` block lands on either path.
 
@@ -222,6 +222,10 @@ For price alerts, edge operators detect mid-candle crosses: `crosses_above` comp
 ## News catalyst pairing
 
 When a price alert fires on a market that an event-watch is tagged with (`om event-watch edit <id> --market EXCHANGE:SYMBOL`, see `news.md`), the fire notification automatically appends the watch's freshest accepted news event from the last few hours as a `Possible catalyst (...)` line. This needs no field on the alert itself; the pairing lives entirely on the watch. After authoring a price alert, offering a news watch on the same underlying (once, not naggingly) is good practice.
+
+## Alert fires on charts
+
+Every alert's fires mirror into the event store, so they chart like any news feed: `chart_pins` with `sources: [{kind: "alert", ref: <id-or-label>}]` (CLI `om chart pins --alert <id>`) pins the fire history onto a live chart and follows new fires as they land. The plotting doctrine (defaults, the one-question rule, chart-time filters, depth, workspace consent) lives in `news.md`'s "Plotting events on charts" section; read it before plotting. The mirror is alert-managed: pause/resume/remove the ALERT and its shadow follows, and generic event-watch verbs on the shadow refuse with a redirect back here.
 
 ## Workflow when a user requests an alert
 
@@ -872,18 +876,17 @@ If the user has no alerts, say so plainly (*"No alerts configured. Want to creat
 - **`om alert history <id>`** — one alert. The default lens. Use when the user names an alert (by id, or by description after disambiguating).
 - **`om alert events`** — all alerts. Use for unscoped questions (*"any errors lately?"*, *"recent fires across all alerts?"*). Add `--alert <id>` if you want the one-alert filter in this command instead.
 
-**Event kinds** (filter via `--kind`, repeatable for OR): `fired` (the alert dispatched), `error` (evaluation or delivery failure), `state_change` (e.g. enabled/disabled, expiry transitions).
+**Event kinds** (filter via `--kind`, repeatable for OR): `fired` (the alert dispatched), `executed` (an `on_fire.execute` order's lifecycle: submitted / filled / rejected), `error` (evaluation or delivery failure), `state_change` (e.g. enabled/disabled, expiry transitions).
 
-**The history is MERGED across both kinds.** Metric-alert rows and event-watch rows interleave newest-first on the arrival clock, each naming its `KIND`, so *"what fired recently?"* is one command. `--kind` accepts either vocabulary (metric-alert kinds above, or event-watch outcomes `irrelevant` / `duplicate` / `corroboration` / `update` / `major_update`); `error` exists in both and matches both. `--alert <id>` takes either kind's id. In `--format json` the `events` array keeps its metric-only shape and event-watch rows ride the additive `event_watch_events` array. A fire whose channel dispatch has not completed reads `delivery pending`, and one the boot recovery declined names why: neither ever renders as delivered.
+**The history is MERGED across both kinds.** Metric-alert rows and event-watch rows interleave newest-first on the arrival clock, each naming its `KIND`, so *"what fired recently?"* is one command. `--kind` accepts either vocabulary (metric-alert kinds above, or event-watch outcomes `irrelevant` / `duplicate` / `corroboration` / `update` / `major_update`); `error` exists in both and matches both. `--alert <id>` takes either kind's id. In `--format json` the `events` array keeps its metric-only shape and event-watch rows ride the additive `event_watch_events` array. A fire's per-channel delivery state rides its durable outbox rows, rendered under the fire line (channel, status, attempts): a fire whose sends have not completed reads `delivery pending`, and one that exhausted its 24h retry budget names the failure; neither ever renders as delivered.
 
 **Filters (both commands share these):**
 
 | Flag | Effect |
 | --- | --- |
 | `--limit <n>` | Cap (default 20) |
-| `--kind <k>` (repeatable, OR) | `fired` / `error` / `state_change` |
+| `--kind <k>` (repeatable, OR) | `fired` / `executed` / `error` / `state_change` |
 | `--since <when>` | Duration (`24h`, `7d`, `90m`, `60s`) or ISO date — only events after |
-| `--channel <name>` | Narrow to delivery errors for the named channel |
 | `--format <fmt>` | `text` (default, humanized table) or `json` |
 
 `om alert events` additionally accepts `--alert <id>`.
@@ -897,6 +900,30 @@ If the user has no alerts, say so plainly (*"No alerts configured. Want to creat
 **Rendering in chat**: query with `--format json`, then render one line per event in plain English — kind, relative time, one-phrase hint (fire label / error stage+message / state transition). Cap at the most recent 5 unless the user asked for more. For empty results say so once (*"No events in the last 24h."*) — no scaffolding, no trailing follow-ups.
 
 **Debugging shortcut.** When the user asks *"why isn't my alert firing?"*, run `om alert history <id> --kind error --since 24h --format json` before speculating — the answer is usually there (schema rejection at evaluation time, missing market data, channel auth failure). For script alerts pair it with `om alert state show <id>` so you see both "did it run" and "what did it remember".
+
+## Reliability: catch-up, delivery, health
+
+What the runner guarantees when things go wrong (daemon stopped, laptop asleep, data-fetch outage, channel down), and what to tell a user who asks "did I miss anything while my machine was off?". Three planes: missed closed bars are caught up, notifications are never silently dropped, and a persistently failing alert announces itself.
+
+### Missed closed bars are caught up
+
+The runner keeps a per-alert cursor on the last CLOSED bar it actually evaluated. On daemon restart, wake from sleep, or recovery from a data-fetch outage, any alert whose cursor is behind gets its unseen closed bars re-evaluated causally: window `(cursor, cutoff]`, where the cutoff is the last bar that closed before the daemon came back, capped at 7 days (the digest states when truncation applied). The decision clock is bar close: cooldown, `fire_mode: "once"`, and edge debounce apply as of each bar's close time, exactly as a live pass would have.
+
+- **Late fires are labeled.** A catch-up fire is a real fire (history row, channel dispatch) carrying `late: true` plus the triggering bar's open/close times, so the message reads as "this happened at 14:32, telling you now", never as current.
+- **Push caps.** At most one late push per alert per gap run (the earliest qualifying trigger) and at most 10 late pushes per gap run; further candidates are summarized in the digest. Candidates older than 60 minutes are digest-only, no push. A condition still true when the daemon returns gets no late push at all: the live pass fires normally and the digest notes it.
+- **One gap digest per run.** After catch-up completes, one notification summarizes the gap: duration, late fires, suppressed and unverifiable lines, missed execution triggers. Exactly one, even across repeated restarts.
+- **Execution never catches up.** An `on_fire.execute` alert whose condition triggered mid-gap places NO order: the digest reports it as a missed execution trigger and execution waits for a fresh false-to-true transition observed live (see [Optional auto-execution](#optional-auto-execution)).
+- **Digest-only shapes (reported, never replayed):** script conditions, WRUN metric leaves, conditions mixing intervals or bar grids, and fast-lane sub-bar moves. The digest reports these as "not monitored" or "could not verify", never silently skips them. An alert created or edited mid-gap is likewise reported as unverifiable for that window (its configuration changed under the gap).
+
+When a user asks whether an alert would have fired during downtime, check `om alert history <id>` and the gap digest before speculating: the late fires, the suppressions, and the unverifiable windows are all recorded there.
+
+### Delivery: the durable outbox
+
+Every fire materializes one delivery row per destination channel in the same transaction as the fire itself, before any network send. One drainer owns all sends: the first attempt right after the fire (no added latency), then retries with backoff `min(2^attempts * 30s, 30min)` for up to 24 hours, after which the row is marked failed and the give-up is recorded in the alert's history. A channel whose circuit breaker is open is rescheduled without burning an attempt. Long multipart messages resume from the first undelivered part instead of resending delivered chunks. `om alert history <id>` renders each fire's per-channel delivery rows (channel, status, attempts) under the fire line, so "did the ping actually reach Telegram?" has a factual answer.
+
+### Health: broken pushes and stale detection
+
+An alert that fails 3 consecutive evaluation passes is marked broken, and the runner now pushes ONE notification per broken episode plus one recovery notice when it evaluates cleanly again (recovery goes only to channels that actually received the failure notice). No repeat nagging inside an episode. Stale-data detection also exists but ships default-off (`OM_ALERT_STALE_BARS=0`): when enabled, an alert whose market data stops arriving shows STATUS `stale` in `om alert list` and writes one history row; it never pushes and never counts toward broken.
 
 ## Workflow when a user wants to preview an alert's message
 
@@ -1002,7 +1029,7 @@ The runner supports the price-class metrics, the indicators listed above, edge o
 | User asks for | Honest response |
 | --- | --- |
 | Indicators not in the table (e.g. ADX, Ichimoku, Supertrend, PSAR, KAMA, VWAP) | "That indicator isn't in the supported set. Closest options: `rsi`, `sma`, `ema`, `macd`, `bb_*`, `atr`, `stoch_*`." |
-| Backtests, historical "would-have-fired" replays | "The runner only evaluates live state — it can't replay history. Want to set an alert for the live condition?" |
+| Backtests, historical "would-have-fired" replays | "The runner doesn't replay arbitrary history on demand: catch-up covers verified monitoring gaps automatically, and `om backtest` covers would-have-fired research. Want to set an alert for the live condition?" |
 | Funding rate / open interest on Polymarket | "Polymarket doesn't have perpetuals — those metrics don't apply. For prediction markets use `price`, `delta_pct`, `delta_abs`, or `volume`." |
 | Polymarket markets that have already resolved | "That market has resolved — the YES price is frozen and the runner won't see any new bars. Want to pick an active sibling market?" |
 | Sports / non-crypto / non-prediction markets that aren't on Polymarket (Kalshi, PredictIt, sportsbooks, etc.) | "The runner only reads from the OpenMarket Data API — Polymarket is the only prediction-market venue covered. Want the closest crypto equivalent instead?" |
@@ -1123,8 +1150,8 @@ The alert contract (compound, indicators, edge operators, `expr` math, script pr
 
 - `om alert create` (action: `alert_create`) — Create an alert from a spec object (no interactive wizard; the CLI command of that name is flag-based — a human authoring a spec by hand pipes it to `om alert import` instead).
 - `om alert edit` — (bespoke; see narrative above)
-- `om alert events` (action: `alert_events`) — Recent alert events (fires, errors, state changes).
-- `om alert history` (action: `alert_events`) — Recent alert events (fires, errors, state changes).
+- `om alert events` (action: `alert_events`) — List recent alert events (fires, errors, state changes).
+- `om alert history` (action: `alert_events`) — List recent alert events (fires, errors, state changes).
 - `om alert import` (action: `alert_import`) — Create an alert from a complete spec object — typically parsed from a JSON file or another tool's output.
 - `om alert list` (action: `alert_list`) — List configured alerts, optionally filtered.
 - `om alert pause` (action: `alert_pause`) — Pause a single alert.
