@@ -39,6 +39,8 @@ om metric screen --metric NAME[:k=v,k=v]
 
 **Never loop `get` across a list of symbols.** That was the pattern this skill exists to replace: each iteration consumes a tool-call slot and the LLM hits its per-turn budget before answering. One `screen` call replaces N `get` calls.
 
+**Screens assume the metric follows the universe symbol.** A `wrun/...` metric whose package pins its inputs to fixed markets computes the same value for every universe row (a fully pinned package) or mixes the universe's venue-native symbols with a foreign pinned leg. Screen with WRUN metrics only when the package's primary input follows the selector (the marketplace skill's pin rules say which shapes do).
+
 **Never call `metric get --metric price` for a chat reply.** The action accepts `price` as a metric only so an alert spec using `metric: "price"` can be sanity-checked here. For "what's BTC at" / "price of SOL" / 24h-change questions, route to the `markets` tool: it returns a `prices` array (renders as a sparkline) and a populated `lastPrice` in one call. `metric get` returns a bare scalar and no chart context.
 
 ## Discovery: `om metric list`

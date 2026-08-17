@@ -1,6 +1,6 @@
 ---
 name: openmarket-chart-actions
-description: Inspect and mutate the user's chart workspaces through the local OpenMarket Collab Service Bridge. Verbs live directly under `om chart` (`status`/`events` for bridge health and observed edits, `list`/`create`/`show`/`refresh`/`screenshot`/`open` for workspaces, `view`/`symbol`/`interval`/`plot-type` per-pane plus `layout`/`sync` workspace-global for chart mutations), with two grouped families, `om chart indicator` for indicator add/remove/update and `om chart drawing` for drawing add/remove. Multichart is supported on every persisting verb via `--chart <n>`. Use this skill when the user asks "is my orchestrator/bridge/daemon connected?", "what workspaces do I have?", "what's on my BTC workspace?", "what symbol / indicators / drawings are on chart N?", or asks to (a) add an indicator (RSI, MACD, EMA, BB, ATR, Stoch, Liquidations), (b) draw a trendline / fibonacci retracement between two anchor points, (c) seek / zoom / pan the visible time range, (d) change the symbol / interval / plot type / multi-chart layout, (e) toggle multi-chart sync (symbol / interval / crosshair), or (f) tune indicator settings. Read this file when invoking any `om chart ...` command.
+description: Inspect and mutate the user's chart workspaces through the local OpenMarket Collab Service Bridge. Verbs live directly under `om chart` (`status`/`events` for bridge health and observed edits, `list`/`select`/`create`/`show`/`refresh`/`screenshot`/`open` for workspaces, `view`/`symbol`/`interval`/`plot-type` per-pane plus `layout`/`sync` workspace-global for chart mutations), with two grouped families, `om chart indicator` for indicator add/remove/update and `om chart drawing` for drawing add/remove. Multichart is supported on every persisting verb via `--chart <n>`. Use this skill when the user asks "is my orchestrator/bridge/daemon connected?", "what workspaces do I have?", "what's on my BTC workspace?", "what symbol / indicators / drawings are on chart N?", or asks to (a) add an indicator (RSI, MACD, EMA, BB, ATR, Stoch, Liquidations), (b) draw a trendline / fibonacci retracement between two anchor points, (c) seek / zoom / pan the visible time range, (d) change the symbol / interval / plot type / multi-chart layout, (e) toggle multi-chart sync (symbol / interval / crosshair), or (f) tune indicator settings. Read this file when invoking any `om chart ...` command.
 user-invocable: true
 allowed-tools:
   - Bash(om *)
@@ -77,11 +77,12 @@ Interpretation:
 | `humanPresent: false` | Nobody is watching. After a mutation, surface the live-view link so the user can open the chart. |
 | `stateStale: true` | The user edited the chart manually after the last snapshot; the daemon auto-resyncs within ~2s, but run `om chart refresh` before answering anything state-dependent. |
 
-### Workspace verbs: list, create, show, refresh, screenshot, open
+### Workspace verbs: list, select, create, show, refresh, screenshot, open
 
 | Command | Purpose | Requires daemon |
 | --- | --- | --- |
 | `om chart list` | List workspaces accessible to the API key. Direct REST call. | **no** |
+| `om chart select <id>` | Make a workspace the ACTIVE chart-actions target: persists the default and repoints the live bridge (the same switch as the TUI `/workspace` command, minus its restart fallback: a failed live repoint reports the remedy and rolls the default back instead of bouncing the daemon). Accepts a short id or share-link URL. Selecting a workspace the user does not own joins it READ-ONLY (VIEWER). | yes |
 | `om chart refresh --workspace <id>` | Read the LIVE workspace snapshot: force a fresh `STATE_SYNC` from the gateway and print it (charts, viewport, theme, version). | yes |
 | `om chart show <id>` | Read **any** workspace's content by short id or share-link URL, WITHOUT joining a live session. Direct REST call; read-only; does not change the active workspace. | **no** |
 | `om chart open <id>` | Open the workspace's LIVE view (`?live=true`) in this machine's browser; `--wait-human <ms>` blocks until a viewer joins the session (or the wait elapses). Use before the first mutation when nobody is watching — see "Make chart actions visible" below. | for `--wait-human` |
@@ -171,6 +172,8 @@ om chart symbol \
 | `--transformations <t>` | optional | Lookup key — defaults to `<exchange>\|<symbol>` if omitted. |
 | `--display-transformations <t>` | optional | Display key — defaults to `--transformations` if omitted. |
 | `--narration <text>` | optional | Operator-visible narration. |
+
+A market named in human form ("NQ", "Apple", "EURUSD") resolves to these wire values through `symbol_resolve` (the chart plane's names-only directory, TradFi venues included): a `bound` answer's `exchange` and `symbol` are exactly `--exchange` and `--symbol`, and ambiguity returns named candidates to pick with the user rather than a guess.
 
 #### `om chart interval` — switch timeframe
 
@@ -308,6 +311,8 @@ om chart indicator add \
 
 For Plus-gated types on a non-Plus account, the server returns `403 TIER_FEATURE_LOCKED` — surface verbatim, do not retry. The user must upgrade or stick to free-tier types.
 
+**WRUN packages with cross-symbol pinned input sources stay off charts for now.** A `wrun/@scope/name/output` add whose package pins a NON-odds feed source to a fixed `symbol`+`exchange` (a cross-symbol reference leg) is UNVERIFIED on the hosted chart lane (the chart backend computes with its own data path); when you KNOW a package carries such a pin (you authored it this session, or its listing says so), decline the add, say why, and offer the metric via alerts/`metric get` instead. Odds-pinned packages (conditionId markets) chart as they always have, and a package you cannot inspect is not grounds for refusal.
+
 Typical `--params`:
 
 | `--type` | Typical `--params` |
@@ -387,15 +392,16 @@ Run `om chart status` and report the `open` (else `workspaces[0]`) `workspaceId`
 
 Two steps:
 
-1. **Resolve the workspace id — re-resolve EVERY turn, never reuse a prior turn's id.**
-   - If the user named one by id, use it.
+1. **Pick the target — omission is the default.**
+   - If the user did NOT name a workspace, **omit the workspace id entirely** (agent tools: omit `workspaceId`; CLI: `--workspace` may be omitted on the chart verbs). The daemon resolves the ACTIVE workspace live at call time, so an omitted id can never be stale. This is the correct call for "my workspace" / "this workspace" / "what do you see".
+   - If they named one for a ONE-OFF action ("also add RSI on Y"), pass that id explicitly for that call only.
    - If they used a friendly name (*"my BTC playground"*), run `om chart list` first to map name → id.
-   - If they didn't name one, the target is **the daemon's ACTIVE workspace** — run `om chart status` and take the `open` entry in `workspaces[]` (else `workspaces[0]`). This is the source of truth for "my workspace" / "this workspace" / "what do you see". It **changes when the user runs `/workspace`**, so a workspace id you resolved on a previous turn may now be wrong — resolve it fresh here, do not carry one over.
-2. **Run `om chart refresh --workspace <id>`** and answer from the JSON.
+   - If they asked to **work on** a workspace ("switch to X", "do stuff on X from now on"), run `om chart select <id>` FIRST — it moves the active pointer exactly like the TUI `/workspace` command — then keep omitting the id; later turns inherit it.
+2. **Run `om chart refresh`** (workspace omitted, or `--workspace <id>` for a named one-off) and answer from the JSON.
 
 Never answer "what's on my chart / workspace" from `om chart list` (that only enumerates all workspaces — it doesn't say which one is active or what's on it), and never tell the user you aren't on any workspace: the daemon is always connected to one, and `om chart status` reports it.
 
-> **⚠️ This applies to MUTATIONS too, not just questions.** When the user says "add RSI", "switch to SOL", "draw a trendline" without naming a workspace, the `--workspace <id>` you pass MUST be the daemon's active workspace resolved *this turn* from `om chart status`. **Never reuse a workspace id from earlier in the conversation** — the user may have run `/workspace` since (a switch you don't see in the transcript), so an id you "remember" can silently mutate the workspace they just left. Resolve the active id first, then act.
+> **⚠️ This applies to MUTATIONS too, not just questions.** When the user says "add RSI", "switch to SOL", "draw a trendline" without naming a workspace, OMIT the workspace id and the mutation lands on the daemon's active workspace, resolved at call time. **Never reuse a workspace id from earlier in the conversation** — the user may have switched since (via `/workspace` or `om chart select`, a switch you don't see in the transcript), so an id you "remember" can silently mutate the workspace they just left. Omit, or select first, then act.
 
 Reading rules:
 
@@ -700,7 +706,7 @@ The wire contract lives in code, not a standalone doc: envelope shapes in `packa
 - `om chart create` (action: `chart_create`) — Create a chart workspace with a clean template (your name, symbol, exchange, and interval; no inherited indicators), REST direct so it works even when the daemon is down.
 - `om chart delete` (action: `chart_delete`) — PERMANENTLY delete chart workspaces (REST direct through the collab gateway).
 - `om chart events` (action: `chart_events`) — Recent edits on the live session, oldest first, split by author.
-- `om chart indicator add` (action: `chart_indicator_add`) — Add a technical indicator or WRUN marketplace indicator (RSI, MACD, EMA, LIQUIDATIONS, wrun/@scope/name/output, ...) to a chart pane.
+- `om chart indicator add` (action: `chart_indicator_add`) — Add a technical indicator, WRUN marketplace indicator, or registry kScript indicator (RSI, MACD, EMA, LIQUIDATIONS, wrun/@scope/name/output, @scope/name, ...) to a chart pane.
 - `om chart indicator list` (action: `chart_indicator_list`) — List every indicator type addable via `chart_indicator_add`: canonical keys, friendly aliases, chart placement, and single-instance rules.
 - `om chart indicator remove` (action: `chart_indicator_remove`) — Remove indicator overlays from a chart pane.
 - `om chart indicator update` (action: `chart_indicator_update`) — Tune an existing indicator's settings.
@@ -712,6 +718,7 @@ The wire contract lives in code, not a standalone doc: envelope shapes in `packa
 - `om chart plot-type` (action: `chart_plot_type`) — Change a chart pane's plot type (candlestick, line, bar, area, ...).
 - `om chart refresh` (action: `chart_refresh`) — Read the LIVE workspace state by issuing REQUEST_STATE_SYNC over the bridge WS and returning the fresh snapshot.
 - `om chart screenshot` (action: `chart_screenshot`) — Render a PNG snapshot of a workspace by short id or share-link URL.
+- `om chart select` (action: `chart_workspace_select`) — Make a workspace the ACTIVE one: the live bridge repoints to it, it becomes the saved default, and every later chart action with `workspaceId` omitted lands on it (exactly what the TUI `/workspace` command does).
 - `om chart show` (action: `chart_show`) — Read a workspace's content (symbol, interval, indicators, drawings, layout) by its short id or share-link URL, WITHOUT joining a live session.
 - `om chart status` (action: `chart_status`) — Report the collab bridge's WS state, peerId, and pending intent counts for every active workspace.
 - `om chart symbol` (action: `chart_symbol`) — Change a chart pane's symbol (e.g. BTCUSDT on BINANCE.F → ETHUSDT on BINANCE.F).

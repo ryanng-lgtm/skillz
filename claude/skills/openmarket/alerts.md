@@ -547,7 +547,9 @@ Polymarket markets publish to the **same** `getPoints` candle endpoint as crypto
 
 ## Workflow variant: custom script alerts
 
-For requests the typed schema can't express — rolling windows, trailing stops, multi-tick streaks, cross-exchange arbitrage, blending market data with external APIs, anything that's a *computation* rather than a *threshold* — author a script alert. The script you write runs in a process group every tick, gets fed JSON on stdin, and returns one JSON object on stdout.
+For requests the typed schema can't express — trailing stops, multi-tick streaks, cross-exchange arbitrage, blending market data with external APIs, anything that's a *computation* rather than a *threshold* — author a script alert. The script you write runs in a process group every tick, gets fed JSON on stdin, and returns one JSON object on stdout.
+
+**Net-move windows are typed now — do NOT reach for a script for "moves X% in Y".** `delta_pct` / `delta_abs` take an optional `params.bars`: the change from the close `bars` closed bars back to the current close. "Alert me if BTC moves 5% either way within an hour" is `selector.interval: "MINUTE"` with `{"any": [{delta_pct gt 5}, {delta_pct lt -5}]}` and `params: {"bars": 60}` on each leaf — fires whenever the net hourly move is stretched past 5% (re-paced by `cooldown`). Use `crosses_above 5` instead of `gt 5` for once-per-excursion semantics. Scripts remain the tool for *max-excursion* windows ("5% off the 24h HIGH", peak-relative trails) and everything below.
 
 A script condition is the **universal substrate** for strategies. It (1) remembers state across ticks — whatever JSON it returns is handed back as `state` next tick, so it can hold a rolling window, a running peak, a streak counter, or a per-entity accumulation ledger; (2) can shell any other `om` command, for data **or to place an order**; and (3) can carry an `on_fire.execute` block exactly like a typed condition. So a script alert is not notification-only — it expresses any *stateful and/or executing* strategy (accumulate into a price band, lock one side per game, trail then close a position). Decompose the user's intent into **watch → decide → act**: the script covers watch + decide, and either an `on_fire.execute` block or an `om order place` call inside the body covers act. See [Executing from a script alert](#executing-from-a-script-alert) below.
 
@@ -555,7 +557,7 @@ A script condition is the **universal substrate** for strategies. It (1) remembe
 
 A script is the right call when the user's request involves any of:
 
-- **Rolling windows over time** — "drops 5% from its 24h high", "MA crosses", "volatility spike vs 7-day average". The typed evaluator only sees the current bar plus the immediately-prior bar (for `crosses_above`/`crosses_below`); anything wider needs state.
+- **Peak/trough-relative windows** — "drops 5% from its 24h HIGH", "volatility spike vs 7-day average". The typed windowed delta reads close-to-close over `params.bars`; a max/min-relative or derived-statistic window needs state. (Plain net-move windows are typed — see above.)
 - **Snapshot at create-time** — "3% off my entry of 91,200" (constant), or "3% off whatever price it is right now" (snapshot the first tick). The typed schema has no concept of "save a reference value when the alert is armed".
 - **Streak / debounce / throttle** — "fire when above 60% for 3 ticks in a row", "no more than once per hour". The typed schema fires every tick the condition is TRUE (recurring mode); finer cadence semantics need a counter.
 - **Mixing data sources** — "fire when BTC drops AND Polymarket 'recession 2026' crosses 40%" can in principle be a Compound, but anything that pulls from an external API needs a script.
@@ -612,7 +614,8 @@ Two consequences you must build into the loop:
 2. **Write the body and show it to the user.** Include a shebang. Make the JSON output strict: `printf '{"fired":...}'` not `echo` (which adds a trailing newline that's fine, but be deliberate).
 3. **Install it, then dry-run it by name.** `alert_create_script` materialises the body into `~/.openmarket/scripts/` and returns the managed `script` name; `alert_test_script` takes that name (optionally `state`) and reports `exit_code` / `stdout`. If the contract is wrong, call `alert_create_script` again with the same `script_name`; it replaces in place and clears stale state. `alert_test_script` takes a **bare managed filename only**: a path is refused (`script_not_managed`), because on this surface an arbitrary path is an arbitrary-executable primitive.
 4. **From a shell instead of the tools?** The CLI keeps the older order: `om alert test-script /tmp/foo.sh --format json` (a path is fine here, because a human typed it), then `om alert create-script --label "..." --script /tmp/foo.sh --format json`.
-5. **Report once.** "Created alert 12 — runs every 10s, fires when BTC drops 5% from its 24h high." Stop there.
+5. **Declare the script's markets.** A script body is opaque to the daemon, so pass `markets: ["EXCHANGE:SYMBOL", ...]` (CLI: repeatable `--market BINANCE_FUTURES:BTCUSDT`) naming what it watches. Declared markets are what put the script's fires ON CHARTS (`om chart pins --sources <alert>` and the active-chart pin lane), route room nudges, and attach catalyst lines — an undeclared script alert fires invisibly to all three.
+6. **Report once.** "Created alert 12 — runs every 10s, fires when BTC drops 5% from its 24h high." Stop there.
 
 ### Common patterns — give the agent shape, not a copy-paste template
 

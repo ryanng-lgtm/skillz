@@ -349,6 +349,13 @@ Signals now have the full lifecycle (`show` / `edit` / `pause` / `resume` / `rem
 - `om logs` — the daemon's per-tick `[strategy] …` lines plus a one-line decision summary (view, sized order) per evaluated strategy. This is the primary window into what a strategy decided; it requires the daemon running as a service.
 - `om event-watch events <slug>` — what an event-driven signal last saw.
 
+## Backtesting a strategy
+
+Backtests are the research skill's job: `skill_read research` documents `backtest_run` (the default one-shot verb: saved slugs only) and `backtest_spec` (explicit windows/costs and UNSAVED inline candidates). Two routing facts that live here because they bite strategy authors:
+
+- **An unsaved idea backtests via `backtest_spec` with an inline `candidate`** ({strategy, signal?} in the authoring shapes of `strategy_create`/`signal_create`); nothing is persisted, and a winning candidate is creatable verbatim.
+- **Authoring the candidate's signal spec?** The per-kind condition shapes and worked JSON examples are in `skill_read("signal", section = the kind name)` (e.g. `metric_band_rule` for band regimes like a golden cross: enter `{"left":{"metric":"sma","params":{"period":50}},"op":"gt","right":{"metric":"sma","params":{"period":200}}}`).
+
 ## Behaviors to follow
 
 - **Run `om status` first** to confirm prerequisites; route any missing feed / signal-credential / wallet / daemon setup to the user with the exact command.

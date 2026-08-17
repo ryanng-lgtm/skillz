@@ -164,6 +164,8 @@ Heed the honesty warnings when summarizing: `metric_not_ready` (the signal's dat
 
 The contract is **promotability**: a candidate is validated by the exact create-path schemas and validators, so a candidate that backtests is creatable once it earns it — the strategy fields pass to `om strategy create` verbatim; an inline signal maps mechanically onto `signal_create` (its `spec` fields become the flat create inputs: kind, selector, condition, long/short, direction/conviction, eval). Candidate slugs must NOT collide with saved ones — including by DERIVED id (slugs slugify to ids by collapsing separator runs) — pick fresh names.
 
+**Authoring the inline signal's spec:** the per-kind spec shapes and worked JSON examples live in `skill_read("signal", section = the kind name)`: e.g. `metric_band_rule` for hysteresis regimes (a golden cross is `long.enter` `{"left":{"metric":"sma","params":{"period":50}},"op":"gt","right":{"metric":"sma","params":{"period":200}}}` with `lt` on exit). Do not guess condition shapes; the operators are word-form (`gt`/`lt`, never `>`), and there is no `compare` wrapper.
+
 ### Sweeping spec variants
 
 `om backtest sweep` compares N variants of one base strategy (saved `--strategy-slug` or unsaved `--candidate-file`) in a single invocation over ONE shared market-data pass — the natural tool for threshold sweeps and exit-policy comparisons:

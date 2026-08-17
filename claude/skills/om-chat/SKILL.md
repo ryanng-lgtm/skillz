@@ -130,8 +130,11 @@ For replies and files, use the autonomous rung the operator authorized:
 
 The first posting attempt may return `canary_pending`: retry that same
 call once, taking no local action. If posting reports auto-approved
-powers or filesystem hands, posting stays locked for this session; keep
-drafting instead.
+powers or filesystem hands, posting stays locked for this session unless
+the operator turns the badge's yolo dial (`om agent policy set <badge>
+--yolo draft|allow`); keep drafting instead. A `draft` dial answers a
+post with `{posted: false, degraded: "draft"}`: the text is in the
+operator's composer, never claim it was posted.
 
 ## Conduct
 
