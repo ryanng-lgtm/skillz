@@ -1,6 +1,6 @@
 ---
 name: loop-me-in
-description: Use when a fix plan, spec, or design doc needs to become a file that a fresh session can execute unattended and prove its own changes landed — "make this runnable", "turn this plan into a loop", "so I can paste it and let it rip". Trigger: /loop-me-in [path].
+description: Use when a fix plan, spec, or design doc needs to become a file that a fresh session can execute unattended and prove its own changes landed — "make this runnable", "turn this plan into a loop", "so I can paste it and let it rip". Elicits the expected result of every change from the user first (never assumed), turns each into a committed spec written before the code, and gates the run on those specs. Trigger: /loop-me-in [path].
 ---
 
 # loop-me-in — a plan in, a self-driving brief out
@@ -13,18 +13,36 @@ A plan is written for a reader who already has the context. A runnable brief is 
 
 **Second principle: the brief closes its own loop.** It builds, drives the real product, decides for itself whether the change landed, fixes what it finds, and re-checks — until green or until it hits a stated cap. Ryan is not the verification step.
 
-**A finished brief has exactly two human touchpoints:**
+**Third principle: requirements are elicited, never inferred.** The run does not decide what "fixed" means. A plan describes a change; only Ryan can say what the change is *for*. Guessing here is the failure that all the machinery downstream cannot detect: a run can be green on every gate and have built the wrong thing.
 
-1. A **blocking decision** the plan did not settle — a product call, an ambiguity, a question the run cannot answer from the page.
-2. **Deployment** — the cherry-pick, push, merge, or release into main.
+**Current behaviour and expected behaviour are two different fields, and only one of them can be measured.** A probe shows how the system behaves *today*. A live capture shows Ryan *reproducing the defect*. Both are evidence of the present, and neither is an oracle — treat either as the expected result and you encode the bug as the specification. Every requirement therefore carries both, separately:
+
+| Field | Source | Answers |
+|---|---|---|
+| `CURRENT` | probe output, live capture, reproduction steps | what it does now |
+| `EXPECTED` | Ryan's decision, an approved product requirement, an API contract, a compatibility invariant | what it must do instead |
+
+`EXPECTED` must name its authority. "Because the probe showed X" is not an authority; it is the thing being changed.
+
+**Fourth principle: the acceptance criteria are executable, and their meaning is locked before the code is read.** Requirements become spec files — committed, runnable, and derived from `EXPECTED` rather than from the implementation that will satisfy it. Implementation is then judged against them: a failing spec is a bad implementation. See the **Spec-first** section below.
+
+**A finished brief has exactly three human touchpoints, and the first is the largest:**
+
+1. **Specification** — up front, before anything runs: the requirements, the expected result of each, and a live capture where words were not enough.
+2. A **blocking decision** the spec session did not settle — a product call, an ambiguity, a question the run cannot answer from the page.
+3. **Deployment** — the cherry-pick, push, merge, or release into main.
 
 Everything between those is the run's job, commits on its own branch included. A brief that ends with "confirm it looks right" has not been converted; it has been reformatted.
+
+**The point of touchpoint 1 is to buy out touchpoints later.** Time spent pinning down expected results is not overhead added to the run — it is the per-phase "does this look right?" interruptions, paid once, in daylight, before the machine is committed to anything.
 
 ## When to use
 
 - A `/ivtg` fix plan, a `superpowers:writing-plans` plan, or any dated plan in the vault is approved and ready to execute.
 - You want to hand execution to a session you won't babysit.
-- Symptoms: the plan says "then fix it" without naming the branch; it assumes a tool that 404s; it was written before three decisions that have since been made; the last run kept pulling you back in to confirm whether a change had actually landed.
+- Symptoms: the plan says "then fix it" without naming the branch; it assumes a tool that 404s; it was written before three decisions that have since been made; the last run kept pulling you back in to confirm whether a change had actually landed; the last run finished green and had fixed something adjacent to the actual complaint.
+
+**Budget for the specification session.** This skill front-loads a conversation: every requirement's expected result, probed and where necessary captured live. That is the work, not a preamble to it — a plan handed over without it produces a brief that cannot tell right from wrong.
 
 **Don't use for:** a plan still under discussion (run `/demuddy` first), or a one-line change you'd just do.
 
@@ -35,15 +53,91 @@ Everything between those is the run's job, commits on its own branch included. A
    **Mine the "Risks & unknowns" / "Open questions" section hardest.** It is the one a brief reliably drops, because it contains no steps to transcribe — and it is where "does this fix even address the report?" lives. A `/demuddy` pass concentrates exactly these into one clean section, which makes them easier to skip and more expensive to skip.
 
    **If the plan exists in more than one copy, diff them before building.** A duplicate vault, an older draft, a pre-review version: they can differ by hundreds of lines and by which fix is correct. Build from the copy the user names, and say in the brief how to recognise a stale one.
-2. **Resolve the environment, don't assume it.** For every repo the plan touches, establish and write down: exact worktree path, branch name and base, whether the tree is clean, how deps are installed, and the verification command. Check these — a stale path is the single most common way these runs die.
-3. **Harvest the traps.** Every "don't do X, it breaks Y" you know: package managers that 404, files that must be regenerated rather than hand-merged, test harnesses with sharp edges, suites that OOM. A trap costs one line here and an hour there.
-4. **Design the verify loop.** Pick the harness, resolve the surface (command, port, URL), and give every phase acceptance rows and a sentinel. Do this while you still have the plan open — retrofitting acceptance rows onto a written brief is how they end up as "check the page renders".
-5. **Ask where it reports.** Do not infer the channel or topic from the plan's subject. Ask the user to paste the destination — channel, and topic if the work belongs to one — once per area if the plan splits across several. Resolve what they paste to a canonical resource string and write that into the brief.
-6. **Pick the trigger** (table below).
-7. **Write the brief to `~/.claude/plans/YYYY-MM-DD/<source-name>-run.md`** — resolve that symlink and say the real path in your report, so a wrong target is caught immediately. Never into a repo; plan files are not committed.
+2. **Resolve the environment, don't assume it.** This comes before any spec work, because a spec cannot be written, run, or committed without knowing the worktree, the branch, the test runner and the install command. For every repo the plan touches, establish and write down: exact worktree path, branch name and base, whether the tree is clean, how deps are installed, the test runner and how it names spec files, and the verification command. Check these — a stale path is the single most common way these runs die.
+
+   **An install is not a safe no-op.** Where a repo depends on a private registry, a bare `install` can re-resolve a package, fail to fetch it, and leave the tree worse than it found it. Name the install command that is known to work, and make a failed install a stop condition rather than something the run works around.
+3. **Lock the acceptance oracle for every requirement. Ask; never assume.** A conversation with Ryan, before phases exist. Work the ladder in **Establishing expected results** below until each requirement has a `CURRENT` and an `EXPECTED` with a named authority, specific enough to encode as an assertion. Assign each one a **gate mode** (table in **Spec-first**). **A requirement whose `EXPECTED` you inferred is a brief-generation blocker: the brief does not ship until Ryan settles it.**
+4. **Plan the specs; the run writes them.** In the brief, map requirements to spec files and phases — many-to-many is fine and often correct. For each, record the gate mode and the *expected* failure signature. The run writes, validates and commits each spec at the start of its own phase; the brief carries the plan and the expected signature, not the spec's text or its recorded output. See **Spec-first**.
+5. **Harvest the traps.** Every "don't do X, it breaks Y" you know: package managers that 404, files that must be regenerated rather than hand-merged, test harnesses with sharp edges, suites that OOM. A trap costs one line here and an hour there.
+6. **Design the verify loop around the specs.** Pick the harness, resolve the surface (command, port, URL), and for each phase name its spec files plus the sentinel proving the build under test is this one. Do this while you still have the plan open. Where a requirement cannot be a unit spec — a visual, a layout, a live surface — its spec is a *scripted* assertion (a committed CDP script, or a command with an expected value), never sweep prose.
+
+   **Resolve the stack's adapters here, by name**, so the brief is not silently hard-coded to one ecosystem: `START`, `TEST_ONE`, `TEST_IMPACTED`, `TYPECHECK`, `BUILD`, `DIST_CHECK`. A repo without one of these omits that gate explicitly rather than inheriting a command from another project.
+7. **Ask where it reports.** Do not infer the channel or topic from the plan's subject. Ask the user to paste the destination — channel, and topic if the work belongs to one — once per area if the plan splits across several. Resolve what they paste to a canonical resource string and write that into the brief.
+8. **Pick the trigger** (table below).
+9. **Write the brief to `~/.claude/plans/YYYY-MM-DD/<source-name>-run.md`** — resolve that symlink and say the real path in your report, so a wrong target is caught immediately. Never into a repo; plan files are not committed.
 
    **Vault trap:** an iCloud-nested duplicate of the plans vault can exist (`…/Obsidian/Obsidian/Claude Plans` beside the real `…/Obsidian/Claude Plans`), and the source plan may be handed to you as a path inside the *duplicate*. Do not infer the destination from where the source file sits, and do not infer it from the symlink alone. If both directories exist, name both and ask which is live before writing.
-8. **Report the path and the paste line.** That's the deliverable.
+
+   **Quote every path.** The vault's real path contains spaces (`Mobile Documents`, `Claude Plans`), and so do some source directories. An unquoted path, or a `for f in $(cat list)`, silently shatters into fragments and the run reads past it. Quote in every command the brief contains, and never word-split a file list.
+10. **Report the path and the paste line.** That's the deliverable.
+
+## Establishing expected results
+
+**Do not assume anything.** Not from the plan's title, not from the code, not from what would be reasonable. A plan says what someone intends to change; it very often does not say what the result should look like, and it is written by someone who already knew.
+
+Two instruments establish `CURRENT`; only Ryan establishes `EXPECTED`. Run them in this order — measure first, then ask, because confirming a finding is fast and specifying from nothing is slow.
+
+| Step | Instrument | Establishes | Produces |
+|---|---|---|---|
+| 1 | **Probe** — cheapest first | `CURRENT` | A recorded observation: command plus output, request plus response, a screenshot of how it behaves *today* |
+| 2 | **Live capture**, when the probe can't settle it | `CURRENT` | A screen recording, CDP trace, console and network capture of Ryan reproducing it, saved in the evidence directory |
+| 3 | **Ask Ryan for the desired delta** | `EXPECTED` | The result in his words — exact text, number, state; what should happen and what should *stop* happening — plus the authority it rests on |
+
+**Steps 1–2 can never produce step 3.** They tell you what is; the change is defined by what ought to be. A probe that shows a badge reading `0` does not tell you whether `0` or no badge at all is correct. That is the question for Ryan, and it is the whole point of the session.
+
+**Escalate to live capture rather than negotiating in prose.** Three rounds of "do you mean X or Y?" costs more than one recording, and a recording carries what nobody thinks to mention — the timing, the intermediate state, the second thing that flickers. Escalate whenever the issue is intermittent, visual, or Ryan can't put it in words; also whenever his description of current behaviour and the probe disagree, since one of them is wrong and the spec must not be written until you know which.
+
+**The live capture is an artifact, not a conversation.** It lands in the evidence directory beside the brief, it is named in the requirement it supports, and the spec cites it. A capture described in chat and never saved is gone by the time the run needs it.
+
+**What "specific enough" means.** Encodable as an assertion, without a judgement call at run time. "The counter should be right" is not. "After deleting the last unread DM, the sidebar badge shows no number at all, not 0" is.
+
+**Every requirement carries its expected result into the brief verbatim.** Ryan's words, not a paraphrase — a paraphrase is where an assumption re-enters after you were careful enough to avoid one.
+
+### The blocker that outranks the others
+
+A requirement whose `EXPECTED` is unconfirmed is a **brief-generation blocker**, and it is settled in daylight: the brief does not ship until Ryan states it. This is deliberately *not* a runtime stop condition — an unattended run must never be the thing that discovers a requirement was never specified. Every gate downstream can pass on a wrong target, so this is the one failure the machinery cannot catch. A brief built on an assumed expectation is worse than no brief: it produces confident, tested, committed, wrong work.
+
+## Spec-first — the requirement is the test
+
+Acceptance criteria are **files in the repo**, whose meaning is fixed from `EXPECTED` before the implementation is read.
+
+### The rules
+
+1. **Lock the meaning before reading the implementation; encode it afterwards.** What is frozen is the *acceptance semantics* — the assertion's subject and its expected value, taken from `EXPECTED` and the capture. The *mechanics* are not frozen: read the test harness, fixtures, helpers, public interfaces and the runner's conventions freely, because a spec written blind to them produces exactly the missing-import and bad-selector failures that rule 2 rejects. What you must never do is derive an expected value from the implementation, or write an assertion that restates what the code does. Review each spec for tautologies before committing it.
+2. **Validate the spec against its gate mode before implementing.** Not every requirement can or should fail red:
+
+   | Mode | Pre-implementation validation | Use for |
+   |---|---|---|
+   | `behavior-red` | The named test runs and fails **at the expected assertion**, with the recorded signature | New behaviour, bug fixes with an observable wrong result |
+   | `green-characterization` | The tests pass **before and after** — they pin behaviour that must not change | Refactors, moves, extractions |
+   | `compile-red` | Fails to build because the named symbol/route/export does not exist yet | New API surface |
+   | `benchmark-delta` | A recorded baseline, a stated tolerance, and a repeat count that survives noise | Performance work |
+   | `structural-invariant` | The invariant holds now and must keep holding (lint rule, dist check, import fence) | Boundary and packaging rules |
+   | `discovery` | No gate is possible yet — the phase's output *is* the information needed to specify | Spikes; ends in a report, never a claim of done |
+
+   Only `behavior-red` requires an assertion failure. Each requirement's mode is chosen during the spec session and written into the brief; a mode that cannot be validated is a brief-generation blocker, not a phase.
+3. **A pre-implementation pass under `behavior-red` is a finding, not a green light.** It means one of: the requirement is already satisfied (report it, drop the phase), the spec asserts the wrong thing, or the spec never ran. Classify which, and say so. It is never banked as progress.
+4. **Infrastructure failure is not red.** A missing runner, dependency error, syntax error, timeout, crash, or zero-tests-executed is an infrastructure failure and is fixed, not recorded as evidence. Red means *this named test executed and failed at the assertion you predicted*.
+5. **The red receipt is the proof, not the commit order.** Commit ordering only proves that test text preceded implementation text. Record a receipt per spec — base SHA, spec SHA, exact command, exit classification, the named test, and the expected-vs-actual failure signature — in the findings log. Separate spec and implementation commits are the default because they are reviewable, but **check first whether the repo tolerates an intentionally-red commit**: CI on every push, pre-commit gates, and `git bisect` all suffer from one. Where it does not, land the pair as one commit and let the receipt carry the red evidence.
+6. **A failing spec is a bad implementation.** The fix loop changes the implementation.
+7. **Freeze the meaning, not the file.** A spec can be wrong in two very different ways:
+   - **Mechanically** — bad selector, malformed fixture, wrong mock, racy wait, misused harness API. The requirement is intact. The run may land a **test-only corrective commit**, logged in the findings log with what was wrong, and must re-validate the gate mode afterwards. This is not an escape hatch: it may not change the assertion's subject or expected value.
+   - **Semantically** — the assertion encodes something Ryan did not ask for, or satisfying it would require weakening what he did ask for. **Stop.** Only Ryan can re-state a requirement.
+
+   Weakening, skipping, deleting or loosening an assertion to make an implementation pass is never a mechanical fix, whatever it looks like at attempt 3.
+8. **Requirements, specs and phases are many-to-many.** One requirement may need several focused spec files and shared fixtures; several coupled requirements may need one atomic implementation. The brief carries a **traceability matrix** — requirement ↔ spec files ↔ phase — so coverage is checkable without forcing a 1:1:1 that produces giant spec files, duplicated fixtures and phases that cannot independently go green. What each phase must state is which spec files are its gate.
+
+### What this actually buys — stated honestly
+
+**Spec-first does not reveal blast radius.** Writing the test before the code tells you nothing about which other modules the change can break. Focused-test *selection* is what saves time, and it is a separate mechanism that spec-first makes easier rather than causes.
+
+The real saving is narrow and worth having: **inside the fix loop**, the question is "do this phase's spec files pass?" — seconds, no guessing which suite covers the change. That is where the attempts pile up, so that is where the hours were going.
+
+What has *not* gone away: an impacted-test set still runs at the phase boundary, and a wider gate at the wave boundary. A green spec proves the requirement is met; it does not prove nothing else broke. Anyone who reads this scheme as "no more suite runs" will ship a regression.
+
+The specs accumulate, and that is the durable half — by the last phase they are a fast, targeted suite for exactly the behaviour this plan cared about, and they stay in the repo afterwards.
+
+The specs accumulate. By the last phase, the run's own spec files are a fast, targeted regression suite for exactly the behaviour this plan cared about — and they stay in the repo afterwards, which is the durable half of the work.
 
 ## The verify loop
 
@@ -75,9 +169,14 @@ Name a sentinel per phase while writing the brief: a new `data-testid`, a new ro
 ### The loop
 
 ```
-build → identity gate → sweep → all acceptance rows landed, no in-scope regressions?
+spec commit (red, for the stated reason)
+   │
+   ▼
+build → identity gate → run this phase's spec + sweep → spec green, acceptance rows
+                                  │                     landed, no in-scope regressions?
                                   ├─ yes → review diff, commit, next phase
-                                  └─ no  → fix agent → attempt += 1 → back to build
+                                  └─ no  → fix agent (implementation only, never the
+                                           spec) → attempt += 1 → back to build
 ```
 
 The sweep returns a fixed shape — verdict per acceptance row with the evidence, regressions seen en route, in-scope gaps with a file guess, out-of-scope findings left alone, and the single question that would need a human. The out-of-scope slot is what keeps an unattended run from wandering: those findings get recorded and reported, not fixed.
@@ -92,11 +191,13 @@ A suite that takes 224 seconds is not a gate — at fourteen phases and three at
 
 | Tier | Scope | When |
 |---|---|---|
-| **Attempt** | The one test file covering the change, plus `typecheck` | Every build inside the fix loop |
-| **Phase** | That file plus the suites of modules importing the changed file | Once, when the attempt gate goes green |
+| **Attempt** | **This phase's spec file**, plus `typecheck` | Every build inside the fix loop |
+| **Phase** | That spec, plus every spec written earlier in this run, plus the suites of modules importing the changed file | Once, when the attempt gate goes green |
 | **Wave** | The union of that wave's phase tiers, plus lint, typecheck, build, dist check | Once per wave |
 
-The phase tier is what makes the omission safe. A single test file misses what a change breaks in its consumers — but the full suite is not the only instrument that catches it. Find the importers, run their tests, and a sweep's coverage arrives for a fraction of the time. Lint, typecheck and build stay at the wave boundary because they are fast; it is the test runner that is expensive.
+The attempt tier is a single spec file because spec-first made it one: the phase exists to satisfy one requirement, so the inner loop asks one question. That is the whole saving.
+
+The phase tier is what makes the omission safe, and it has two parts for two different reasons. **Re-running every earlier spec** catches the phase that satisfies its own requirement by breaking a previous one — cheap, because these are targeted files the run wrote itself. **The importers' suites** catch what the change broke in consumers the specs never mention. Lint, typecheck and build stay at the wave boundary because they are fast; it is the test runner that is expensive.
 
 **The full suite runs in exactly two situations:**
 
@@ -206,10 +307,27 @@ Paste line: /loop <one sentence naming the work>
 First action: /caveman:caveman full — internal work only. The completion post,
 the findings log, and commit messages stay normal prose.
 
+## Requirements — CURRENT, EXPECTED, and the oracle
+One row per requirement, none of it paraphrased: `CURRENT` (probe command and
+its recorded output, or the live-capture path in the evidence directory);
+`EXPECTED` in Ryan's words verbatim; the **authority** EXPECTED rests on
+(his decision, a product requirement, an API contract, a compatibility
+invariant); and the gate mode. No row may be UNSPECIFIED — that is resolved
+before this brief ships, not at 3am.
+
+## Traceability matrix
+Requirement ↔ spec files ↔ phase, many-to-many. Per spec: its gate mode and
+the *expected* failure signature the run must match before implementing.
+The run records the actual signature as a red receipt in the findings log.
+State that acceptance semantics are frozen while test mechanics are not; that
+a mechanical test defect may be corrected in a logged test-only commit that
+re-validates the gate mode; and that a semantic spec error stops the run.
+
 ## Ground truth
 Repos and worktrees (path, branch, base, clean?), the spec-of-record path,
 what already landed (commit shas), what is deliberately NOT in scope.
 One branch per repo, one worktree for the whole run.
+The install command known to work, and that a failed install stops the run.
 
 ## Environment traps
 One line each. Install commands that break things. Files that must be
@@ -237,15 +355,19 @@ carries: phase and attempt, identity verdict, acceptance rows, regressions,
 in-scope gaps, out-of-scope findings, and the screenshot and console-log paths.
 
 ## Phases
-Numbered. Each carries: the change, the files, the sentinel that proves it
-reached the served output, the acceptance rows the sweep must return a verdict
-on, the command gate, and what "done" looks like.
-One phase = one commit = one reviewable unit.
+Numbered, one requirement each. Every phase carries: the requirement it
+satisfies, its spec file and that spec's recorded red failure, the change, the
+files, the sentinel that proves the build under test is this one, the
+acceptance rows the sweep must return a verdict on, the command gate, and what
+"done" looks like — which is always "this spec is green".
+One requirement = one spec = one phase = one commit pair (spec red, then
+implementation green).
 
 ## Gates
-Three scoped commands per repo — attempt tier (one test file plus typecheck),
-phase tier (that file plus its importers' suites), wave tier (the union of the
-wave's phase tiers plus lint, typecheck, build, dist check). The full suite is
+Three scoped commands per repo — attempt tier (this phase's spec file plus
+typecheck), phase tier (that spec plus every earlier spec in the run plus the
+importers' suites), wave tier (the union of the wave's phase tiers plus lint,
+typecheck, build, dist check). The full suite is
 not a tier: it runs once at phase 0 for the baseline, and thereafter only as a
 logged escalation when a failure will not localize. State which number each
 tier is checked against, and how long the full suite takes so it is never
@@ -270,18 +392,42 @@ the completion post. Needs explicit human OK: push, merge, cherry-pick into
 main, publish, release, migrations against real data, anything else
 outward-facing. Codex agents never commit — the run reviews the diff, stages,
 and commits via the `/commit` skill.
+**Never authorised, at any attempt, for any reason: changing what a spec
+asserts, or its expected value, to make an implementation pass.** Weakening,
+skipping, loosening or deleting an assertion is the same move under another
+name. A mechanical test defect — selector, fixture, mock, racy wait — may be
+corrected in a test-only commit that leaves the assertion's subject and
+expected value untouched, is logged in the findings log, and re-validates the
+gate mode. Anything beyond that is a semantic change to the requirement, and
+only Ryan can make one.
 
 ## Stop conditions
-The situations where the run must stop and report instead of deciding:
-ambiguity the plan didn't settle, a product decision, a second failure of
-the same kind, a third failed sweep on one phase, a browser that will not come
-up healthy, work that would widen scope.
+Two lists, and the difference matters more than either.
+
+CLEARED IN DAYLIGHT — brief-generation blockers. The brief does not ship
+until every one is resolved, so the run never meets them: unconfirmed
+EXPECTED, a gate mode that cannot be validated, an unresolved worktree or
+branch, a failing install, a duplicate-vault ambiguity, a missing posting
+grant, a verification that only a human can perform.
+
+RUNTIME — the run halts and reports only for: a semantic spec error, a
+product decision the spec session did not settle, a third failed sweep on one
+phase, or work that would widen scope.
+
+RUNTIME RECOVERY, not a stop — the run handles these itself and logs them:
+a foreign process on a port (step to the next port), a browser that will not
+come up healthy after two attempts (record the phase as unverified and
+continue with command gates), an unreachable posting destination (write the
+report to the findings log instead), a phase blocked by an earlier red phase
+(skip it and take the next independent one).
 Everything else: keep going. Do not stop to ask whether it looks right.
 ```
 
 ## Rules for the brief you write
 
 - **Copy facts, don't cite them.** "See the handoff" fails in a fresh session. Paste the constraint.
+- **Every requirement arrives with Ryan's expected result attached**, verbatim, plus how it was established. No expected result, no phase.
+- **Every phase's done-condition is its spec going green**, and that spec was red first for a recorded reason.
 - **Every phase ends in a verification command**, not "check it works".
 - **State the baseline numbers.** "5,781 tests, 0 fail; lint 42 warnings, 0 errors" turns an ambiguous red run into an obvious regression.
 - **Name the known flakes.** Otherwise the run treats one as a real failure and starts patching.
@@ -289,13 +435,27 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 - **Scope fences are explicit.** Say what must NOT be touched; that is where autonomous runs do their damage.
 - **Verification is quantitative.** A command plus an expected number, not "looks right". A check the run genuinely cannot perform — hardware, a third-party account, a human judgement call — is a stop condition, not a phase. "Ryan will look at it" is not one of those.
 - **One worktree per repo, one branch, for the whole run.** Say it explicitly and forbid `git worktree add` and per-phase checkouts. Phases stack as commits on one branch. A fresh session will otherwise isolate a phase and build against a tree missing the earlier phases' changes — which fails quietly, not loudly. Name the phase pairs that touch the same file, so the ordering constraint is visible.
-- **Pilot before the long run.** Tell the brief to execute phase 1 and report before continuing, when the plan is large or the repo is unfamiliar.
+- **Pilot without blocking.** "Execute phase 1 and report before continuing" is a contradiction in an unattended run: if it waits for review the night ends after one phase, and if it doesn't it was never a pilot. Instead, when the plan is large or the repo is unfamiliar, make phase 1 a **self-judged canary** — it posts its result immediately and continues, and it *stops the run* only on a stated tripwire (its gate mode could not be validated, or the environment turned out different from the brief). Ryan wakes to either a finished run or a run that stopped at phase 1 with a reason.
 - **Feed lessons back.** If the run discovers a trap, it belongs in the plan's Environment traps for next time — fixing the instance without recording it means the next run pays again.
 
 ## Common mistakes
 
 | Mistake | Consequence |
 |---|---|
+| Assuming the expected result instead of asking | Every gate passes; the run built the wrong thing, tested and committed |
+| Treating a probe or a live capture as the expected result | Both measure CURRENT. You have just specified the bug as the requirement |
+| An EXPECTED with no named authority | Nobody can tell later whether it was a decision or a guess |
+| Paraphrasing Ryan's expected result into the brief | The assumption you avoided re-enters as your wording |
+| Negotiating an ambiguous issue in prose instead of asking for a live capture | Rounds of clarification, and a spec written on the wrong reading anyway |
+| A live capture described in chat but never saved to the evidence dir | The one piece of ground truth is gone when the run needs it |
+| Deriving an expected value from the implementation | The spec asserts what the code does, so it passes whether the code is right or not |
+| Writing a spec blind to the harness, fixtures and interfaces | Guaranteed missing-import and bad-selector failures — the exact ones that don't count as red |
+| Demanding `behavior-red` of a refactor or a perf change | Unsatisfiable gate; the phase cannot start, or a fake failure gets manufactured to satisfy it |
+| Accepting any non-zero exit as red | A missing runner, syntax error or zero tests executed all look like proof; none is |
+| Relying on commit order as the red evidence | Proves text order only. Without a receipt, nothing shows the spec ever ran or why it failed |
+| An intentionally-red commit in a repo with CI on every push or bisect in use | You have knowingly broken CI, cherry-picks and `git bisect` for a record a receipt could have carried |
+| Loosening an assertion and calling it a mechanical fix | The one move that voids the scheme, wearing the costume of the one that's allowed |
+| Treating a spec that passes pre-implementation as a green phase | Either the requirement was already met, the spec is wrong, or it isn't running — and the run can't tell which |
 | Linking the spec instead of copying its constraints | Fresh session can't see it; invents its own interpretation |
 | Omitting the worktree path, or not forbidding per-phase worktrees | A later phase builds against a tree missing the earlier ones; fails quietly |
 | Building from a stale copy of the plan | Implements a superseded fix; the cite that was corrected is the one it follows |
@@ -309,6 +469,8 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 | No attempt cap, or a third attempt that patches instead of diagnosing | Patches forever against a wrong model of the bug |
 | Fixing out-of-scope bugs the sweep surfaced | Unattended scope creep, in a diff nobody watched grow |
 | Writing `timeout 900 …`, or no time box at all | No such binary on macOS; and one hang costs the whole window |
+| Gate helpers left to run under zsh | zsh doesn't word-split, so a multi-file gate collapses to one bogus path and reports "no tests found" — which reads as green |
+| An unquoted `$RUN_DIR` | The plans vault path contains spaces; the evidence write lands somewhere else or fails silently |
 | Treating "the CDP port answers" as a working browser | Sweeps run against a dead renderer and report false negatives all night |
 | Relaunching the browser until it works | Forty headless Chromes by morning, nothing verified |
 | Killing or tearing down a process the run didn't start | Takes down Ryan's browser, or another session's dev server |
@@ -328,6 +490,14 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 
 ## Red flags
 
+- **You're about to write an expected result Ryan never said.** If you cannot quote him or name the contract it comes from, you are guessing. Stop and ask.
+- **You caught yourself thinking "obviously it should…".** That is the assumption. Ask anyway; the obvious ones are cheap to confirm and are exactly where the wrong build comes from.
+- **You're about to write `EXPECTED` by describing what the probe showed.** That is `CURRENT`. You have not specified anything yet.
+- **You took an expected *value* from the implementation** — a constant, a shape, an existing string. The spec is now a tautology whatever order it was written in.
+- **Every requirement in the brief came out as `behavior-red`.** Real plans contain refactors and invariants. A uniform mode usually means the modes were not considered.
+- **A spec passed on the first run, before any implementation.** Do not bank it. Name which of the three reasons applies.
+- **The fix loop is on attempt 2 and the spec is starting to look wrong to you.** Decide honestly which kind of wrong: mechanical (fix it, log it, re-validate) or semantic (stop). "It's basically mechanical" at attempt 3 is how the scheme dies.
+- **A requirement has no row in the traceability matrix.** It has no gate, whatever the acceptance rows claim.
 - You're about to write "as discussed" or "as above" — the fresh session has neither.
 - You can't name the branch. Stop and resolve it; don't write "the feature branch".
 - The brief has no stop conditions. Every unattended run needs an exit that isn't "finish anyway".

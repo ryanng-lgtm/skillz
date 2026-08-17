@@ -20,6 +20,21 @@ clears. Sweep verdicts, screenshots, and console logs are the only proof the nig
 happened; a run that leaves them in `/tmp` has verified nothing you can still read.
 **Teardown kills processes. It never deletes `$RUN_DIR`.**
 
+`$RUN_DIR` contains spaces on this machine — the plans symlink resolves through
+`Mobile Documents` and `Claude Plans`. **Quote every use of it**, and never build a file
+list by word-splitting a path.
+
+> [!important] **These helpers must run under `bash`, not `zsh`.**
+> They use bash arrays (`declare -a`, `"${arr[@]}"`, `+=`) and `[[ ]]`, and Ryan's login
+> shell is zsh. Put `#!/usr/bin/env bash` at the top of the brief's helper block, or invoke
+> each gate as `bash -c '…'`, and state which in the brief.
+>
+> **Arrays, never space-joined strings.** File lists are carried as arrays and expanded
+> quoted, so a path containing a space stays one argument. This is also why nothing here
+> relies on word-splitting: zsh doesn't split unquoted expansions at all, so a helper built
+> on splitting collapses its list into one bogus path under zsh and the runner reports
+> "no tests found" — which a fix loop reads as green.
+
 ## 0. `with_timeout` — macOS has no `timeout`
 
 Neither `timeout` nor `gtimeout` is on this machine (no GNU coreutils). A brief that
@@ -139,14 +154,34 @@ ensure_chrome() {                       # at most TWO launch attempts for the wh
 Both parts must pass or the sweep result is void: rebuild, restart, re-gate. A failed gate
 is recorded as "not verified", never as "not landed".
 
-```sh
-# (a) the process serving $PORT is rooted in this worktree
-PID=$(lsof -ti tcp:$PORT -sTCP:LISTEN | head -1)
-lsof -a -p "$PID" -d cwd -Fn | sed -n 's/^n//p'      # must equal $WORKTREE
+Both parts must **assert**. Printing a value is not a gate: an earlier version of this
+block printed the serving cwd without ever comparing it, and `$CD evaluate` exits 0 while
+printing `false`, so a missing sentinel passed at the shell level.
 
-# (b) the phase's sentinel reaches the served output — same tab, every time
-$CD navigate --wait-until load "$APP_URL"
-$CD evaluate 'document.querySelector("[data-testid=\"<sentinel>\"]") !== null'
+```sh
+identity_gate() {    # returns non-zero if the thing under test is not this worktree's build
+  local pid cwd sentinel
+
+  # (a) the process serving $PORT is rooted in this worktree
+  pid=$(lsof -ti "tcp:$PORT" -sTCP:LISTEN | head -1)
+  [ -n "$pid" ] || { echo "identity: nothing listening on $PORT" >&2; return 1; }
+  cwd=$(lsof -a -p "$pid" -d cwd -Fn | sed -n 's/^n//p')
+  # contract: the serving cwd is the worktree or a directory beneath it
+  case "$cwd" in
+    "$WORKTREE"|"$WORKTREE"/*) ;;
+    *) echo "identity: port $PORT served from '$cwd', not under '$WORKTREE'" >&2; return 1 ;;
+  esac
+
+  # (b) the phase's sentinel reaches the served output — same tab, every time
+  "$CD" navigate --wait-until load "$APP_URL" >/dev/null || {
+    echo "identity: navigate failed" >&2; return 1; }
+  sentinel=$("$CD" evaluate \
+    'document.querySelector("[data-testid=\"<sentinel>\"]") !== null')
+  [ "$sentinel" = "true" ] || {
+    echo "identity: sentinel absent (evaluate returned '$sentinel')" >&2; return 1; }
+
+  return 0
+}
 ```
 
 The sentinel is a string that exists **only** after this phase's change — a new
@@ -163,7 +198,10 @@ that does not override it runs at xhigh, including a sweep whose whole job is to
 four things and report what it saw. Always pass the flag explicitly.
 
 ```sh
-effort_for() {   # effort_for <role> <attempt>
+effort_for() {   # effort_for <role> [attempt] — attempt defaults, so `effort_for diagnose`
+                 # cannot abort under `set -u`
+  local role="$1" attempt="${2:-1}"
+  set -- "$role" "$attempt"
   case "$1:$2" in
     sweep:1)  echo low     ;;   # acceptance rows name a selector and expected text: a checklist
     sweep:2)  echo medium  ;;   # something didn't land — look harder
@@ -214,8 +252,8 @@ with_timeout 900 codex exec \
   -c sandbox_workspace_write.network_access=true \
   --sandbox workspace-write \
   --add-dir "$RUN_DIR" \
-  --output-last-message "$RUN_DIR/sweep-p$N.md" \
-  "$(cat "$RUN_DIR/sweep-prompt-p$N.md")"
+  --output-last-message "$RUN_DIR/sweep-p$N-a$ATTEMPT.md" \
+  "$(cat "$RUN_DIR/sweep-prompt-p$N-a$ATTEMPT.md")"
 ```
 
 `sandbox_workspace_write.network_access=true` is required — `workspace-write` blocks
@@ -255,9 +293,9 @@ last night find", which is the question actually asked the next morning.
 ```sh
 {
   echo "## P$N attempt $ATTEMPT — <phase name>"
-  echo "identity: $(sed -n 's/^IDENTITY: //p' "$RUN_DIR/sweep-p$N.md")"
-  sed -n '/^ACCEPTANCE:/,/^REGRESSIONS:/p' "$RUN_DIR/sweep-p$N.md"
-  sed -n '/^REGRESSIONS:/,$p'              "$RUN_DIR/sweep-p$N.md"
+  echo "identity: $(sed -n 's/^IDENTITY: //p' "$RUN_DIR/sweep-p$N-a$ATTEMPT.md")"
+  sed -n '/^ACCEPTANCE:/,/^REGRESSIONS:/p' "$RUN_DIR/sweep-p$N-a$ATTEMPT.md"
+  sed -n '/^REGRESSIONS:/,$p'              "$RUN_DIR/sweep-p$N-a$ATTEMPT.md"
   echo "evidence: $RUN_DIR/p$N-*.png, $RUN_DIR/p$N-console.log"
   echo
 } >> "$FINDINGS"
@@ -283,6 +321,36 @@ The fix prompt carries the sweep's `GAPS` verbatim, the scope fence, and the ver
 command. Codex does not commit and does not stage — the run reviews the diff, then
 `git add` plus the `/commit` skill.
 
+**The fix prompt states the specs are read-only**, naming this phase's spec files and the
+earlier run specs as files it may read but never modify, and instructing it to report "spec
+appears to misencode the requirement" as its answer rather than adjusting an assertion.
+Without that sentence an agent told to make a test pass will eventually edit the test.
+
+Check the diff before committing. This must **return non-zero on violation** — a guard that
+prints a warning and exits 0 is not a guard:
+
+```sh
+# RUN_SPEC_FILES is a bash array, appended to as each spec is committed:
+#   declare -a RUN_SPEC_FILES=(); RUN_SPEC_FILES+=("$spec")
+assert_specs_untouched() {
+  local -a changed=() protected=("${RUN_SPEC_FILES[@]}")
+  # staged, unstaged AND untracked — an added file is a modification too
+  while IFS= read -r -d '' f; do changed+=("$f"); done < <(
+    { git diff --name-only -z; git diff --cached --name-only -z
+      git ls-files -z --others --exclude-standard; } )
+  local c p
+  for c in "${changed[@]}"; do
+    for p in "${protected[@]}"; do
+      [ "$c" = "$p" ] && { echo "STOP: fix attempt modified spec $c" >&2; return 1; }
+    done
+  done
+  return 0
+}
+```
+
+Exact `=` comparison, not `grep` — substring matching lets `a.spec.ts` match
+`not-a.spec.ts.bak`. NUL-delimited, so a path with spaces survives.
+
 On attempt 3, this becomes the diagnosis agent instead:
 
 ```sh
@@ -298,13 +366,20 @@ with_timeout 1800 codex exec \
 ## 8. Loop control and gate tiers
 
 ```
-build → identity gate → sweep → all rows landed and no in-scope regressions? → commit, next phase
+spec commit (red, reason recorded)
+   ↓
+build → identity gate → spec + sweep → spec green, rows landed, no in-scope
+                                 │      regressions? → commit, next phase
                                  ↓ no
-                              fix agent → attempt += 1 → back to build
+                              fix agent (implementation only) → attempt += 1 → back to build
 ```
 
 Cap at **3 sweeps per phase**. On the third failure, stop that phase, record what is still
 red, and move to the next phase that does not depend on it.
+
+**The fix agent may not touch the spec.** Its prompt says so explicitly (section 7). If the
+spec itself looks wrong, that is a stop condition for Ryan, not a repair the run performs —
+a run that edits its own acceptance criteria has stopped verifying anything.
 
 One codex agent at a time — sweep or fix, never both, never two phases in parallel. Two
 `codex exec` runs plus a browser tree is where an unattended night turns into swap.
@@ -313,45 +388,101 @@ One codex agent at a time — sweep or fix, never both, never two phases in para
 
 Every scheduled gate is scoped. The full suite is not one of them — see "Escalation" below.
 
+**`PHASE_IMPACTED` is resolved during the spec session, not here.** Use the repo's own
+test-selection or dependency tooling and write the resolved paths into the brief. The two
+greps below are a *last-resort fallback* for a repo with no such tooling, and the brief must
+say when it fell back to them — they miss single-quoted imports, path aliases, re-exports,
+dynamic `import()`, and every extension they don't name, so a gate built on them reports
+green over dependencies it never found.
+
 ```sh
-# tests that exercise a module, directly or through its consumers
+# FALLBACK ONLY — see the caveat above. Prefer repo-native impacted-test selection.
 tests_touching() {   # tests_touching channel-todos
   grep -rl -- "$1" test 2>/dev/null | grep -E '\.test\.tsx?$' | sort -u
 }
 
-# source files importing a module — their tests are the phase tier
 importers_of() {     # importers_of channel-todos
-  grep -rlE "from \"[./][^\"]*$1\"" src 2>/dev/null | sort -u
+  grep -rlE "from ['\"][./][^'\"]*$1['\"]" src 2>/dev/null | sort -u
+}
+
+# BEFORE implementing, for behavior-red specs only. A non-zero exit is NOT proof of red:
+# a missing runner, syntax error, timeout, crash or zero-tests-executed all exit non-zero.
+# Red means the NAMED test ran and failed at the PREDICTED assertion.
+#   $1 = spec file   $2 = test name as the runner prints it   $3 = expected signature
+gate_spec_red() {
+  local spec="$1" name="$2" want="$3" rc
+  local out="$RUN_DIR/spec-red-p$N-$(basename "$spec").txt"
+  bun test "$spec" -t "$name" >"$out" 2>&1; rc=$?
+
+  if [ "$rc" -eq 0 ]; then
+    echo "PRE-IMPLEMENTATION PASS — classify before proceeding: requirement already met" >&2
+    echo "(report and drop the phase), spec asserts the wrong thing, or spec never ran." >&2
+    return 2
+  fi
+  # proof the named test actually executed — an empty run also exits non-zero
+  grep -qE '([1-9][0-9]*) fail' "$out" || {
+    echo "INFRASTRUCTURE FAILURE, not red: no test failure reported. See $out" >&2; return 3; }
+  grep -qF -- "$name" "$out" || {
+    echo "INFRASTRUCTURE FAILURE: named test '$name' never ran. See $out" >&2; return 3; }
+  grep -qF -- "$want" "$out" || {
+    echo "RED FOR THE WRONG REASON: expected signature '$want' absent. See $out" >&2; return 4; }
+
+  echo "red as predicted; receipt: $(git rev-parse HEAD) / $out"
+  return 0
+}
+
+# NEVER call the runner with an empty file list: `bun test` with no arguments runs the
+# WHOLE SUITE, which is the one thing the tier scheme exists to avoid. Every gate below
+# refuses to run rather than widen silently.
+run_tests() {        # run_tests <file>...
+  [ "$#" -gt 0 ] || { echo "GATE ERROR: empty test list — refusing to run" >&2; return 1; }
+  bun test "$@"
 }
 
 gate_attempt() {     # seconds — runs on every build inside the fix loop
-  bun test "$PHASE_TEST_FILE" && bun run typecheck
+  run_tests "${PHASE_SPEC_FILES[@]}" && bun run typecheck
 }
 
 gate_phase() {       # tens of seconds — runs once, when gate_attempt goes green
-  local files; files=$(tests_touching "$PHASE_MODULE")
-  for imp in $(importers_of "$PHASE_MODULE"); do
-    files="$files $(tests_touching "$(basename "$imp" | sed 's/\.[jt]sx\?$//')")"
+  # every spec written so far this run, so a new phase cannot satisfy its own
+  # requirement by breaking an earlier one, plus the impacted set
+  local -a files=("${RUN_SPEC_FILES[@]}" "${PHASE_IMPACTED[@]}")
+  local -a uniq=(); local f
+  for f in "${files[@]}"; do
+    [[ " ${uniq[*]} " == *" $f "* ]] || uniq+=("$f")
   done
-  # shellcheck disable=SC2086
-  bun test $(printf '%s\n' $files | sort -u) && bun run typecheck
+  run_tests "${uniq[@]}" && bun run typecheck
 }
 
-gate_wave() {        # wave boundary — the wave's own tests, NOT the whole suite
-  local files=""
-  for m in $WAVE_MODULES; do files="$files $(tests_touching "$m")"; done
-  # shellcheck disable=SC2086
-  with_timeout 900 bash -c "bun run lint && bun run typecheck && bun run build \
-    && bun tools/check-dist.ts && bun test $(printf '%s\n' $files | sort -u | tr '\n' ' ')"
+gate_wave() {        # wave boundary — the union of this wave's phase tiers, NOT the suite
+  # WAVE_TESTS is the accumulated union of every phase tier in this wave, built as each
+  # phase completes — not rediscovered here, or it silently disagrees with what ran before
+  run_tests "${WAVE_TESTS[@]}" || return 1
+  with_timeout 900 bash -c \
+    "$TYPECHECK && $LINT && $BUILD${DIST_CHECK:+ && $DIST_CHECK}"
 }
 ```
 
 Lint, typecheck, build and the dist check stay at the wave boundary because they are fast.
 It is the test runner that is expensive, so the wave tier runs the union of its own phases'
-tests rather than everything in the repo.
+tiers rather than everything in the repo.
 
-Each phase in the brief names its `PHASE_TEST_FILE` and `PHASE_MODULE`, and each wave its
-`WAVE_MODULES`, so no tier has to be guessed at 3am.
+`$LINT`, `$TYPECHECK`, `$BUILD`, `$DIST_CHECK` are the adapters resolved for this repo
+during the spec session. `DIST_CHECK` is intentionally optional — a repo without one omits
+the gate rather than inheriting `bun tools/check-dist.ts` from a project that has it. The
+`bun test` / `bun run` spellings above are this stack's adapters too; a Go, Python or Rust
+repo substitutes its own and the tier structure is unchanged.
+
+**Arrays, not strings.** Every list here is a bash array (`PHASE_SPEC_FILES`,
+`PHASE_IMPACTED`, `RUN_SPEC_FILES`, `WAVE_TESTS`), expanded as `"${arr[@]}"`. That is what
+makes the earlier "quote every path, never word-split" rule and these helpers consistent —
+the previous version relied on word-splitting and contradicted it. Initialise each as
+`declare -a NAME=()` at the top of the brief's helper block and append with `NAME+=("$x")`.
+
+`PHASE_IMPACTED` is resolved **before the run**, during the spec session, using the repo's
+own dependency or test-selection tooling — not rediscovered at 3am with `grep`. A grep for
+`from "…"` misses single-quoted imports, aliases, re-exports and dynamic imports, so a
+gate built on it reports green over dependencies it never found.
 
 ### Reproducing one failure
 
@@ -359,7 +490,7 @@ The sweep's `GAPS` line carries the failing case's own command. Re-run **that**,
 suite that contains it:
 
 ```sh
-bun test "$PHASE_TEST_FILE" -t "<the failing test name>"
+bun test "<the spec file>" -t "<the failing test name>"
 ```
 
 Minutes per attempt disappear here. A fix loop that re-runs a 224-second suite to see one
@@ -386,8 +517,9 @@ report, so the one expensive run of the night is always accountable.
 
 | Tier | Green means |
 |---|---|
-| attempt | the named test file passes, typecheck clean |
-| phase | that file and every importer's suite pass, typecheck clean |
+| spec-red | the phase's spec FAILS, for the reason the requirement predicts — recorded before any implementation |
+| attempt | the phase's spec file passes, typecheck clean |
+| phase | that spec, every earlier spec in the run, and every importer's suite pass, typecheck clean |
 | wave | the union of the wave's phase tiers passes, plus lint, typecheck, build, dist check |
 | escalation | the phase-0 full-suite baseline, with zero new failures and no new failing suite names |
 
