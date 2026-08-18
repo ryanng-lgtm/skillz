@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * om-chat-web — a browser harness for the OM Chat GUI.
+ * testing-harness — a browser harness for the OM Chat GUI.
  *
  * Drives a real Chromium against two surfaces of the same product:
  *
@@ -28,7 +28,16 @@ import { dirname, join, resolve } from "node:path";
 
 const HOME = homedir();
 
-const STATE_DIR = process.env.OM_CHAT_STATE ?? join(HOME, ".claude", "state", "om-chat-web");
+// Saved browser profiles and run scratch. The skill was once called
+// "om-chat-web"; a profile directory left at the old path is still honoured so
+// an existing cloud login survives the rename.
+const LEGACY_STATE_DIR = join(HOME, ".claude", "state", "om-chat-web");
+const DEFAULT_STATE_DIR = join(HOME, ".claude", "state", "testing-harness");
+const STATE_DIR =
+  process.env.OM_CHAT_STATE ??
+  (existsSync(DEFAULT_STATE_DIR) || !existsSync(LEGACY_STATE_DIR)
+    ? DEFAULT_STATE_DIR
+    : LEGACY_STATE_DIR);
 const PROFILE_DIR = join(STATE_DIR, "profiles");
 const RUN_DIR = join(STATE_DIR, "runs");
 
@@ -115,7 +124,7 @@ const log = (...parts) => console.log(...parts);
 const warn = (...parts) => console.warn(...parts);
 
 function fail(message) {
-  console.error(`om-chat-web: ${message}`);
+  console.error(`testing-harness: ${message}`);
   process.exit(1);
 }
 
@@ -579,7 +588,7 @@ async function cmdDoctor() {
   const internal = repoState(REPOS.internal);
   const problems = [];
 
-  log("\nom-chat-web doctor\n");
+  log("\ntesting-harness doctor\n");
 
   log(`  cloud    ${cloud.reachable ? "ok" : "FAIL"}  ${TARGETS.cloud.base}  (${cloud.detail})`);
   if (!cloud.reachable) problems.push("cloud baseline is unreachable");
@@ -1188,7 +1197,7 @@ async function cmdSnap(args) {
   return out;
 }
 
-const USAGE = `om-chat-web — browser harness for the OM Chat GUI
+const USAGE = `testing-harness — browser harness for the OM Chat GUI
 
   doctor                       verify the wiring before trusting a capture
   login    [--target cloud]    establish or refresh the saved session
@@ -1242,6 +1251,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`om-chat-web: ${error.message}`);
+  console.error(`testing-harness: ${error.message}`);
   process.exit(1);
 });

@@ -1,7 +1,7 @@
 {
-  "name": "om-chat-web",
+  "name": "testing-harness",
   "version": "1.0.0",
-  "description": "",
+  "description": "Browser harness for proving OM Chat GUI changes in the running product",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
