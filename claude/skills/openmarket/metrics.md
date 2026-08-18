@@ -1,6 +1,6 @@
 ---
 name: openmarket-metrics
-description: Compute named scalar metric values ad-hoc via `om metric get`, scan a universe of symbols via `om metric screen`, and discover the registry via `om metric list`. Covers the registered indicators (RSI, EMA, SMA, MACD, Bollinger Bands, ATR, Stochastic) plus the alert-engine schema-parity metrics (price, delta_pct, delta_abs, volume, funding_rate, open_interest). Chart-only indicators (CCI, MFI, OBV, VWAP, ADL, ADX, PSAR, Ichimoku) are NOT computable here — they exist only as chart overlays via `om chart indicator add`. NOT for raw-price chat questions: "what's the price of X" / "what's BTC at" / 24h-change queries always route to the `markets` tool (sparkline + lastPrice), never to `metric_get`. Use this skill when the user asks for a named indicator value ("what's RSI on BTC?", "give me MACD for ETH 4h"), wants to find symbols matching a condition ("find oversold majors", "scan top 50 by volume for high RSI"), wants to verify an alert threshold against the live value, or needs to discover what metrics exist. Always shell to `om metric`; never recompute math locally.
+description: Compute named scalar metric values ad-hoc via `om metric get`, scan a universe of symbols via `om metric screen`, and discover the registry via `om metric list`. Covers the registered indicators (RSI, EMA, SMA, MACD, Bollinger Bands, ATR, Stochastic) plus the alert-engine schema-parity metrics (price, delta_pct, delta_abs, volume, funding_rate, open_interest). Chart-only indicators (CCI, MFI, OBV, VWAP, ADL, ADX, PSAR, Ichimoku) are NOT computable here — they exist only as chart overlays via `om chart indicator add`. NOT for raw-price chat questions — "what's the price of X" / "what's BTC at" / 24h-change queries always route to the `markets` tool (sparkline + lastPrice), never to `metric_get`. Use this skill when the user asks for a named indicator value ("what's RSI on BTC?", "give me MACD for ETH 4h"), wants to find symbols matching a condition ("find oversold majors", "scan top 50 by volume for high RSI"), wants to verify an alert threshold against the live value, or needs to discover what metrics exist. Always shell to `om metric`; never recompute math locally.
 user-invocable: false
 allowed-tools:
   - Bash(om *)
@@ -31,6 +31,7 @@ om metric screen --metric NAME[:k=v,k=v]
 | Question shape | Tool |
 | --- | --- |
 | "What's BTC at?" / "price of SOL" / "ETH 24h change" | **`markets`, not this skill.** Returns lastPrice + sparkline-ready `prices` array. |
+| "How's AAPL / Apple stock?" (equities) | **`symbol_resolve` first; then on the bound POLYGON market: venue-scoped `markets` (exchange + symbolFilter) for price/sparkline, `points` for history, `metric_get` for indicators.** Bare unscoped tickers match only tokenized-crypto perps; equity listings are unranked (no top_n). FX/index/CME bound markets are names-only: data verbs refuse with the boundary named. |
 | "What's RSI on BTC?" (one symbol) | `get` |
 | "Give me MACD and EMA on ETH 4h" (one symbol, many metrics) | `get` (multi-metric form) |
 | "Find oversold majors" / "which alts are above the upper BB?" (many symbols, one metric) | `screen` |

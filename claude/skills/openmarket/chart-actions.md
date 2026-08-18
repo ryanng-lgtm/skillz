@@ -708,6 +708,7 @@ The wire contract lives in code, not a standalone doc: envelope shapes in `packa
 - `om chart events` (action: `chart_events`) — Recent edits on the live session, oldest first, split by author.
 - `om chart indicator add` (action: `chart_indicator_add`) — Add a technical indicator, WRUN marketplace indicator, or registry kScript indicator (RSI, MACD, EMA, LIQUIDATIONS, wrun/@scope/name/output, @scope/name, ...) to a chart pane.
 - `om chart indicator list` (action: `chart_indicator_list`) — List every indicator type addable via `chart_indicator_add`: canonical keys, friendly aliases, chart placement, and single-instance rules.
+- `om chart indicator preview` (action: `chart_indicator_preview`) — Draw a LOCALLY COMPUTED WRUN output on a chart pane as an ephemeral PREVIEW line (draft lane: works for unpublished packages installed via `om wrun install`).
 - `om chart indicator remove` (action: `chart_indicator_remove`) — Remove indicator overlays from a chart pane.
 - `om chart indicator update` (action: `chart_indicator_update`) — Tune an existing indicator's settings.
 - `om chart interval` (action: `chart_interval`) — Change a chart pane's candle interval (1m, 5m, 15m, 1h, 4h, 1d, 1w, ...).

@@ -41,7 +41,7 @@ Check, and if absent stop and tell the user the exact command to run:
 | Data-feed vendor (registered via event-watch) | an event-driven signal to ingest events | the relevant `om setup` for the vendor (see `openmarket-event-watches`) |
 | Signal credentials (LLM, for a text/classifier signal) | classifying a `text_long_short` signal | `om config set-key` / `om config set-model` |
 | OpenMarket data API key | a metric signal (`metric_level_rule` / `metric_band_rule`) to fetch its metrics (`getPoints`) | `om login` (or `om init`) — the same key `om metric get` uses; no wallet |
-| Execution wallet for the venue | `--run-mode dry_run` or `live` (not `observe`) | `om setup` for the venue (today: `om setup polymarket`) |
+| Execution wallet for the venue | `--run-mode dry_run` or `live` (not `observe`) | `om setup` for the venue (`om setup hyperliquid` / `om setup polymarket`) |
 | Daemon running (as a **service**) | anything to actually evaluate/execute | `om service install` then `om service start` |
 
 `observe` mode needs no wallet, and metric signals need only the OpenMarket data API (no event-watch, no LLM, no wallet for observe). Prefer the **service** over a foreground `om run`: only the service writes `runner.log`, which is what `om logs` reads back — a foreground daemon's output is not readable.
@@ -353,7 +353,7 @@ Signals now have the full lifecycle (`show` / `edit` / `pause` / `resume` / `rem
 
 Backtests are the research skill's job: `skill_read research` documents `backtest_run` (the default one-shot verb: saved slugs only) and `backtest_spec` (explicit windows/costs and UNSAVED inline candidates). Two routing facts that live here because they bite strategy authors:
 
-- **An unsaved idea backtests via `backtest_spec` with an inline `candidate`** ({strategy, signal?} in the authoring shapes of `strategy_create`/`signal_create`); nothing is persisted, and a winning candidate is creatable verbatim.
+- **An unsaved idea backtests via `backtest_spec` with an inline `candidate`** ({strategy, signal?} in the authoring shapes of `strategy_create`/`signal_create`); nothing is persisted, and a winning candidate is creatable verbatim — except a `constant` signal, which is replay-only (the kind is retired from `signal_create`; re-author it as a metric/text kind to trade the idea).
 - **Authoring the candidate's signal spec?** The per-kind condition shapes and worked JSON examples are in `skill_read("signal", section = the kind name)` (e.g. `metric_band_rule` for band regimes like a golden cross: enter `{"left":{"metric":"sma","params":{"period":50}},"op":"gt","right":{"metric":"sma","params":{"period":200}}}`).
 
 ## Behaviors to follow

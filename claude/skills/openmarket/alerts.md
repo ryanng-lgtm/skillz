@@ -1,6 +1,6 @@
 ---
 name: openmarket-alerts
-description: Author and manage market alert specs for the OpenMarket runner. Covers crypto venues (Binance, Bybit, Coinbase, OKX, Hyperliquid, ...) and Polymarket prediction markets (YES/NO probability on election / war / sports / regulatory outcomes). Includes the canonical AlertSpec condition tree (single leaf / all / any / not / compare / expr / arithmetic), every supported metric (price, delta_pct, delta_abs, volume, funding_rate, open_interest, plus indicators rsi / sma / ema / macd* / bb_* / atr / stoch_*), operators (gt/gte/lt/lte/eq/crosses_above/crosses_below), and both the crypto discover-then-import workflow AND the Polymarket conditionId-extraction workflow. Read this file when actually composing an AlertSpec.
+description: Author and manage market alert specs for the OpenMarket runner. Covers crypto venues (Binance, Bybit, Coinbase, OKX, Hyperliquid, ...) and Polymarket prediction markets (YES/NO probability on election / war / sports / regulatory outcomes). Includes the canonical AlertSpec condition tree (single leaf / all / any / not / compare / expr / arithmetic), every supported metric (price, delta_pct, delta_abs, volume, volume_sma, funding_rate, open_interest, open_interest_delta_pct, rolling_high, rolling_low, plus indicators rsi / sma / ema / macd* / bb_* / atr / stoch_*), operators (gt/gte/lt/lte/eq/crosses_above/crosses_below, on leaves AND on Compare — golden crosses, breakouts, volume spikes), and both the crypto discover-then-import workflow AND the Polymarket conditionId-extraction workflow. Read this file when actually composing an AlertSpec.
 user-invocable: false
 allowed-tools:
   - Bash(om *)
@@ -42,8 +42,11 @@ The runner accepts a full condition tree. The outermost `condition` field is one
     | { "any": [child, child, ...] }
     // Compound — child must be false
     | { "not": child }
-    // Value-vs-value compare (both sides computed)
-    | { "left": valueExpr, "op": "gt"|"gte"|"lt"|"lte"|"eq", "right": valueExpr }
+    // Value-vs-value compare (both sides computed). Level ops always; the
+    // edge ops express a cross between two MOVING series (golden cross,
+    // breakout vs rolling_high, volume vs a multiple of volume_sma); see
+    // the edge-compare rules under Supported operators.
+    | { "left": valueExpr, "op": "gt"|"gte"|"lt"|"lte"|"eq"|"crosses_above"|"crosses_below", "right": valueExpr }
 }
 ```
 
@@ -113,6 +116,48 @@ The set of valid `metric` values and their parameter shapes lives in the tool-sc
 | `gt`, `gte`, `lt`, `lte`, `eq` | Level | Compare current metric value against a threshold |
 | `crosses_above`, `crosses_below` | Edge | TRUE on the tick the value crosses the threshold. Requires `selector.interval` (e.g. `"FIFTEEN_MINUTES"`). |
 
+**Edge ops on a `Compare` (cross between two moving series).** `{"left": ..., "op": "crosses_above", "right": ...}` fires once when the left side overtakes the right (golden cross `sma(50)` x `sma(200)`, breakout `price` x `rolling_high`, volume spike `volume` x `multiply(3, volume_sma)`). Arithmetic on a side re-computes over the previous bar too, so consecutive pairs compare like for like. Save-time rules you must author within, or the create bounces:
+
+- BOTH sides must contain at least one metric reference. A metric against a plain constant is the single-leaf spelling: use `{"metric", "selector", "op", "value"}` instead.
+- Every metric reference on either side must declare the SAME explicit `selector.interval` (the cross is bar-to-bar).
+- WRUN package metrics (`wrun/...`) cannot be edge-compare operands.
+- An edge (leaf or Compare) can never sit under `"not"` (the save rejects it with code `edge_under_not`); a negated transition is true on nearly every tick and is never what the user means. Rephrase the fire condition as the cross the user actually wants.
+
+At runtime both sides must sit on the same bar pair: a venue lagging one bar behind makes the alert abstain for that tick (named in `alert_events` as an error, no fire). Same-market comparisons never hit this; tell the user about it only if they ask for a CROSS across two venues with different bar phases (e.g. CME session bars vs UTC crypto bars), which can never align and will surface as a broken-alert page.
+
+**Golden-cross / breakout / spike JSON shapes (copy these):**
+```json
+{ "label": "BTC golden cross (1d)",
+  "condition": {
+    "left":  { "metric": "sma", "params": { "period": 50 },
+               "selector": { "symbol": "BTCUSDT", "exchange": "BINANCE_FUTURES", "interval": "DAY" } },
+    "op": "crosses_above",
+    "right": { "metric": "sma", "params": { "period": 200 },
+               "selector": { "symbol": "BTCUSDT", "exchange": "BINANCE_FUTURES", "interval": "DAY" } } } }
+```
+```json
+{ "label": "BTC 20-bar breakout (1h)",
+  "condition": {
+    "left":  { "metric": "price",
+               "selector": { "symbol": "BTCUSDT", "exchange": "BINANCE_FUTURES", "interval": "HOUR" } },
+    "op": "crosses_above",
+    "right": { "metric": "rolling_high", "params": { "bars": 20 },
+               "selector": { "symbol": "BTCUSDT", "exchange": "BINANCE_FUTURES", "interval": "HOUR" } } } }
+```
+```json
+{ "label": "BTC volume 3x spike (5m)",
+  "condition": {
+    "left":  { "metric": "volume",
+               "selector": { "symbol": "BTCUSDT", "exchange": "BINANCE_FUTURES", "interval": "FIVE_MINUTES" } },
+    "op": "crosses_above",
+    "right": { "expr": "multiply", "args": [
+      { "value": 3 },
+      { "metric": "volume_sma", "params": { "period": 20 },
+        "selector": { "symbol": "BTCUSDT", "exchange": "BINANCE_FUTURES", "interval": "FIVE_MINUTES" } } ] } } }
+```
+
+`rolling_high` / `rolling_low` are the extremum of the `bars` bars BEFORE the current one (required `params.bars`; the forming bar is excluded so a breakout cannot raise its own ceiling). `volume_sma` requires `params.period` and follows `volume`'s quote rules. `open_interest_delta_pct` takes optional `params.bars` like the other deltas; under the default USD quote it measures NOTIONAL OI change (price folded in), so positioning questions ("did traders add contracts?") want `selector.quote: "COIN"`; say which one you armed.
+
 ### Quote-currency normalization (`selector.quote`)
 
 `open_interest` and `volume` come back in different units across venues — coin contracts on Binance Futures, USD on BitMEX, USDC on Polymarket. **The runner defaults to USD normalization** so thresholds work the same wherever the alert points. Set `selector.quote` to override:
@@ -151,7 +196,7 @@ Most useful on `open_interest` and `volume`. Also valid on `price`, `delta_abs`,
 | `label` | string, required | Human-readable. `id` auto-allocates as the next positive integer (`1`, `2`, `3`, ...) if omitted. Users refer to alerts by these numbers in conversation. |
 | `fire_mode` | `"once"` or `"recurring"`, optional | `"recurring"` for notification-only alerts; `"once"` when `on_fire.execute` is present, so a buy/sell does not repeat while the condition stays true. To override either default, set the field explicitly. |
 | `expires_at` | ISO 8601 string, optional | After this timestamp the tick loop stops evaluating. **Defaults to never-expires** when the field is omitted (the stored spec will have no `expires_at` field and the tick loop skips the expiration check entirely). To set a finite expiry, send an ISO 8601 string in the JSON spec, or `--expires <value>` on the CLI (accepts a duration like `1h` / `7d` with the unit required, or an ISO timestamp). `"expires_at": null` is also accepted as the explicit "no expiry" sentinel. |
-| `cooldown` | duration string (`1h`, `30m`, `45s`, `7d`), optional | Wall-clock suppression: after firing, suppress re-fires for this duration. Pure wall-clock — going FALSE in between does NOT reset. Max 30d. **Defaults to `"60s"`** when the field is omitted, so a misconfigured level-op `recurring` alert can't spam every tick. To disable, send `"cooldown": null` in the JSON spec (or `--cooldown none` on the CLI). With `fire_mode: "once"` the field is silently ignored (only one fire ever). Edits to `cooldown` preserve fire history (it is a dispatch policy, not a data-identity field). Catch-up evaluation honors cooldown too, measured at each bar's close time rather than the moment the daemon caught up (see [Reliability](#reliability-catch-up-delivery-health)). On the CLI: `--cooldown <value>` on create / edit. |
+| `cooldown` | duration string (`1h`, `30m`, `45s`, `7d`), optional | Wall-clock suppression: after firing, suppress re-fires for this duration. Pure wall-clock — going FALSE in between does NOT reset. Max 30d. **Defaults to `"60s"`** when the field is omitted, so a misconfigured level-op `recurring` alert can't spam every tick. To disable, send `"cooldown": null` in the JSON spec (or `--cooldown none` on the CLI). With `fire_mode: "once"` the field is silently ignored (only one fire ever). Edits to `cooldown` preserve fire history (it is a dispatch policy, not a data-identity field). Catch-up evaluation honors cooldown too, measured at each bar's close time rather than the moment the daemon caught up (see [Reliability](#reliability-catch-up-delivery-health)). Cooldown is a QUIET period, not a blind one: typed conditions keep evaluating through the window and only the fire is suppressed, so a cross that comes and goes inside the window is consumed silently — dropped, never queued, never fired late when the window opens. Scripts are the exception (the body is not spawned during cooldown; the documented accumulator patterns pace side effects with the window). On the CLI: `--cooldown <value>` on create / edit. |
 | `latency_class` | `"fast"` or `"standard"`, optional | Routing hint. `"standard"` (the implicit default when the field is absent) evaluates on the heartbeat tick — the standard 10s cadence. `"fast"` opts into a push-stream wake: the runner subscribes the alert's leaf to the corresponding OM price stream and evaluates the cross condition the moment a tick arrives, typically within ~100ms. Today fast lane supports single-leaf `price` alerts (`gt` / `lt` / `gte` / `lte` / `eq` / `crosses_above` / `crosses_below`) on any exchange the OM data stream covers. Compound conditions, indicators (RSI / MACD / etc.), and script alerts continue to run on the heartbeat regardless of this field. Cosmetic at edit time (does not re-arm). On the CLI: `--latency standard|fast` on create / edit. |
 | `condition` | Condition tree, required | See above. |
 | `channels` | `string[]`, optional | Per-alert dispatch targets, stored as channel **ids** (rendered by current name). Routing is **literal** — fires go to exactly these channels. Every create surface materializes this at write time: a create without an explicit channel seeds the current default's id, so a normal alert always literally lists where it goes. An **empty** `channels[]` is card-only (the inline om-chat card is the delivery — no push, no agent take). Ids/names that no longer resolve are dropped at fire time. See [Channels](#channels-1) below. |
@@ -163,7 +208,7 @@ Most useful on `open_interest` and `volume`. Also valid on `price`, `delta_abs`,
 
 A create without `--channel` **seeds** the current default's id (or the lone channel when there is exactly one); with several channels and no default the create is **refused** with the remedy hint *"multiple destinations and no default — pass `--channel <name>` or set one: `om setup default <name>`"* — use the workflow below to pick a destination (or set a default) before creating. On an interactive terminal, `om alert create` with no `--channel` instead opens a destination **picker**: one row per configured channel with its bound thread (or *"no thread yet"*, or *"post only — no agent reply"* for a webhook), most-recently-routed first, and a *"Don't send anywhere (keep in om chat — card only, no agent take)"* row below a divider — so a person picks the destination rather than meeting the refusal. Non-interactive surfaces (`--channel` given, `--format json`, piped input) keep the seed-or-refuse behavior above. `--channel default` re-materializes the default. A materialized alert keeps its own destinations even if the home default later changes — re-point it explicitly. System lifecycle messages (runner started / stopping) still post to every configured channel — that broadcast is separate from per-alert routing.
 
-**Where a created alert posts (agent flow):** you do not need to ask where each alert goes. When you omit `channels`, the create resolves the destination by conversation context — the channel bound to THIS conversation if there is one, otherwise the configured default, otherwise card-only — and the result carries a `routing_note` naming where the alert will post. **State that note to the user** (*"This alert posts to Telegram-personal, this conversation."* / *"Posted to your default channel, trading-group."* / *"No channel is configured, so this stays an om chat card only — `om setup` adds one."*). The note always names the `om alert edit <id> --channel <name>` command to move it; on chat platforms a one-tap **Send to <other destination> instead** button additionally rides beneath the create (the other likely destination — the default, or this conversation's own channel). If the destinations would wake more conversations than the wake cap, the note also warns that the ones past the cap get a plain post with no agent take. Pass `channels: ["discord"]` only when the user names a destination in their request (*"alert me on Discord when..."*), and `channels: []` for a deliberate card-only alert. Manage channels themselves with `om setup list / om setup <adapter> / om setup update <name> / om setup remove <name> / om setup default <name>`. To inspect or change routing from one channel's side — its bound thread, every alert and watch routed to it, and `--add <id>` / `--remove <id>` to route a spec on or off it — use `om channel <name>`.
+**Where a created alert posts (agent flow):** you do not need to ask where each alert goes. When you omit `channels`, the create resolves the destination by conversation context — the channel bound to THIS conversation if there is one, otherwise the configured default, otherwise card-only — and the result carries a `routing_note` naming where the alert will post. **State that note to the user** (*"This alert posts to Telegram-personal, this conversation."* / *"Posted to your default channel, trading-group."* / *"No channel is configured, so this stays an om chat card only — `om setup` adds one."*). The note always names the `om alert edit <id> --channel <name>` command to move it; on chat platforms a one-tap **Send to <other destination> instead** button additionally rides beneath the create (the other likely destination — the default, or this conversation's own channel). If the destinations would wake more conversations than the wake cap, the note also warns that the ones past the cap get a plain post with no agent take. Pass `channels: ["discord"]` only when the user names a destination in their request (*"alert me on Discord when..."*), and `channels: []` for a deliberate card-only alert. Script-condition creates may also carry a `saturation_notice` (the fleet's active script alerts exceed the concurrent script pool cap): relay it verbatim like the routing note; it is a heads-up about overlap risk, not an error. Manage channels themselves with `om setup list / om setup <adapter> / om setup update <name> / om setup remove <name> / om setup default <name>`. To inspect or change routing from one channel's side — its bound thread, every alert and watch routed to it, and `--add <id>` / `--remove <id>` to route a spec on or off it — use `om channel <name>`.
 
 ## Optional auto-execution
 
@@ -549,7 +594,7 @@ Polymarket markets publish to the **same** `getPoints` candle endpoint as crypto
 
 For requests the typed schema can't express — trailing stops, multi-tick streaks, cross-exchange arbitrage, blending market data with external APIs, anything that's a *computation* rather than a *threshold* — author a script alert. The script you write runs in a process group every tick, gets fed JSON on stdin, and returns one JSON object on stdout.
 
-**Net-move windows are typed now — do NOT reach for a script for "moves X% in Y".** `delta_pct` / `delta_abs` take an optional `params.bars`: the change from the close `bars` closed bars back to the current close. "Alert me if BTC moves 5% either way within an hour" is `selector.interval: "MINUTE"` with `{"any": [{delta_pct gt 5}, {delta_pct lt -5}]}` and `params: {"bars": 60}` on each leaf — fires whenever the net hourly move is stretched past 5% (re-paced by `cooldown`). Use `crosses_above 5` instead of `gt 5` for once-per-excursion semantics. Scripts remain the tool for *max-excursion* windows ("5% off the 24h HIGH", peak-relative trails) and everything below.
+**Net-move windows are typed now — do NOT reach for a script for "moves X% in Y".** `delta_pct` / `delta_abs` take an optional `params.bars`: the change from the close `bars` closed bars back to the current close. "Alert me if BTC moves 5% either way within an hour" is `selector.interval: "MINUTE"` with `{"any": [{delta_pct gt 5}, {delta_pct lt -5}]}` and `params: {"bars": 60}` on each leaf — fires whenever the net hourly move is stretched past 5% (re-paced by `cooldown`). Use `crosses_above 5` instead of `gt 5` for once-per-excursion semantics. **Rolling-extremum windows are typed now too**: "5% off the 24h HIGH" is a Compare cross, `price crosses_below multiply(0.95, rolling_high(bars: 24))` on an HOUR selector, and "breaks the 20-bar high" is `price crosses_above rolling_high(bars: 20)`. Scripts remain the tool for peak-relative TRAILS that must remember an all-time-since-armed peak (rolling_high looks back a fixed window, not since-arm) and everything below.
 
 A script condition is the **universal substrate** for strategies. It (1) remembers state across ticks — whatever JSON it returns is handed back as `state` next tick, so it can hold a rolling window, a running peak, a streak counter, or a per-entity accumulation ledger; (2) can shell any other `om` command, for data **or to place an order**; and (3) can carry an `on_fire.execute` block exactly like a typed condition. So a script alert is not notification-only — it expresses any *stateful and/or executing* strategy (accumulate into a price band, lock one side per game, trail then close a position). Decompose the user's intent into **watch → decide → act**: the script covers watch + decide, and either an `on_fire.execute` block or an `om order place` call inside the body covers act. See [Executing from a script alert](#executing-from-a-script-alert) below.
 
@@ -557,11 +602,11 @@ A script condition is the **universal substrate** for strategies. It (1) remembe
 
 A script is the right call when the user's request involves any of:
 
-- **Peak/trough-relative windows** — "drops 5% from its 24h HIGH", "volatility spike vs 7-day average". The typed windowed delta reads close-to-close over `params.bars`; a max/min-relative or derived-statistic window needs state. (Plain net-move windows are typed — see above.)
+- **Since-armed peaks and derived statistics** — "trail 5% below the highest price SINCE I armed this" (rolling_high looks back a fixed `bars` window, not since-arm; a since-arm peak needs state), or windows over a statistic the registry lacks (volatility vs its own 7-day average). Fixed-window extremum asks ("5% off the 24h high", "breaks the 20-bar high") are TYPED (rolling_high/rolling_low Compare crosses, see above), and "volume spikes vs its rolling average" is typed via volume_sma.
 - **Snapshot at create-time** — "3% off my entry of 91,200" (constant), or "3% off whatever price it is right now" (snapshot the first tick). The typed schema has no concept of "save a reference value when the alert is armed".
 - **Streak / debounce / throttle** — "fire when above 60% for 3 ticks in a row", "no more than once per hour". The typed schema fires every tick the condition is TRUE (recurring mode); finer cadence semantics need a counter.
 - **Mixing data sources** — "fire when BTC drops AND Polymarket 'recession 2026' crosses 40%" can in principle be a Compound, but anything that pulls from an external API needs a script.
-- **Polymarket flows beyond a price threshold** — leaderboard rank changes, new whale positions, volume spikes vs rolling average, market resolution. The typed schema handles price-on-conditionId fine; everything richer (positions, leaderboard, market-summary) is script territory.
+- **Polymarket flows beyond a price threshold** — leaderboard rank changes, new whale positions, market resolution. The typed schema handles price-on-conditionId fine (and volume-vs-average via volume_sma); everything richer (positions, leaderboard, market-summary) is script territory.
 
 Default to a typed alert when the user's wording maps cleanly to a single condition (`gt`/`lt`/`crosses_above`). Reach for a script the moment "and remember the last X" enters the requirement.
 
@@ -820,7 +865,7 @@ Flag and `--condition-file` modes are mutually exclusive on a single invocation.
 
 ## Workflow when a user wants to see their alerts
 
-User asks *"show my alerts"*, *"what alerts do I have"*, *"list my alerts"*. Always go through `om alert list --format json` (gets the full bodies) and render in chat as a Markdown table using the humanized format below — **not** the raw JSON, and **not** the CLI's column-aligned text output verbatim.
+User asks *"show my alerts"*, *"what alerts do I have"*, *"list my alerts"*. Always go through `om alert list --format json` (gets the full bodies) and render in chat as a Markdown table using the humanized format below — **not** the raw JSON, and **not** the CLI's column-aligned text output verbatim. The `alert_list` action returns `{alerts, unreadable}`: when `unreadable` is non-empty, say so after the table (*"1 more alert exists on disk that this build cannot read; created by a newer om, upgrade to see it."*). Never present an unreadable spec as absent or deleted.
 
 **Use server-side filters when the user narrows the list.** *"Show my BTC alerts"* → `om alert list --symbol BTCUSDT --format json`. *"Show only disabled alerts"* → `om alert list --disabled --format json`. *"Show alerts that fired today"* → `om alert list --fired-since 24h --format json`. Filters AND across axes; repeatable flags OR within an axis. `--symbol` / `--exchange` / `--metric` match any leaf in the condition tree, so compound alerts surface correctly. Available flags:
 
@@ -1157,9 +1202,9 @@ The alert contract (compound, indicators, edge operators, `expr` math, script pr
 - `om alert history` (action: `alert_events`) — List recent alert events (fires, errors, state changes).
 - `om alert import` (action: `alert_import`) — Create an alert from a complete spec object — typically parsed from a JSON file or another tool's output.
 - `om alert list` (action: `alert_list`) — List configured alerts, optionally filtered.
-- `om alert pause` (action: `alert_pause`) — Pause a single alert.
+- `om alert pause` (action: `alert_pause`) — Pause one alert by id, or every alert installed from a package (`package: @scope/name[@version]`).
 - `om alert remove` (action: `alert_remove`) — Remove a single alert by id.
-- `om alert resume` (action: `alert_resume`) — Resume a single paused alert.
+- `om alert resume` (action: `alert_resume`) — Resume one paused alert by id, or arm every alert installed from a package (`package: @scope/name[@version]`; pack alerts install paused).
 - `om alert schema` (action: `alert_schema`) — Return the AlertSpec input schema as JSON Schema (draft 2020-12), suitable for LLM tool-use input_schema.
 - `om alert show` — Show one alert by id, whichever kind it is: a metric alert's spec and state, or an event watch (routed by id/slug)
 - `om alert state clear` (action: `alert_state_clear`) — Wipe a custom-script alert's persistent memory.
