@@ -36,6 +36,44 @@ codex/
 `claude/skills/`. Those two are identical across both agents, so they're stored
 once; `graphify` genuinely differs between them and is stored twice.
 
+## Skills
+
+Everything below is authored here. The `openmarket` and `om-chat` skills ship
+with the `om` CLI and are only vendored into this repo so both agents get the
+same copy — they're synced by `skills: sync om-bundled docs from om <version>`
+commits, not edited by hand, and aren't listed.
+
+### Claude (`claude/skills/` → `~/.claude/skills/`)
+
+| Skill | Trigger | What it does |
+| --- | --- | --- |
+| `bump-rc` | `/bump-rc [version]` | Releases `@openmarket/rooms-client`: picks the bump from what actually changed, runs the release script, repins both GUI consumers. |
+| `demuddy` | `/demuddy [path]` | Editorial pass that turns a much-edited plan into a handover-ready one — strips decision archaeology, dedupes rules, reorders into build order, keeps every gotcha and cite. |
+| `graphify` | `/graphify` | Turns any input (code, docs, papers, images, video) into a persistent knowledge graph with god nodes and community detection; query/path/explain instead of grepping. |
+| `humanize` | `/humanize [light] [path]` | Rewrites Claude-authored text so it reads like Ryan wrote it — strips AI tells, matches voice per register. `light` keeps the structure and edits sentences only. |
+| `ivtg` | `/ivtg` | Investigator mode: issues fed one at a time, each investigated across the named repos and written into one dated plan file. Never implements. |
+| `llm-council` | "council this", "pressure-test this" | Runs a question through 5 AI advisors who analyse it independently, peer-review each other anonymously, then synthesise a verdict. |
+| `loop-me-in` | `/loop-me-in [path]` | Turns an approved plan into a brief a fresh session can execute unattended — elicits the expected result of every change first, writes it as a spec before the code, and gates the run on those specs. |
+| `om-build` | `/om-build [--hosted\|--cloud]` | Builds an OM Chat GUI from source — the daemon-embedded `/rooms` GUI or the hosted `/chat/` cloud fork — including the swap onto the live install. |
+| `prompt-ready` | `/prompt-ready` | Persistent mode that turns raw, natural-language requests into clean, self-contained, copy-paste-ready prompts for a different session. |
+| `syncup` | `/syncup [repo ...]` | Refreshes main from origin, rebases the working branch onto it, resolves every conflict, and hands uncommitted work back intact. Never pushes. |
+| `testing-harness` | `/testing-harness` | Proves a change in the real running app rather than in tests. `--parity-check` diffs the cloud deployment against the local daemon visually; `--regression` (designed, not yet built) checks the running app against invariants and a baseline. |
+| `war-diary` | — | Turns a day of GitLab `.atom` activity plus the day's Claude Code sessions into Frontend War Diaries daily-log notes and matching Kanban cards. |
+
+### Codex (`codex/skills/` → `~/.codex/skills/`)
+
+| Skill | Trigger | What it does |
+| --- | --- | --- |
+| `commit` | `/commit` | Commits the currently staged changes only — concise message from the existing index, never stages anything extra. |
+| `graphify` | `/graphify` | The Codex build of graphify. Genuinely differs from the Claude one, so it's stored separately rather than symlinked. |
+
+### Commands (`claude/commands/` → `~/.claude/commands/`)
+
+| Command | What it does |
+| --- | --- |
+| `/commit` | Commits the currently staged changes. |
+| `/mr-markdown` | Generates a condensed MR markdown for the changes on the current branch. |
+
 ## Sync
 
 `hook.sh` runs as a Claude Code `PostToolUse` hook. Any edit that resolves to a
