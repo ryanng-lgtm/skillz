@@ -199,6 +199,9 @@ That visual suite renders hand-built static fixtures — `shell-fixture.html`,
 `settings-fixture.html` — against a bare vite server on `:8097`. It never touches
 the daemon, the real backend, or a logged-in session.
 
+`8097` is the operator's reserved dev-server port: if you run that suite here,
+preflight it and never kill a process you did not start. The full reserved-port table is `## Reserved ports` in `~/.claude/CLAUDE.md`; take an assigned port, never a merely-free one.
+
 So: appearance, contrast, and mobile-layout snapshots belong there. This rig owns
 what fixtures cannot reach — real data shapes, real hydration, real wire, real
 auth. A journey that would pass against a fixture belongs in the GUI repo, not

@@ -17,7 +17,7 @@ Ryan's names, which read backwards if you assume "hosted" means the SaaS:
 `--hosted` is the daemon **hosting** the GUI at `/rooms`; `--cloud` is the
 `/chat/` fork. No flag means `--hosted`.
 
-**Never mix them in one run.** `--cloud` never writes `~/.local/bin/om`, never
+**Never mix them in one run.** `--cloud` never writes the `om` binary, never
 runs `om service restart`, and never stages anything into the monorepo.
 `--hosted` never touches the cloud repo. `--no-gui` means nothing under
 `--cloud`.
@@ -29,6 +29,70 @@ runs `om service restart`, and never stages anything into the monorepo.
 If either fork's copy of a file in `tools/parity-manifest.json` was edited,
 run `bun tools/sync-shared.ts --diff` before building. It is the only
 cross-fork alarm that exists; both forks can be green while drifting.
+
+---
+
+## Remote viewing — every rig is reached through the SSH tunnel
+
+This skill runs on **dboons-mac-mini**, and nothing it starts is looked at on
+that box. Ryan views it from the MacBook over an SSH tunnel, so a rig that is
+demonstrably serving on the mini can still be invisible — because it took an
+unforwarded port, or bound the wrong loopback. Neither failure has a local
+symptom: every `curl` in this skill still passes.
+
+The tunnel, run from the MacBook:
+
+```bash
+ssh -N \
+  -L 4178:127.0.0.1:4178 \
+  -L 13137:127.0.0.1:13137 \
+  -L 8097:127.0.0.1:8097 \
+  -L 8098:127.0.0.1:8098 \
+  -L 31337:127.0.0.1:31337 \
+  dboon@dboons-mac-mini
+```
+
+Ports are **reserved, not chosen**. The authoritative table is `## Reserved
+ports` in `~/.claude/CLAUDE.md`; the rows this skill touches:
+
+| Port | Owner / rig | Rule here |
+|---|---|---|
+| 31337 | the `om` daemon — `--hosted` `/rooms` | never bind it yourself; the daemon owns it, `om service restart` is the only handle |
+| 8097 | the operator's local dev server — `--cloud` rig B | operator-owned; preflight, never kill an existing process, never bind from an agent worktree |
+| 8098 | device-owned review renderer (singleton) | **hands off** — never start, restart, stop, or replace it. Not an om-build rig |
+| 4178 | `--cloud` rig A, `vite preview` | run-owned; stop what you started |
+| 13137 | `--cloud` rig C, docker gateway parity | run-owned; stop what you started |
+| 18097–18197 | agent-owned test servers | deliberately **not** tunneled — never hand one of these to the operator as a URL |
+
+Two rules follow from the `-L <port>:127.0.0.1:<port>` form, and neither failure
+has a local symptom:
+
+- **Only forwarded ports are reachable.** A rig on any other port is a rig Ryan
+  cannot open. Never pick a port because it happens to be free — take the one
+  assigned above, or say plainly in the report that the tunnel needs a new `-L`
+  line. The `18097`–`18197` test range is excluded on purpose: those servers are
+  agent-internal and are never review surfaces.
+- **Bind 127.0.0.1.** The forward's far side connects to IPv4 loopback on the
+  mini. A server bound to `[::1]` only is up, listening, and answers `localhost`
+  on the mini — while the MacBook gets connection refused. Pass
+  `--host 127.0.0.1` explicitly rather than trusting a framework default.
+  (`0.0.0.0` / `*` also works, since it includes IPv4 loopback; `[::1]`-only is
+  the one that breaks.)
+
+Before handing over any URL, confirm the binding — this is the check that
+separates "serving" from "reachable":
+
+```bash
+lsof -nP -iTCP:<port> -sTCP:LISTEN    # want 127.0.0.1:<port>; `[::1]:<port>` alone is broken
+```
+
+The forward is symmetric, so the URL to hand over is the same number:
+`http://localhost:<port>/...` on the MacBook.
+
+Preflight the port before starting a rig. A listener left from an earlier
+session either trips `--strictPort` or, worse, keeps answering — and Ryan
+reviews the *previous* build believing it is this one. Kill only a process this
+run started; on 8097 and 8098 kill nothing at all.
 
 ---
 
@@ -71,7 +135,7 @@ which looks exactly like the GUI broke. Steps 1, 2 and 6 reproduce locally what
 ### 0. Preflight
 
 ```bash
-cd ~/Documents/GitLab/openmarket-internal
+cd ~/github/openmarket-internal
 git status --short                     # note anything dirty BEFORE staging assets
 git log -1 --oneline
 grep '"version"' packages/cli/package.json
@@ -89,11 +153,33 @@ grep -A2 ProgramArguments ~/Library/LaunchAgents/xyz.openmarket.runner.plist   #
 
 Report the delta (installed version → source version) and which path you intend
 to replace before building. Two installs on one box is normal and is the usual
-cause of "I upgraded and `om --version` didn't change": on Ryan's machine
-`~/.local/bin/om` is the standalone install launchd runs, and
-`/opt/homebrew/bin/om` is an older Cellar install shadowed behind it.
+cause of "I upgraded and `om --version` didn't change".
 
-If the target is a Cellar path, stop — see the hard rule.
+**The layout on this box, verified 2026-08-18** — do not assume the older
+description of a `~/.local/bin/om` standalone shadowing a Cellar build; it is
+the other way round:
+
+- `/opt/homebrew/bin/om` is a **symlink**, not a binary, and it is what launchd
+  runs. The standalone installer overwrote brew's link with its own.
+- It resolves to `~/.local/opt/openmarket/<version>/bin/om` — one directory per
+  installed version. **Run `ls ~/.local/opt/openmarket/` to see which exist**;
+  do not trust any list written here, it goes stale every time this skill runs.
+- Homebrew's `openmarket` formula was uninstalled 2026-08-18, so brew ships no
+  `om` of its own. The symlink's realpath is under `~/.local/opt`, so the
+  never-overwrite-brew rule does **not** fire — but re-check with `realpath`,
+  since brew still owns the *directory* the symlink lives in and a future
+  `brew install openmarket` would fight for that name.
+- `~/.local/bin` is **not on PATH here** and contains no `om`. Installing there
+  produces a binary neither your shell nor launchd will ever run — the exact
+  half-upgraded state this skill warns about.
+
+Resolve the symlink before deciding anything:
+
+```bash
+realpath /opt/homebrew/bin/om        # the file that actually runs
+```
+
+If that realpath contains `/Cellar/openmarket/`, stop — see the hard rule.
 
 A local-main build usually does **not** change the version string. Say so up
 front, or the report reads as a no-op: the honest proof is the asset stamp in
@@ -231,7 +317,7 @@ First check the protocol era matches, or the GUI is built against a different
 wire contract than the daemon:
 
 ```bash
-cd ~/Documents/GitLab/openmarket-chat && bun run rooms-client:status
+cd ~/github/openmarket-chat && bun run rooms-client:status
 ```
 
 **Compare the constants, not the package number.** `package.json` says `0.43.0`
@@ -241,14 +327,14 @@ the current release. The package number stopped tracking the protocol era, so
 `grep '"version"' package.json` is the wrong field to read. What matters:
 
 ```bash
-grep VERSION ~/Documents/GitLab/openmarket-internal/packages/rooms-client/dist/version.js
+grep VERSION ~/github/openmarket-internal/packages/rooms-client/dist/version.js
 ```
 
 That must match the version you are about to install. If it does not, or the
 status line says `registry copy`, link the GUI to the monorepo source:
 
 ```bash
-OM_REPO=~/Documents/GitLab/openmarket-internal bun run rooms-client:link
+OM_REPO=~/github/openmarket-internal bun run rooms-client:link
 ```
 
 Stay linked. There is no "unlink once it publishes" milestone while the package
@@ -262,15 +348,15 @@ Nothing warns you. Whenever the monorepo HEAD moved since the last run, check
 and rebuild before building the GUI:
 
 ```bash
-git -C ~/Documents/GitLab/openmarket-internal diff --stat <lastHEAD>..HEAD -- packages/rooms-client/src
-cd ~/Documents/GitLab/openmarket-internal/packages/rooms-client && bun run build   # exits 2, still emits — see traps
+git -C ~/github/openmarket-internal diff --stat <lastHEAD>..HEAD -- packages/rooms-client/src
+cd ~/github/openmarket-internal/packages/rooms-client && bun run build   # exits 2, still emits — see traps
 grep VERSION dist/version.js
 ```
 
 Then build:
 
 ```bash
-cd ~/Documents/GitLab/openmarket-chat
+cd ~/github/openmarket-chat
 bun install
 bun run build
 ```
@@ -299,8 +385,8 @@ Working-tree only. Order matters: the embed is resolved at compile time, so this
 must happen before step 3.
 
 ```bash
-cd ~/Documents/GitLab/openmarket-internal
-GUI=~/Documents/GitLab/openmarket-chat/dist
+cd ~/github/openmarket-internal
+GUI=~/github/openmarket-chat/dist
 SLOT=packages/cli/assets/rooms-gui
 
 cp "$GUI/assets/rooms.js"  "$SLOT/rooms.js"
@@ -326,7 +412,7 @@ daemon serves the placeholder no matter what you compile.
 ### 3. Compile
 
 ```bash
-cd ~/Documents/GitLab/openmarket-internal
+cd ~/github/openmarket-internal
 bun install
 bun run build          # prebuild builds apps/dashboard, then compiles -> packages/cli/dist/om
 ```
@@ -343,21 +429,21 @@ vs ~92 MB). If you want proof rather than inference, boot it in isolation — th
 touches neither the live daemon nor `~/.openmarket`:
 
 ```bash
-OM_HOME=/tmp/om-gui-verify OM_BIND=127.0.0.1:31999 ./packages/cli/dist/om run &
+OM_HOME=/tmp/om-gui-verify OM_BIND=127.0.0.1:18137 ./packages/cli/dist/om run &   # agent-owned range
 sleep 8
-curl -s http://127.0.0.1:31999/rooms/ | grep -q OM_ROOMS_GUI_DIR \
+curl -s http://127.0.0.1:18137/rooms/ | grep -q OM_ROOMS_GUI_DIR \
   && echo "PLACEHOLDER — the embed did not take" || echo "real GUI embedded"
-curl -s http://127.0.0.1:31999/rooms/ | grep -o 'rooms\.js?v=[a-f0-9]*'   # must match step 1's stamp
+curl -s http://127.0.0.1:18137/rooms/ | grep -o 'rooms\.js?v=[a-f0-9]*'   # must match step 1's stamp
 
 # Cleanup: kill by PID and PROVE it died. `pkill` returns before the process
-# does, and a survivor keeps holding 31999 — the next run's verify then talks
+# does, and a survivor keeps holding 18137 — the next run's verify then talks
 # to the OLD binary and cheerfully prints "real GUI embedded". Seen in the wild.
-TESTPID=$(curl -s http://127.0.0.1:31999/healthz | grep -o '"pid":[0-9]*' | cut -d: -f2)
+TESTPID=$(curl -s http://127.0.0.1:18137/healthz | grep -o '"pid":[0-9]*' | cut -d: -f2)
 kill $TESTPID 2>/dev/null; sleep 2
 kill -0 $TESTPID 2>/dev/null && { kill -9 $TESTPID; sleep 1; }
 rm -rf /tmp/om-gui-verify
 pgrep -fl "om run" || echo "no strays"          # NOT "dist/om run" — that pattern
-lsof -nP -iTCP:31999 -sTCP:LISTEN || echo "31999 free"   # cannot see ~/.local/bin/om
+lsof -nP -iTCP:18137 -sTCP:LISTEN || echo "18137 free"   # cannot see the installed om
 ```
 
 The stray check must match `om run`, not `dist/om run`. The narrow pattern only
@@ -366,21 +452,53 @@ is still running — a narrower assurance than it sounds like.
 
 ### 5. Install and restart
 
+Install a **new version directory** and repoint the symlink. This matches the
+standalone installer's own layout, overwrites nothing, and leaves the running
+daemon's inode alone until the restart:
+
 ```bash
-mv packages/cli/dist/om ~/.local/bin/om      # or whatever step 0 identified
+VER=$(./packages/cli/dist/om --version)
+mkdir -p ~/.local/opt/openmarket/"$VER"/bin
+mv packages/cli/dist/om ~/.local/opt/openmarket/"$VER"/bin/om
+chmod +x ~/.local/opt/openmarket/"$VER"/bin/om
+ln -sfn ~/.local/opt/openmarket/"$VER"/bin/om /opt/homebrew/bin/om
 om service restart
 om --version && om service status
 ```
 
-`mv` across filesystems is not atomic — keep source and destination on the same
-volume (both under `$HOME` is fine). The daemon must be restarted explicitly:
-a new binary with a still-running old daemon is the half-upgraded state that
-reads as a failed upgrade.
+`/opt/homebrew/bin` is user-writable here, so this never needs sudo; if it ever
+does, stop and ask. `mv` across filesystems is not atomic — source and
+destination are both under `$HOME`, so this is a rename. The daemon must be
+restarted explicitly: a new binary with a still-running old daemon is the
+half-upgraded state that reads as a failed upgrade.
+
+Rollback is one command **only when a previous version directory still
+exists**:
+
+```bash
+ls ~/.local/opt/openmarket/                     # what is actually available
+ln -sfn ~/.local/opt/openmarket/<previous-version>/bin/om /opt/homebrew/bin/om
+om service restart
+```
+
+**Check before you promise a rollback**, and note the asymmetry that trips this:
+
+- A build whose version **differs** from the installed one creates a *new*
+  directory, so the outgoing binary survives and rollback is a symlink flip.
+- A build at the **same version** — the common case for local work — overwrites
+  `<version>/bin/om` in place. The outgoing binary is gone, and the nearest
+  rollback target is whatever *older* version directory still exists, not the
+  build you just replaced. Rolling back then also reverts the daemon version,
+  which may not be what was wanted.
+
+So a same-version rebuild is effectively irreversible unless you copy the
+outgoing binary aside first. If that matters for a given run, do it before the
+`mv` and say so in the report.
 
 ### 6. Restore the stubs — always
 
 ```bash
-cd ~/Documents/GitLab/openmarket-internal
+cd ~/github/openmarket-internal
 git checkout packages/cli/assets/rooms-gui/
 rm -f packages/cli/.*.bun-build
 git status --short          # must match what step 0 recorded
@@ -401,6 +519,18 @@ curl -s http://127.0.0.1:31337/rooms/ | grep -q OM_ROOMS_GUI_DIR \
 curl -s http://127.0.0.1:31337/rooms/ | grep -o 'rooms\.js?v=[a-f0-9]*'
 ```
 
+Then confirm the tunnel side — the GUI is the entire point of this target, and
+31337 is forwarded:
+
+```bash
+lsof -nP -iTCP:31337 -sTCP:LISTEN    # 127.0.0.1:31337 — reachable through -L
+```
+
+Hand over `http://localhost:31337/rooms#/` for the MacBook. If Ryan gets
+connection refused there while every curl above passes, the tunnel is down or
+was started without the `-L 31337` line — a tunnel symptom, not a build
+regression.
+
 `/healthz` is the authoritative version check: `om --version` reports the binary
 your shell resolved, which can differ from the one the supervisor is running.
 (There is no `om system status` CLI verb — `system_status` is an MCP tool name.)
@@ -410,8 +540,10 @@ moves when the version does not.
 Report: **the branch and sha each repo was built from** (flagged if not clean
 `main` level with origin, or a linked worktree), version before → after, the
 asset stamp, which binary path was replaced, whether the GUI is embedded or
-placeholder, daemon restart result, worktree state, and anything left for Ryan
-(a shadowed `om` still first on PATH, a skipped GUI, a failed restart).
+placeholder, daemon restart result, worktree state, the MacBook URL
+(`http://localhost:31337/rooms#/`), and anything left for Ryan (a shadowed `om`
+still first on PATH, a skipped GUI, a failed restart, a tunnel that needs
+restarting).
 
 Also report **any daemon error line seen after the restart, and whether it
 predates this build.** `om service status` shows the most recent error even
@@ -426,6 +558,20 @@ grep "<the error text>" ~/.openmarket/runner.log | head -1   # first occurrence
 
 A count that stops growing after the restart means the new version FIXED it —
 worth reporting as such.
+
+**When that grep returns zero, the error is not absent — it is stored, not
+logged.** `Last error` is a persisted field on the runner's state, and
+`runner.log` rotates (`runner.log.1`, `.2`), so a real, long-standing error can
+appear in `om service status` with no trace in any log. Date the underlying
+artifact instead:
+
+```bash
+ls -la ~/.openmarket/scripts/<script-id>.sh     # mtime older than this build = pre-existing
+grep -rl "<script-id>" ~/.openmarket/alerts/    # which alert owns it
+```
+
+A script whose mtime predates the build is a pre-existing authoring defect, not
+a regression from the swap — report it that way, and name the owning alert.
 
 ### Traps (`--hosted`)
 
@@ -443,6 +589,7 @@ worth reporting as such.
 | Several `om` processes in Activity Monitor | each Claude Code session spawns two `om mcp serve --stdio` children (one `--catalog operator`); they outlive daemon restarts | `ps -o ppid=` — parented by a `claude` PID means not a leak; only PPID 1 is a daemon |
 | `Last error: ... You're reading too fast` after restart | the librarian scans rooms in a burst on startup and trips a read rate limit | pre-existing since 2026-08-09, self-resolves in ~5s; confirm `errors=[]` on the next `[schedule]` line before reporting it |
 | Huge diff / 14 MB file in `git status` | staged GUI assets not restored | `git checkout packages/cli/assets/rooms-gui/` |
+| Every curl passes on the mini but `/rooms` will not open on the MacBook | tunnel down, or started without `-L 31337:127.0.0.1:31337` | not a build failure — see *Remote viewing*; report the tunnel line Ryan needs |
 | `OM_ROOMS_GUI_DIR` set but the daemon ignores it | the launchd plist has no `EnvironmentVariables` key, so the supervised daemon never sees your shell's env; and the watch-and-re-read path is source-only (`setRoomsGuiHotReload(isDevExecPath())`, `rooms-routes.ts:95`) | it is a hand-run-daemon tool, not a shortcut around the embed — do the compile |
 | `cannot upgrade: process.execPath is ...` from `om upgrade` | you ran the source entrypoint, not a compiled binary | expected — that guard is `upgrade-core.ts:424` |
 
@@ -636,7 +783,7 @@ it never goes near the daemon.
 ### 0. Preflight
 
 ```bash
-cd ~/Documents/GitLab/openmarket-chat-cloud
+cd ~/github/openmarket-chat-cloud
 git status --short
 git rev-parse --abbrev-ref HEAD && git log -1 --oneline
 bun tools/sync-shared.ts --diff        # drift vs the openmarket-chat twin
@@ -669,20 +816,24 @@ ls dist                   # index.html, assets/, icons/, manifest.webmanifest, s
 
 ### 2. Serve it locally
 
-Three rigs; pick by what Ryan needs to see. All of them need a port — check
-`~/WebstormProjects/PORTS.md` first if it exists (it did not as of 2026-08-12),
-otherwise stay off 8097 (the repo's strict dev port) and 31337 (the daemon).
+Three rigs; pick by what Ryan needs to see. Their ports are **reserved** (see
+*Remote viewing* above) — 4178 for rig A, 8097 for rig B, 13137 for rig C. Do not substitute a different port because one is busy; free the assigned
+one, or report that the tunnel needs another `-L`. Every rig binds 127.0.0.1
+explicitly so the forward can reach it.
 
 **A. Static preview of the artifact you just built** — layout, shell, visual work:
 
 ```bash
-pnpm exec vite preview --port 8098 --strictPort
-# open http://localhost:8098/chat/
+pnpm exec vite preview --port 4178 --strictPort --host 127.0.0.1
+# MacBook: http://localhost:4178/chat/
 ```
 
-`vite preview` binds `[::1]` **only**: `curl http://127.0.0.1:8098/` refuses the
-connection while `localhost` works. Use `localhost`, or pass `--host 127.0.0.1`.
-Deep links resolve (`/chat/rooms` → 200, SPA fallback).
+4178, not 8098 — 8098 is the device-owned review renderer and this skill never
+touches it. `--host 127.0.0.1` is **required here, not optional**. Left off,
+`vite preview` binds `[::1]` only: `curl http://127.0.0.1:4178/` refuses while `localhost` on
+the mini works — and the tunnel, which dials IPv4 loopback, refuses too. The rig
+looks healthy from the mini and is dead from the MacBook. Deep links resolve
+(`/chat/rooms` → 200, SPA fallback).
 
 No gateway is present in this rig, so `/chat/api/*`, `/chat/ws/rooms`, and
 `/api/v1/auth-v2` are unproxied — login and live data will fail. That is
@@ -691,10 +842,13 @@ expected, not a regression.
 **B. Dev server with proxies** — iterating on source:
 
 ```bash
-pnpm run dev              # vite on 8097, strictPort, base /chat/
+pnpm run dev -- --host 127.0.0.1    # vite on 8097, strictPort, base /chat/
+# MacBook: http://localhost:8097/chat/
 ```
 
-It proxies `/api/v1` → `localhost:3000` and `/chat/api/rooms` →
+The script is pinned to `--port 8097 --strictPort` and passes no `--host`, so
+append it. 8097 is the operator's own dev-server port: preflight it, and if
+something is already listening, ask rather than killing it. It proxies `/api/v1` → `localhost:3000` and `/chat/api/rooms` →
 `localhost:3002`; those backends must be running or you get the same auth
 failures as rig A.
 
@@ -703,19 +857,24 @@ what is in question:
 
 ```bash
 docker build -t om-chat-cloud .
-docker run --rm -p 8081:8080 \
+docker run --rm -p 127.0.0.1:13137:8080 \
   -e CHAT_SERVICE=<host:port> -e ROOMS_WS_SERVICE=<host:port> \
   -e THARAMINE_SERVICE=<host:port> -e AUTH_SERVICE=<host:port> \
   om-chat-cloud
-# open http://localhost:8081/chat/
+# MacBook: http://localhost:13137/chat/
 ```
+
+13137 is the tunnel's slot for this rig; the `127.0.0.1:` prefix on `-p` keeps
+the container off every other interface while staying reachable through the
+forward.
 
 Only those four names are substituted into the template
 (`NGINX_ENVSUBST_FILTER` in the Dockerfile); anything else in the config stays
 literal. Unknown gateway paths return 404 by design.
 
 Kill whatever you started when you are done, and say in the report that it is
-gone.
+gone — a survivor holds a tunnel port, and the next run's rig either refuses to
+start or silently serves the stale build to the MacBook.
 
 ### 3. Full gate before claiming the work is done
 
@@ -741,17 +900,20 @@ helm template openmarket-chat-cloud charts/openmarket-chat-cloud \
 ### 4. Report
 
 Branch and HEAD, the entry hash from `dist/index.html`, which rigs were started
-and on which ports, whether each still runs or was killed, `check:dist` and
-gate results, parity drift from step 0, and anything left for Ryan. Never
-report a deploy — this target does not do one.
+and on which ports, the MacBook URL for each (`http://localhost:<port>/chat/`)
+and the confirmed 127.0.0.1 binding, whether each still runs or was killed,
+`check:dist` and gate results, parity drift from step 0, and anything left for
+Ryan. Never report a deploy — this target does not do one.
 
 ### Traps (`--cloud`)
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `curl 127.0.0.1:<port>` refuses but the log says it is serving | `vite preview` binds `[::1]` only | use `localhost`, or `--host 127.0.0.1` |
+| `curl 127.0.0.1:<port>` refuses but the log says it is serving, and the MacBook cannot open it either | `vite preview` binds `[::1]` only; the tunnel dials IPv4 loopback | restart it with `--host 127.0.0.1` — `localhost` on the mini masks this, the tunnel does not |
+| Mini serves fine, MacBook gets connection refused | the port is not in the tunnel's `-L` set, or the tunnel dropped | use the assigned port from *Remote viewing*; otherwise report that a new `-L` line is needed |
+| `--strictPort` refuses to start, or the MacBook shows a build you did not just make | a rig from an earlier session still holds the port | `lsof -nP -iTCP:<port> -sTCP:LISTEN`, kill it by PID, confirm the port is free before starting |
 | Login fails / no rooms load in preview | rig A has no gateway; API and WS paths are unproxied | rig B with backends up, or rig C |
-| `pnpm install --frozen-lockfile` complains about the pnpm version | `packageManager` pins 10.22.0; PATH pnpm may be older (9.15.9 on this box, which builds fine) | `corepack pnpm install --frozen-lockfile`, or proceed if it installs cleanly |
+| `pnpm install --frozen-lockfile` complains about the pnpm version | `packageManager` pins 10.22.0; PATH pnpm is 10.34.5 as of 2026-08-18 — now *newer* than the pin, not older | `corepack pnpm install --frozen-lockfile`, or proceed if it installs cleanly |
 | Tempted to `bun install` because `bun.lock` is there | both lockfiles are committed; the build contract is pnpm | pnpm for install/lint/typecheck/build; bun only for `bun test` |
 | Build output has no `rooms.js` | correct — this fork emits `assets/chat-<hash>.js` at base `/chat/` | if `/rooms` is the goal, run `--hosted` |
 | Shared file changed but the twin did not move | `test/shared-parity.test.ts` only checks a fork against its own manifest | `bun tools/sync-shared.ts --diff`, then `--refresh` here and a plain sync in the twin |
