@@ -99,6 +99,51 @@ A local-main build usually does **not** change the version string. Say so up
 front, or the report reads as a no-op: the honest proof is the asset stamp in
 step 7, not `om --version`.
 
+**Say what you are building FROM, before you build it.** This skill compiles the
+working tree, not a git ref — uncommitted edits, a feature branch, a detached
+HEAD and a linked worktree all get embedded exactly as they sit on disk. Nothing
+downstream records that: the `?v=` stamp is a content hash, so it moves, but it
+cannot tell anyone *which branch* it came from. A build off someone's half-done
+feature branch is indistinguishable from a build off `main` in every artifact
+this skill produces.
+
+Capture both repos up front and put it in the opening line and the final report:
+
+```bash
+for R in ~/Documents/GitLab/openmarket-internal ~/Documents/GitLab/openmarket-chat; do
+  cd "$R" || continue
+  BR=$(git rev-parse --abbrev-ref HEAD)                    # "HEAD" means detached
+  [ "$BR" = HEAD ] && BR="detached@$(git rev-parse --short HEAD)"
+  D=$(git status --porcelain | wc -l | tr -d ' ')
+  WT=$(git rev-parse --git-common-dir)                     # differs from .git in a worktree
+  [ "$WT" = .git ] && WT="" || WT=" [linked worktree]"
+  UP=$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null || echo "no upstream")
+  AB=$(git rev-list --left-right --count "$UP"...HEAD 2>/dev/null | awk '{print "behind "$1", ahead "$2}')
+  printf '%-22s %s @ %s  %s  dirty=%s%s\n' "$(basename "$R")" "$BR" "$(git rev-parse --short HEAD)" "${AB:-$UP}" "$D" "$WT"
+done
+```
+
+**State it plainly and early**, e.g.:
+
+> Building from **openmarket-internal** `main @ 2041dae1` (clean) and
+> **openmarket-chat** `main @ 20e8862f` (clean).
+
+**Call it out loudly when it is not plain `main`, clean, and level with origin.**
+Any of these belongs in the opening line *and* the final report, because the
+person reading the report is otherwise entitled to assume it was `main`:
+
+- a branch other than `main` — name it
+- `dirty=N` — say how many files, and that uncommitted work is in the binary
+- `ahead N` — the build contains commits that are not on origin
+- `behind N` — the build is missing commits that are
+- a linked worktree — say which path, since two worktrees of one repo can
+  disagree and the daemon only gets the one you compiled
+
+The two repos are independent here. Building `main` in the monorepo while the
+GUI sits on a feature branch is legitimate and common — but it must be said,
+because `om --version` will look like a normal release while `/rooms` serves
+something that exists only on that branch.
+
 ### 0.5. The skip gate — run this before building anything
 
 Most invocations of this skill have nothing to do. Rebuilding anyway costs a
@@ -362,10 +407,11 @@ your shell resolved, which can differ from the one the supervisor is running.
 The served `?v=` stamp is the authoritative *GUI* check, and the only one that
 moves when the version does not.
 
-Report: version before → after, the asset stamp, which binary path was replaced,
-whether the GUI is embedded or placeholder, daemon restart result, worktree
-state, and anything left for Ryan (a shadowed `om` still first on PATH, a
-skipped GUI, a failed restart).
+Report: **the branch and sha each repo was built from** (flagged if not clean
+`main` level with origin, or a linked worktree), version before → after, the
+asset stamp, which binary path was replaced, whether the GUI is embedded or
+placeholder, daemon restart result, worktree state, and anything left for Ryan
+(a shadowed `om` still first on PATH, a skipped GUI, a failed restart).
 
 Also report **any daemon error line seen after the restart, and whether it
 predates this build.** `om service status` shows the most recent error even
