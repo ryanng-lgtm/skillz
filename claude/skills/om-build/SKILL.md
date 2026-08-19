@@ -99,6 +99,84 @@ A local-main build usually does **not** change the version string. Say so up
 front, or the report reads as a no-op: the honest proof is the asset stamp in
 step 7, not `om --version`.
 
+### 0.5. The skip gate — run this before building anything
+
+Most invocations of this skill have nothing to do. Rebuilding anyway costs a
+compile, a binary swap and a daemon restart, and it re-rolls the asset stamp so
+the report *looks* like work happened when nothing changed.
+
+Six conditions. **All six clean means stop and report one line.** Any one dirty
+means build, and the reason is what you say you are building for.
+
+```bash
+OM_BIN=~/.local/bin/om
+MONO=~/Documents/GitLab/openmarket-internal
+GUI=~/Documents/GitLab/openmarket-chat
+
+need=0; why=""
+flag() { need=1; why="${why:+$why; }$1"; }
+
+health=$(curl -s http://127.0.0.1:31337/healthz)
+
+# 1. the daemon is running the binary that is on disk (not a pre-swap inode)
+pid=$(printf '%s' "$health" | sed -n 's/.*"pid":\([0-9]*\).*/\1/p')
+if [ -z "$pid" ]; then
+  flag "daemon not answering on 31337"
+else
+  disk=$(stat -f '%i' "$OM_BIN")
+  live=$(lsof -p "$pid" 2>/dev/null | awk '$4=="txt" && $NF ~ /bin\/om/ {print $(NF-1); exit}')
+  [ "$disk" = "$live" ] || flag "daemon runs inode $live, disk has $disk"
+fi
+
+# 2. version pin matches what the daemon reports
+src_ver=$(grep -m1 '"version"' "$MONO/packages/cli/package.json" | grep -o '[0-9][0-9.]*')
+run_ver=$(printf '%s' "$health" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+[ "$src_ver" = "$run_ver" ] || flag "daemon $run_ver, source $src_ver"
+
+# 3. the stamp the daemon serves matches the bundle on disk
+built=$(grep -o 'rooms\.js?v=[a-f0-9]*' "$GUI/dist/index.html" 2>/dev/null | head -1)
+served=$(curl -s http://127.0.0.1:31337/rooms/ | grep -o 'rooms\.js?v=[a-f0-9]*' | head -1)
+{ [ -n "$built" ] && [ "$built" = "$served" ]; } || flag "served $served, built $built"
+
+# 4-6. any source newer than the artifact it produces
+newer() { find "$1" -type f -newer "$2" 2>/dev/null | wc -l | tr -d ' '; }
+n=$(newer "$GUI/src" "$GUI/dist/index.html");                                    [ "$n" = 0 ] || flag "$n GUI src file(s) newer than dist"
+n=$(newer "$MONO/packages/rooms-client/src" "$MONO/packages/rooms-client/dist/version.js"); [ "$n" = 0 ] || flag "$n rooms-client src file(s) newer than dist"
+n=$(newer "$MONO/packages/cli/src" "$OM_BIN");                                   [ "$n" = 0 ] || flag "$n packages/cli src file(s) newer than the installed binary"
+
+[ "$need" -eq 0 ] && echo "SKIP — nothing to build" || echo "BUILD — $why"
+```
+
+**On `SKIP`, stop.** Do not build, do not stage, do not restart. Report exactly
+one line and end:
+
+> Nothing to build — daemon `<version>` (pid `<pid>`) already serving stamp
+> `<stamp>`; GUI `<repo>@<sha>` and monorepo `<sha>` both clean and already
+> compiled in.
+
+That is the whole report. No tables, no per-step narration, no "checks passed"
+list — there were no checks worth reporting because nothing ran.
+
+**Why six and not two.** Version-and-stamp alone is not sufficient, and three
+separate runs proved it:
+
+- `rooms-client` `dist` and `src` can both read the same version while the
+  source has moved underneath — the constant tracks releases, not content. A
+  wire-contract change (`rooms-protocol.ts`) shipped stale this way.
+- The GUI's own `src` can be untouched while its **dependency** moved, so the
+  bundle is stale even though `find src -newer dist` says zero. Rebuilding
+  `rooms-client` alone re-rolled the GUI stamp, which is the proof.
+- `packages/cli/src` can move with the GUI untouched — the binary needs a
+  rebuild even when `/rooms` would be byte-identical.
+
+**Bias to building.** Every condition is cheap; a compile is not, but shipping a
+GUI built against last release's protocol is worse. When a check cannot answer
+(daemon down, `dist/` missing, `lsof` returns nothing), that counts as dirty.
+
+**A `git pull` usually forces a build even when content is unchanged**, because
+checkout stamps mtimes to now. That is the conservative direction and is fine —
+say "source mtimes moved" rather than claiming a code change.
+
 ### 1. Build the rooms GUI bundle
 
 Skip steps 1, 2 and 6 entirely on `--no-gui` (`/rooms` will serve the
@@ -308,6 +386,8 @@ worth reporting as such.
 | Symptom | Cause | Fix |
 |---|---|---|
 | `om --version` unchanged after install | either a different `om` is first on PATH, or local main simply never bumped the version | `which -a om`; then confirm via the `?v=` stamp, not the version |
+| Ran the whole build and the stamp came out identical | nothing had changed; the skip gate (step 0.5) was not run | run it first — six conditions, all clean means stop and report one line |
+| Skip gate says BUILD right after a `git pull`, with no code change | checkout rewrites mtimes to now | expected and conservative; say "source mtimes moved", not "code changed" |
 | `/rooms` shows an install-instructions page | stubs were compiled in | redo steps 1-3; check the stub marker gate in step 2 |
 | Daemon still on the old version | binary swapped, daemon not restarted | `om service restart` |
 | `bun install` 404s in openmarket-chat | `@openmarket/rooms-client` is private on npm | link from the monorepo (`rooms-client:link`), never a different registry |
@@ -319,6 +399,158 @@ worth reporting as such.
 | Huge diff / 14 MB file in `git status` | staged GUI assets not restored | `git checkout packages/cli/assets/rooms-gui/` |
 | `OM_ROOMS_GUI_DIR` set but the daemon ignores it | the launchd plist has no `EnvironmentVariables` key, so the supervised daemon never sees your shell's env; and the watch-and-re-read path is source-only (`setRoomsGuiHotReload(isDevExecPath())`, `rooms-routes.ts:95`) | it is a hand-run-daemon tool, not a shortcut around the embed — do the compile |
 | `cannot upgrade: process.execPath is ...` from `om upgrade` | you ran the source entrypoint, not a compiled binary | expected — that guard is `upgrade-core.ts:424` |
+
+### When to stop and hand over the runbook
+
+This skill is tuned to one machine. Other people run these repos with different
+paths, a different npm identity, no linked `rooms-client`, or no daemon at all.
+
+**Bail out instead of debugging when any of these is true:**
+
+- Two attempts at the same step have failed.
+- The failure is not in the Traps table and is not obviously a typo.
+- The environment differs from what step 0 assumes — no `~/.local/bin/om`, no
+  launchd plist, repos somewhere else, a Cellar install as the only `om`.
+- Anything needs a credential you do not have (the private `@openmarket` scope).
+
+Do not keep probing. Print the runbook below, say which step failed and what the
+error was, and stop. A person with the right access finishes it in ten minutes;
+an agent guessing at it burns an hour and can leave a half-installed binary.
+
+### The manual runbook — build and run the latest daemon from source
+
+Hand this over verbatim. It assumes nothing this skill set up.
+
+**What you need first**
+
+- `bun` on PATH (`bun --version`).
+- Both repos cloned. They are separate — the GUI is **not** in the monorepo:
+  - monorepo (daemon + CLI + `rooms-client`): `openmarket-internal`
+  - rooms GUI: `openmarket-chat`
+- Write access to wherever `om` is installed. Never `sudo`.
+
+If you do not know where the repos are:
+
+```bash
+find ~ -maxdepth 4 -type d -name openmarket-internal 2>/dev/null
+find ~ -maxdepth 4 -type d -name openmarket-chat 2>/dev/null
+```
+
+**Set the paths once. Every step below uses them.**
+
+```bash
+export MONO=~/Documents/GitLab/openmarket-internal   # <- yours may differ
+export GUI=~/Documents/GitLab/openmarket-chat
+export OM_BIN="$(command -v om || echo ~/.local/bin/om)"
+echo "$MONO"; echo "$GUI"; echo "$OM_BIN"
+```
+
+> If `$OM_BIN` resolves inside `/Cellar/openmarket/`, **stop.** Homebrew owns
+> that file and a hand-placed binary gets clobbered on the next `brew upgrade`.
+> Install to `~/.local/bin/om` instead and make sure it comes first on PATH.
+
+**1. Get both repos current**
+
+```bash
+git -C "$MONO" status --short && git -C "$MONO" pull --ff-only
+git -C "$GUI"  status --short && git -C "$GUI"  pull --ff-only
+```
+
+Commit or stash anything the status lines show before pulling.
+
+**2. Point the GUI at the monorepo's `rooms-client`, and rebuild it**
+
+`@openmarket/rooms-client` is private on npm. If you cannot install it, link it
+from the monorepo instead — that bypasses the registry entirely:
+
+```bash
+cd "$GUI" && OM_REPO="$MONO" bun run rooms-client:link
+bun run rooms-client:status          # expect: LINKED -> .../packages/rooms-client
+```
+
+A linked `rooms-client` does **not** rebuild itself when the monorepo moves, so
+rebuild it by hand every time:
+
+```bash
+cd "$MONO/packages/rooms-client" && bun run build
+grep VERSION dist/version.js         # must match the version you are installing
+```
+
+**3. Build the GUI bundle**
+
+```bash
+cd "$GUI"
+bun install     # skip if it 404s on @openmarket/rooms-client — the link covers it
+bun run build
+```
+
+Note the `assets pinned to ?v=<stamp>` line. That stamp is your proof later.
+Then confirm all five embed inputs exist — a missing one means the build failed
+quietly and you must not continue:
+
+```bash
+for f in dist/assets/rooms.js dist/assets/rooms.css dist/index.html dist/sw.js dist/manifest.webmanifest; do
+  [ -f "$f" ] && echo "ok $f" || echo "MISSING $f"
+done
+```
+
+**4. Stage the GUI into the binary's embed slots** (working tree only — never commit these)
+
+```bash
+cd "$MONO"
+SLOT=packages/cli/assets/rooms-gui
+cp "$GUI/dist/assets/rooms.js"  "$SLOT/rooms.js"
+cp "$GUI/dist/assets/rooms.css" "$SLOT/rooms.css"
+cp "$GUI/dist/index.html"       "$SLOT/index.html.txt"
+bun packages/cli/scripts/pack-rooms-gui-extra.ts "$GUI/dist" "$SLOT/extra.json.txt"
+
+grep -l "__OM_ROOMS_GUI_STUB__" "$SLOT/rooms.js" "$SLOT/extra.json.txt" \
+  && echo "STILL STUBBED — stop" || echo "staged"
+```
+
+Skipping this step is the single most common mistake: the build succeeds and
+`/rooms` serves an install-instructions page, which looks exactly like the GUI
+broke.
+
+**5. Compile**
+
+```bash
+cd "$MONO" && bun install && bun run build
+ls -la packages/cli/dist/om && ./packages/cli/dist/om --version
+```
+
+**6. Install and restart**
+
+```bash
+mv packages/cli/dist/om "$OM_BIN"     # mv, never cp — cp truncates a running binary
+om service restart
+```
+
+**7. Verify — the served stamp, not the version**
+
+```bash
+curl -s http://127.0.0.1:31337/healthz | head -c 120
+curl -s http://127.0.0.1:31337/rooms/ | grep -o 'rooms\.js?v=[a-f0-9]*'
+```
+
+The stamp must equal step 3's. A local build often does **not** change
+`om --version`, so the version proves nothing; the stamp is the real check.
+If `/rooms` shows install instructions, step 4 did not take.
+
+**8. Put the stubs back — always, including after a failure**
+
+```bash
+cd "$MONO"
+git checkout packages/cli/assets/rooms-gui/
+rm -f packages/cli/.*.bun-build
+git status --short                    # must be clean
+```
+
+`extra.json.txt` alone is ~14 MB of base64. Committing it permanently bloats the
+repo, and `git add -A` will happily sweep it up.
+
+**If it still does not work**, report: which step, the exact error, `om --version`,
+the served stamp, and whether `git status` is clean in both repos.
 
 ### The real fix (`--hosted` only)
 
