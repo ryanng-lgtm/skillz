@@ -289,6 +289,8 @@ Note there is no `--flip-threshold` here: 0.7 is already the default, and passin
 
 **After the create lands, offer a quick backtest before arming.** One call: `backtest_run` with the new strategy's slug (the one-shot verb derives window, interval, costs, and time basis from what is stored, and returns the result against a buy-and-hold benchmark). It is the cheapest way for the user to eyeball whether the idea roughly behaves before any mode change; offer, do not auto-run.
 
+**Hand the chart URL over honestly.** The result's `chart` block carries the live-view URL — relay it. Read `chart.mode` before promising what the link shows: `strategy_panel` means a watching viewer has the Strategy Tester live; `panel+markers` means the run ALSO drew persistent fill markers because nobody was watching or the daemon session could not attach (`chart.markers_reason` says which) — those markers are relay-stored and survive reloads and the daemon being down; `markers` means only the persistent markers landed (panel unavailable). The panel itself is re-pushed per viewer by the user's om daemon: if their daemon is stopped, say the link shows the markers now and the full tester panel once the daemon is back. The full report is also on disk at `report_path` — cite it for anything the compact result dieted away.
+
 ### 5. Confirm the daemon is running
 
 Strategies execute only under the daemon. If `om status` showed it down, route the user to `om service install` then `om service start` (run as a service, not foreground, so decisions land in `runner.log`). The agent cannot start it.

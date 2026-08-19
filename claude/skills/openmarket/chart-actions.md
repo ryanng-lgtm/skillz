@@ -26,8 +26,11 @@ The chart is the display plane where your work turns visible. When the user asks
 
 Same `om` binary as alerts. The daemon (`om run` foreground or `om service start` background) holds the bridge; the `om chart` subcommands either:
 
-- **call the daemon's loopback HTTP** (`status`, `refresh`, `view`, `indicator add`, `drawing add` — they require the daemon to be running), or
+- **call the daemon's loopback HTTP** (`status`, `refresh`, `view`, `indicator add` — they require the daemon to be running),
+- **call the daemon but fall back to direct gateway REST when it is down** (`symbol`, `interval`, `drawing add`, `drawing remove` — the persistent trio: the change lands in the workspace document either way; daemon-down you lose only session extras like playback and blackboard reads), or
 - **call the upstream collab gateway REST directly** (`list` — works even when the daemon is down).
+
+Daemon-down honesty when relaying results: the workspace DOCUMENT (symbols, intervals, drawings, indicators, persistent backtest fill markers) is relay-stored and survives everything. OM payload lanes (Strategy Tester panels, `chart pins` event pins, WRUN previews) are re-pushed per viewer by the user's om daemon — a share link opened while that daemon is down renders the document without them. Warn the user before handing out a chart URL if their daemon is stopped and the content they care about lives on a payload lane.
 
 Configuration is handled by `om init`:
 
