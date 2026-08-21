@@ -115,7 +115,7 @@ om backtest spec \
   --compact
 ```
 
-with `hold-long.json` (the strategy half is creatable verbatim via `om strategy create`; the `constant` signal is replay-only — the kind is retired from `signal_create`, so to trade a winner re-author its signal as a metric/text kind; the sizer owns the weight):
+with `hold-long.json` (the strategy half is creatable verbatim via `om strategy create`; the `constant` signal is replay-only — the kind is retired from the signal create tools, so to trade a winner re-author its signal as a metric/text kind; the sizer owns the weight):
 
 ```json
 {
@@ -162,7 +162,7 @@ Heed the honesty warnings when summarizing: `metric_not_ready` (the signal's dat
 
 `--candidate-file <path>` replays a strategy that exists nowhere on disk — a JSON file of shape `{strategy, signal?}` where `strategy` carries the authoring fields of `om strategy create` (slug, signal, market, sizer, optional label/exit/daemon) and the optional inline `signal` carries `{slug, spec, label?}`. Omit `signal` to reference a saved signal by the strategy's `signal` slug. Nothing is persisted, and the report's `backtest.query.candidate: true` marks its origin.
 
-The contract is **promotability, scoped to the creatable signal kinds**: the strategy fields pass to `om strategy create` verbatim, and an inline signal of a creatable kind (`text_long_short`, `metric_level_rule`, `metric_band_rule`) maps mechanically onto `signal_create` (its `spec` fields become the flat create inputs: kind, selector, condition, long/short, eval). The one exception is `constant`: it backtests but is replay-only — the kind is retired from `signal_create` — so a winning constant candidate is promoted by re-authoring its signal as a metric/text kind. Candidate slugs must NOT collide with saved ones — including by DERIVED id (slugs slugify to ids by collapsing separator runs) — pick fresh names.
+The contract is **promotability, scoped to the creatable signal kinds**: the strategy fields pass to `om strategy create` verbatim, and an inline signal of a creatable kind (`text_long_short`, `metric_level_rule`, `metric_band_rule`) maps mechanically onto its kind's create tool, `signal_create_text` or `signal_create_metric` (its `spec` fields become the flat create inputs — selector, condition, long/short, eval, plus `kind` on the metric tool). The one exception is `constant`: it backtests but is replay-only — the kind is retired from the create surface — so a winning constant candidate is promoted by re-authoring its signal as a metric/text kind. Candidate slugs must NOT collide with saved ones — including by DERIVED id (slugs slugify to ids by collapsing separator runs) — pick fresh names.
 
 **Authoring the inline signal's spec:** the per-kind spec shapes and worked JSON examples live in `skill_read("signal", section = the kind name)`: e.g. `metric_band_rule` for hysteresis regimes (a golden cross is `long.enter` `{"left":{"metric":"sma","params":{"period":50}},"op":"gt","right":{"metric":"sma","params":{"period":200}}}` with `lt` on exit). Do not guess condition shapes; the operators are word-form (`gt`/`lt`, never `>`), and there is no `compare` wrapper.
 

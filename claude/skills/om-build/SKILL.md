@@ -196,7 +196,7 @@ this skill produces.
 Capture both repos up front and put it in the opening line and the final report:
 
 ```bash
-for R in ~/Documents/GitLab/openmarket-internal ~/Documents/GitLab/openmarket-chat; do
+for R in ~/github/openmarket-internal ~/github/openmarket-chat; do
   cd "$R" || continue
   BR=$(git rev-parse --abbrev-ref HEAD)                    # "HEAD" means detached
   [ "$BR" = HEAD ] && BR="detached@$(git rev-parse --short HEAD)"
@@ -240,9 +240,9 @@ Six conditions. **All six clean means stop and report one line.** Any one dirty
 means build, and the reason is what you say you are building for.
 
 ```bash
-OM_BIN=~/.local/bin/om
-MONO=~/Documents/GitLab/openmarket-internal
-GUI=~/Documents/GitLab/openmarket-chat
+OM_BIN=$(realpath /opt/homebrew/bin/om)   # a symlink here — resolve it, or stat reads the link
+MONO=~/github/openmarket-internal
+GUI=~/github/openmarket-chat
 
 need=0; why=""
 flag() { need=1; why="${why:+$why; }$1"; }

@@ -1192,6 +1192,8 @@ Recovery rules:
 
 The alert contract (compound, indicators, edge operators, `expr` math, script protocol) is documented in `SPEC.md` at the repo root. The canonical zod schema lives at `packages/sdk/src/alert-spec.ts` (published as `@openmarket/sdk/alert-spec`) and is the source of truth for what the runner accepts. Anything not described above is not accepted by the runner; do not generate specs for it.
 
+**Bindable WRUN markets**: a `wrun/...` operand whose package declares a bindable odds input takes `sourceBindings: { <input>: { conditionId: "0x...", outcome?: "YES"|"NO" } }` beside `params` — the market is chosen per alert, so one installed package serves many markets. A missing or malformed binding refuses at save/evaluate time with `wrun_source_bindings_invalid` (never a silent warm-up).
+
 <!-- AUTO: COMMAND REFERENCE — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
 ## Command reference
