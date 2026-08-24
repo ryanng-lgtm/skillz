@@ -29,6 +29,13 @@ no monorepo, no `om` binary, no daemon, and checks no openmarket package.
 (`--cloud`), or "Using om-build to put the checked-out branch on the simulator"
 (`--mobile`).
 
+**Every target builds from the main worktree, never a linked one.** Resolve it
+with `git worktree list --porcelain | awk '/^worktree /{print $2; exit}'` — the
+first entry is always the main worktree, from wherever you start — and build
+there. A build off a feature worktree produces artifacts identical in shape to a
+correct one, so nothing downstream catches the mistake. If the user meant a
+feature worktree, they have to say so and you stop first.
+
 If either fork's copy of a file in `tools/parity-manifest.json` was edited,
 run `bun tools/sync-shared.ts --diff` before building. It is the only
 cross-fork alarm that exists; both forks can be green while drifting.
@@ -1002,3 +1009,4 @@ debugging a database the current code did not create.
 | `Failed to load app from 127.0.0.1:<port>` | app raced Metro's startup | wait for `/status`, then Reload in the app |
 | Rebuilds native every run | comparing against the wrong artifact, or `ios/build` churn | the gate compares against the *installed* container, not DerivedData |
 | Another run's device gets hijacked | targeted a template or lane clone | `--mobile` uses the interactive simulator only |
+| Built the wrong branch entirely | ran from a feature worktree | always resolve `$MAIN` first; never build a linked worktree |
