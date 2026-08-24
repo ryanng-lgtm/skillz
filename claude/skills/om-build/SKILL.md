@@ -12,6 +12,7 @@ anything; they share no build, no artifact shape, and no verification.
 |---|---|---|---|---|
 | `--hosted` (default) | `openmarket-chat` | `assets/rooms.js` + `rooms.css` + `index.html`, embedded into `om` | `http://127.0.0.1:31337/rooms#/` | yes — recompiles and swaps it |
 | `--cloud` | `openmarket-chat-cloud` | fingerprinted `assets/chat-<hash>.js` at base `/chat/` | a local server you start, at `/chat/` | never |
+| `--mobile` | `openmarket-chat-app` | dev-client `.app` plus the JS bundle this worktree's Metro serves | the iPhone 17 Pro simulator | never |
 
 Ryan's names, which read backwards if you assume "hosted" means the SaaS:
 `--hosted` is the daemon **hosting** the GUI at `/rooms`; `--cloud` is the
@@ -19,12 +20,14 @@ Ryan's names, which read backwards if you assume "hosted" means the SaaS:
 
 **Never mix them in one run.** `--cloud` never writes `~/.local/bin/om`, never
 runs `om service restart`, and never stages anything into the monorepo.
-`--hosted` never touches the cloud repo. `--no-gui` means nothing under
-`--cloud`.
+`--hosted` never touches the cloud repo. `--mobile` is standalone: it touches
+no monorepo, no `om` binary, no daemon, and checks no openmarket package.
+`--no-gui` means nothing under `--cloud` or `--mobile`.
 
 **Announce at start:** "Using om-build to build and install om from source"
-(`--hosted`) or "Using om-build to build and serve the cloud /chat/ fork"
-(`--cloud`).
+(`--hosted`), "Using om-build to build and serve the cloud /chat/ fork"
+(`--cloud`), or "Using om-build to put the checked-out branch on the simulator"
+(`--mobile`).
 
 If either fork's copy of a file in `tools/parity-manifest.json` was edited,
 run `bun tools/sync-shared.ts --diff` before building. It is the only
