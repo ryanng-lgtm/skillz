@@ -758,3 +758,169 @@ report a deploy — this target does not do one.
 | Tempted to `bun install` because `bun.lock` is there | both lockfiles are committed; the build contract is pnpm | pnpm for install/lint/typecheck/build; bun only for `bun test` |
 | Build output has no `rooms.js` | correct — this fork emits `assets/chat-<hash>.js` at base `/chat/` | if `/rooms` is the goal, run `--hosted` |
 | Shared file changed but the twin did not move | `test/shared-parity.test.ts` only checks a fork against its own manifest | `bun tools/sync-shared.ts --diff`, then `--refresh` here and a plain sync in the twin |
+
+---
+
+## `--mobile` — OpenFloor iOS app on the simulator
+
+Goal: after this runs, the simulator shows **exactly** the branch checked out in
+the `openmarket-chat-app` main worktree — no other branch's JS, no stale build.
+
+Standalone target. No monorepo, no `om` binary, no daemon, no
+`@openmarket/rooms-client` check — the app consumes it as a published
+dependency and this skill does not build or verify it.
+
+The native shell and the JS come from different places, and that split is where
+this goes wrong. The `.app` is compiled from `ios/`; everything a feature branch
+usually changes is JS served live by Metro. So the build is cheap **and** the
+exactness problem is entirely about which Metro the app is talking to.
+
+```bash
+APP=~/Gitlab/openmarket-chat-app
+SIM=${OM_MOBILE_SIM:-27AA105E-752C-491F-8047-A4C23420E150}   # iPhone 17 Pro
+PORT=${OM_MOBILE_PORT:-8081}
+BUNDLE_ID=sh.openmarket.openfloor
+```
+
+### Hard rules
+
+- **The main worktree is the source.** Build what is checked out there, working
+  tree and all. Never check out a branch, stash, or clean to make it build.
+- **Exactly one Metro, and it must be this worktree's.** Several dev servers run
+  on this box (8081/8082/8083, and lane Metros on 8090+). The dev client will
+  happily load another worktree's bundle onto this build, which reads as "my
+  change isn't there". Own the port or stop.
+- **Never target a verification device.** `OpenFloor-Template*` and
+  `OpenFloor <slug>` clones belong to `$om-mobile-feature` runs; taking one
+  corrupts a run in flight. `--mobile` uses Daryl's interactive simulator only.
+- **`node_modules` must be a real directory.** A symlink to another worktree's
+  copy makes Expo Router resolve the app root through it and boot the "Welcome
+  to Expo" fallback — an app with no routes, which looks like a broken build.
+- **Never rebuild native to ship a JS change.** It costs ten minutes and proves
+  nothing the bundle does not already prove.
+
+### 0. Preflight — say what you are about to ship
+
+```bash
+cd "$APP"
+BR=$(git rev-parse --abbrev-ref HEAD); [ "$BR" = HEAD ] && BR="detached@$(git rev-parse --short HEAD)"
+git log -1 --oneline
+DIRTY=$(git status --porcelain | wc -l | tr -d ' ')
+[ -L node_modules ] && echo "FATAL: node_modules is a symlink — pnpm install here first"
+xcrun simctl list devices | grep -F "$SIM" || echo "FATAL: simulator $SIM not found"
+```
+
+State the branch, HEAD, and dirty count in the opening line. Uncommitted edits
+ship as-is; that is intended, but it has to be said or the report is misleading.
+
+Install dependencies only when the lockfile moved:
+
+```bash
+[ pnpm-lock.yaml -nt node_modules/.modules.yaml ] && pnpm install --frozen-lockfile
+```
+
+### 0.5. The skip gate — decide whether native has to be rebuilt
+
+Rebuild the `.app` only when a native input changed or nothing is installed.
+Everything else is a JS change and needs Metro alone.
+
+```bash
+INSTALLED=$(xcrun simctl get_app_container "$SIM" "$BUNDLE_ID" app 2>/dev/null)
+
+need=0; why=""
+flag() { need=1; why="${why:+$why; }$1"; }
+[ -z "$INSTALLED" ] && flag "app not installed on this simulator"
+if [ -n "$INSTALLED" ]; then
+  for f in package.json pnpm-lock.yaml app.json; do
+    [ "$f" -nt "$INSTALLED" ] && flag "$f newer than installed app"
+  done
+  n=$(find plugins ios/OpenFloor ios/Podfile ios/Podfile.lock -newer "$INSTALLED" 2>/dev/null | wc -l | tr -d ' ')
+  [ "$n" = 0 ] || flag "$n native file(s) newer than installed app"
+fi
+[ "$need" -eq 0 ] && echo "JS-ONLY — reuse the installed build" || echo "NATIVE REBUILD — $why"
+```
+
+`get_app_container` needs the simulator booted; boot it first if the lookup
+fails for that reason rather than concluding the app is missing.
+
+### 1. Pin one Metro on this worktree
+
+```bash
+xcrun simctl bootstatus "$SIM" -b && open -a Simulator
+OWNER=$(lsof -nP -iTCP:$PORT -sTCP:LISTEN -t | head -1)
+if [ -n "$OWNER" ]; then
+  lsof -p "$OWNER" | awk '$4=="cwd"{print $NF}'      # must be $APP
+fi
+```
+
+If the port is held by a server rooted anywhere else, stop and say so — do not
+kill another session's Metro, and do not fall back to a different port silently.
+Either the user frees it or you re-run with `OM_MOBILE_PORT` set.
+
+When the port is free:
+
+```bash
+(cd "$APP" && nohup npx expo start --dev-client --port "$PORT" >/tmp/om-mobile-metro.log 2>&1 &)
+until curl -sf "http://127.0.0.1:$PORT/status" >/dev/null; do sleep 2; done
+```
+
+### 2. Build native — only when the gate said so
+
+```bash
+npx expo run:ios --device "$SIM" --no-bundler
+```
+
+`--no-bundler` matters: without it `expo run:ios` starts its own Metro on 8081
+and the app may bind to that one instead of the pinned server. On `JS-ONLY`,
+skip this step entirely.
+
+### 3. Bind the app to that Metro
+
+The dev client remembers previously used servers and will reconnect to a dead or
+foreign one. Always bind explicitly:
+
+```bash
+xcrun simctl openurl "$SIM" \
+  "openfloor://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A$PORT"
+```
+
+iOS then shows an "Open in OpenFloor?" confirmation. Confirm it —
+`agent-device press` if driving headless, otherwise ask the user to tap Open.
+Bundling takes up to a minute on a cold Metro.
+
+### 4. Verify provenance before claiming anything
+
+Three checks; all three must pass:
+
+```bash
+lsof -p "$(lsof -nP -iTCP:$PORT -sTCP:LISTEN -t | head -1)" | awk '$4=="cwd"{print $NF}'
+curl -s -o /dev/null -w 'bundle bytes=%{size_download}\n' \
+  "http://127.0.0.1:$PORT/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&transform.engine=hermes"
+```
+
+1. Metro's cwd is `$APP` — the bundle can only come from this worktree.
+2. The bundle is **~16 MB**. Around 5 MB is the Expo "no routes" fallback, not
+   the app; treat it as a failed build and check the symlink rule.
+3. The simulator shows real app content — the Chats inbox, not the launcher's
+   "DEVELOPMENT SERVERS" list and not "Welcome to Expo".
+
+A screenshot of the running app is the only honest proof the branch is on
+screen. Take one.
+
+### 5. Report
+
+Branch, HEAD, dirty count, whether native was rebuilt (and why) or the installed
+build was reused, the port and simulator, and the verified bundle size. If the
+branch was dirty, say that the simulator shows uncommitted work.
+
+### Traps (`--mobile`)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| App runs but the change is missing | bound to another worktree's Metro | re-bind with the step 3 deep link; check Metro's cwd |
+| "Welcome to Expo — create a file in src/app" | `node_modules` symlinked to another worktree; Expo Router resolves the app root through it | real `pnpm install` in this worktree, restart Metro |
+| Bundle is ~5 MB | same fallback as above | never ship it; fix and re-bundle |
+| Launcher shows "DEVELOPMENT SERVERS" and never loads | the deep link was not confirmed | tap Open, then wait for bundling |
+| `Failed to load app from 127.0.0.1:<port>` | app raced Metro's startup | wait for `/status`, then Reload in the app |
+| Rebuilds native every run | comparing against the wrong artifact, or `ios/build` churn | the gate compares against the *installed* container, not DerivedData |
+| Another run's device gets hijacked | targeted a template or lane clone | `--mobile` uses the interactive simulator only |
