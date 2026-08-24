@@ -888,6 +888,12 @@ iOS then shows an "Open in OpenFloor?" confirmation. Confirm it —
 `agent-device press` if driving headless, otherwise ask the user to tap Open.
 Bundling takes up to a minute on a cold Metro.
 
+If the app lands on the sign-in screen, sign in with Daryl's credentials —
+`security find-generic-password -a daryl@trontalgroup.com -s claude-agent-login -w`
+— then allow the notifications prompt. This simulator is his, so its session is
+his to restore; unlike a verification clone, the credential persists here and
+the next run starts signed in.
+
 ### 4. Verify provenance before claiming anything
 
 Three checks; all three must pass:
