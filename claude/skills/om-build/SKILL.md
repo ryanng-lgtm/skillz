@@ -806,14 +806,29 @@ BUNDLE_ID=sh.openmarket.openfloor
 
 ### 0. Preflight — say what you are about to ship
 
+Resolve the main worktree first — the first entry of `worktree list` is always
+it, from whatever directory you start in — and refuse to proceed anywhere else:
+
 ```bash
-cd "$APP"
+MAIN=$(git -C "$APP" worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+[ "$MAIN" = "$(cd "$APP" && pwd -P)" ] || echo "FATAL: $APP is not the main worktree (main is $MAIN)"
+cd "$MAIN"
+[ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ] || echo "FATAL: linked worktree — refuse"
+```
+
+Then capture what is about to ship:
+
+```bash
 BR=$(git rev-parse --abbrev-ref HEAD); [ "$BR" = HEAD ] && BR="detached@$(git rev-parse --short HEAD)"
 git log -1 --oneline
 DIRTY=$(git status --porcelain | wc -l | tr -d ' ')
 [ -L node_modules ] && echo "FATAL: node_modules is a symlink — pnpm install here first"
 xcrun simctl list devices | grep -F "$SIM" || echo "FATAL: simulator $SIM not found"
 ```
+
+Every later step uses `$MAIN`, including the Metro root check in step 1 and the
+provenance check in step 4. A Metro rooted in a linked worktree fails those
+checks by construction, which is the enforcement — not a comment in a table.
 
 State the branch, HEAD, and dirty count in the opening line. Uncommitted edits
 ship as-is; that is intended, but it has to be said or the report is misleading.
