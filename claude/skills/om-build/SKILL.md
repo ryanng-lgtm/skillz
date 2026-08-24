@@ -919,6 +919,57 @@ Branch, HEAD, dirty count, whether native was rebuilt (and why) or the installed
 build was reused, the port and simulator, and the verified bundle size. If the
 branch was dirty, say that the simulator shows uncommitted work.
 
+### Switching branches while Metro runs
+
+A `git checkout` in the main worktree usually needs **no rebuild and no re-run
+of this skill**. Metro watches the tree, rebuilds on change, and Fast Refresh
+pushes the new JS into the running app. Re-run only when the checkout crosses a
+native or dependency boundary — the same conditions the 0.5 gate tests:
+
+| What the checkout changed | What is needed |
+|---|---|
+| any `src/**` JS/TS | nothing; Metro rebuilds, then reload if unsure |
+| `pnpm-lock.yaml` / `package.json` deps | `pnpm install --frozen-lockfile`, restart Metro |
+| `app.json`, `plugins/`, `ios/` | full `--mobile` run — native rebuild |
+
+Fast Refresh is best-effort: it silently degrades to a full reload, and it does
+not reliably re-run module side effects, so after a many-file branch switch do
+not trust it. Make it deterministic instead — a relaunch keeps the pinned dev
+server and needs no confirmation dialog:
+
+```bash
+xcrun simctl terminate "$SIM" "$BUNDLE_ID"; sleep 2
+xcrun simctl launch "$SIM" "$BUNDLE_ID"
+```
+
+`agent-device metro reload` is not a substitute here: it tries an HTTP
+`/reload` route this Expo server does not serve and times out.
+
+**How to tell whether the running app is current.** Watch Metro's own log — it
+prints a line per rebuild, and the module count tells you which kind:
+
+```bash
+tail -f /tmp/om-mobile-metro.log      # "iOS Bundled 1006ms … (1 module)" = incremental
+```
+
+A rebuild line stamped *after* the checkout means Metro has picked the branch
+up. No line means nothing rebuilt — the app is still running the previous
+branch's JS. For a positive check rather than an absence, hash the served
+bundle before and after; a changed hash proves new code is being served:
+
+```bash
+curl -s "http://127.0.0.1:$PORT/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&transform.engine=hermes" | shasum -a 256
+```
+
+The bundle is always built from disk on request, so a fresh fetch reflects the
+working tree even when the app on screen does not. That is the gap a relaunch
+closes.
+
+One thing a reload never fixes: persisted state written by another branch.
+After a checkout that crosses a SQLite migration, wipe the app's data
+(`xcrun simctl uninstall` then reinstall, or clear from the app) instead of
+debugging a database the current code did not create.
+
 ### Traps (`--mobile`)
 
 | Symptom | Cause | Fix |
