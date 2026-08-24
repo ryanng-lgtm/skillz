@@ -1,6 +1,6 @@
 ---
 name: om-build
-description: Use when an OM Chat GUI has to be built from source and put in front of Ryan — the daemon-embedded `/rooms` GUI when `om upgrade` cannot fetch a release (openmarket-releases 404s) or a local change has to reach the running daemon, or the hosted `/chat/` cloud fork when it has to be built, validated, and served locally. Covers both targets and the swap onto the live install. Trigger: /om-build [--hosted|--cloud] [--no-gui]
+description: Use when an OM Chat GUI has to be built from source and put in front of Ryan — the daemon-embedded `/rooms` GUI when `om upgrade` cannot fetch a release (openmarket-releases 404s) or a local change has to reach the running daemon, the hosted `/chat/` cloud fork when it has to be built, validated, and served locally, or the OpenFloor iOS app when the simulator must show exactly the branch checked out in the openmarket-chat-app main worktree. Covers all three targets and the swap onto the live install. Trigger: /om-build [--hosted|--cloud|--mobile] [--no-gui]
 ---
 
 # om-build — build an OM Chat GUI from source
