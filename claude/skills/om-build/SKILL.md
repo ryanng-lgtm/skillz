@@ -880,7 +880,7 @@ Either the user frees it or you re-run with `OM_MOBILE_PORT` set.
 When the port is free:
 
 ```bash
-(cd "$APP" && nohup npx expo start --dev-client --port "$PORT" >/tmp/om-mobile-metro.log 2>&1 &)
+(cd "$MAIN" && nohup npx expo start --dev-client --port "$PORT" >/tmp/om-mobile-metro.log 2>&1 &)
 until curl -sf "http://127.0.0.1:$PORT/status" >/dev/null; do sleep 2; done
 ```
 
@@ -924,7 +924,8 @@ curl -s -o /dev/null -w 'bundle bytes=%{size_download}\n' \
   "http://127.0.0.1:$PORT/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&transform.engine=hermes"
 ```
 
-1. Metro's cwd is `$APP` — the bundle can only come from this worktree.
+1. Metro's cwd is `$MAIN` — the bundle can only come from the main worktree. A
+   cwd anywhere else means another worktree's JS is being served; stop.
 2. The bundle is **~16 MB**. Around 5 MB is the Expo "no routes" fallback, not
    the app; treat it as a failed build and check the symlink rule.
 3. The simulator shows real app content — the Chats inbox, not the launcher's
