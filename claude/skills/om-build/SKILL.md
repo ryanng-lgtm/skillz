@@ -784,8 +784,13 @@ BUNDLE_ID=sh.openmarket.openfloor
 
 ### Hard rules
 
-- **The main worktree is the source.** Build what is checked out there, working
-  tree and all. Never check out a branch, stash, or clean to make it build.
+- **Always build from the main worktree — never a linked one.** House rule, no
+  exceptions. Build whatever is checked out there, working tree and all; never
+  check out a branch, stash, or clean to make it build. If the session sits in a
+  feature worktree, resolve the main worktree and build there anyway; if that is
+  not what the user wanted, stop and say so rather than building the wrong tree.
+  A build from a linked worktree is indistinguishable from a correct one in
+  every artifact this target produces — which is precisely why it is banned.
 - **Exactly one Metro, and it must be this worktree's.** Several dev servers run
   on this box (8081/8082/8083, and lane Metros on 8090+). The dev client will
   happily load another worktree's bundle onto this build, which reads as "my
