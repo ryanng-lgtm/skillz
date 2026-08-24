@@ -869,7 +869,7 @@ fails for that reason rather than concluding the app is missing.
 xcrun simctl bootstatus "$SIM" -b && open -a Simulator
 OWNER=$(lsof -nP -iTCP:$PORT -sTCP:LISTEN -t | head -1)
 if [ -n "$OWNER" ]; then
-  lsof -p "$OWNER" | awk '$4=="cwd"{print $NF}'      # must be $APP
+  lsof -p "$OWNER" | awk '$4=="cwd"{print $NF}'      # must be $MAIN
 fi
 ```
 
