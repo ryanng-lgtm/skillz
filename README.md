@@ -76,9 +76,15 @@ commits, not edited by hand, and aren't listed.
 
 ## Sync
 
-`hook.sh` runs as a Claude Code `PostToolUse` hook. Any edit that resolves to a
-path inside this repo — including edits made through the `~/.claude/skills`
-symlinks — fires `sync.sh`, which commits and pushes in the background.
+`sync.sh` runs as a Claude Code `Stop` hook, so a session commits and pushes
+once, in the background, when it finishes answering — not once per edit. It
+sweeps the whole repo with `git add -A`, so anything a turn changed under here
+goes out together, including edits made through the `~/.claude/skills`
+symlinks. On a turn that changed nothing it exits immediately.
+
+`hook-install.sh` registers it per machine and migrates an older `PostToolUse`
+registration across; `hook.sh` is the per-edit entry point that used to be
+registered, kept for running the sync from a tool call by hand.
 
 `sync.sh` never force-pushes. It rebases onto the remote first; on a conflict it
 stops, keeps your commit local, and writes `.sync-conflict` with instructions.
@@ -88,8 +94,9 @@ Run it by hand any time:
 ./sync.sh
 ```
 
-Changes made outside Claude Code (a text editor, another CLI) don't trip the
-hook. Run `./sync.sh` after those.
+Changes made outside a Claude Code session (a text editor, another CLI) don't
+trip the hook on their own, though the next session's first turn sweeps them up.
+Run `./sync.sh` after those if you want them out sooner.
 
 To pause automatic pushing on a machine — working offline, or mid-way through a
 change you don't want published yet:
