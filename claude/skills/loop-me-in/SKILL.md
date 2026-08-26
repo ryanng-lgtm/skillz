@@ -53,9 +53,13 @@ Everything between those is the run's job, commits on its own branch included. A
    **Mine the "Risks & unknowns" / "Open questions" section hardest.** It is the one a brief reliably drops, because it contains no steps to transcribe — and it is where "does this fix even address the report?" lives. A `/demuddy` pass concentrates exactly these into one clean section, which makes them easier to skip and more expensive to skip.
 
    **If the plan exists in more than one copy, diff them before building.** A duplicate vault, an older draft, a pre-review version: they can differ by hundreds of lines and by which fix is correct. Build from the copy the user names, and say in the brief how to recognise a stale one.
-2. **Resolve the environment, don't assume it.** This comes before any spec work, because a spec cannot be written, run, or committed without knowing the worktree, the branch, the test runner and the install command. For every repo the plan touches, establish and write down: exact worktree path, branch name and base, whether the tree is clean, how deps are installed, the test runner and how it names spec files, and the verification command. Check these — a stale path is the single most common way these runs die.
+2. **Resolve the environment, don't assume it.** This comes before any spec work, because a spec cannot be written, run, or committed without knowing the worktree, the branch, the test runner and the install command. For every repo the plan touches, establish and write down: the source repo path, the worktree path the run will create and the feature branch it will cut there, the base branch read from `origin/HEAD` rather than assumed to be `main`, how deps are installed, the test runner and how it names spec files, and the verification command. Check these — a stale path is the single most common way these runs die.
+
+   **Specify the worktree; never create it.** This skill writes briefs and runs no `git worktree` command of its own. Name the exact path the run will create, so every gate, evidence path and command in the brief is absolute and correct before that worktree exists.
 
    **An install is not a safe no-op.** Where a repo depends on a private registry, a bare `install` can re-resolve a package, fail to fetch it, and leave the tree worse than it found it. Name the install command that is known to work, and make a failed install a stop condition rather than something the run works around.
+
+   **A new worktree starts empty of everything git does not track.** Dependencies, build caches, `.env` and other ignored files, and any uncommitted work sitting in Ryan's own checkout do not travel to it. Name what must be installed or copied across before the first gate; a plan that depends on uncommitted local work is a brief-generation blocker, not something the run discovers at 3am.
 3. **Lock the acceptance oracle for every requirement. Ask; never assume.** A conversation with Ryan, before phases exist. Work the ladder in **Establishing expected results** below until each requirement has a `CURRENT` and an `EXPECTED` with a named authority, specific enough to encode as an assertion. Assign each one a **gate mode** (table in **Spec-first**). **A requirement whose `EXPECTED` you inferred is a brief-generation blocker: the brief does not ship until Ryan settles it.**
 4. **Plan the specs; the run writes them.** In the brief, map requirements to spec files and phases — many-to-many is fine and often correct. For each, record the gate mode and the *expected* failure signature. The run writes, validates and commits each spec at the start of its own phase; the brief carries the plan and the expected signature, not the spec's text or its recorded output. See **Spec-first**.
 5. **Harvest the traps.** Every "don't do X, it breaks Y" you know: package managers that 404, files that must be regenerated rather than hand-merged, test harnesses with sharp edges, suites that OOM. A trap costs one line here and an hour there.
@@ -69,7 +73,7 @@ Everything between those is the run's job, commits on its own branch included. A
    **Vault trap:** an iCloud-nested duplicate of the plans vault can exist (`…/Obsidian/Obsidian/Claude Plans` beside the real `…/Obsidian/Claude Plans`), and the source plan may be handed to you as a path inside the *duplicate*. Do not infer the destination from where the source file sits, and do not infer it from the symlink alone. If both directories exist, name both and ask which is live before writing.
 
    **Quote every path.** The vault's real path contains spaces (`Mobile Documents`, `Claude Plans`), and so do some source directories. An unquoted path, or a `for f in $(cat list)`, silently shatters into fragments and the run reads past it. Quote in every command the brief contains, and never word-split a file list.
-10. **Report the path and the paste line.** That's the deliverable.
+10. **Report the path and the paste line.** That's the deliverable. Print the paste line in full, with every path already resolved and quoted — it has to work pasted into a fresh session by itself, so a placeholder left in it is a broken deliverable, not a detail.
 
 ## Establishing expected results
 
@@ -135,8 +139,6 @@ The real saving is narrow and worth having: **inside the fix loop**, the questio
 
 What has *not* gone away: an impacted-test set still runs at the phase boundary, and a wider gate at the wave boundary. A green spec proves the requirement is met; it does not prove nothing else broke. Anyone who reads this scheme as "no more suite runs" will ship a regression.
 
-The specs accumulate, and that is the durable half — by the last phase they are a fast, targeted suite for exactly the behaviour this plan cared about, and they stay in the repo afterwards.
-
 The specs accumulate. By the last phase, the run's own spec files are a fast, targeted regression suite for exactly the behaviour this plan cared about — and they stay in the repo afterwards, which is the durable half of the work.
 
 ## The verify loop
@@ -150,7 +152,7 @@ Commands, prompts, the sweep output contract, and the exact codex invocations li
 | Target | Harness | Why |
 |---|---|---|
 | Any web UI served from the worktree | A codex agent driving the `chrome-devtools` CDP script | Headless-capable, scriptable, no interactive consent, works against any localhost surface |
-| The OM Chat GUI | `/om-chat-web` | Already carries `doctor` (is the daemon actually serving the working tree?), saved logins, and a cloud-vs-local pixel-diff report |
+| The OM Chat GUI | `/testing-harness` | Already carries `doctor` (is the daemon actually serving the working tree?), saved logins, and a cloud-vs-local pixel-diff report. Confirm it is in this session's skill list before naming it — it was renamed from `/om-chat-web`, and a brief that names a trigger the run doesn't have has no harness at all |
 | Backend, CLI, library | A command with an expected value | A browser check that proves nothing is worse than admitting the check is a command |
 
 `claude-in-chrome` is the wrong tool here: per-site permission grants and Ryan's real profile mean the run stalls at 3am waiting for consent.
@@ -236,7 +238,7 @@ Anything the run starts that outlives one command — dev server, Chrome, backgr
 
 ## The completion post
 
-Every brief reports to OM Chat over the `openmarket-chat` MCP tools, unless the work is unshippable or the user says not to. An unattended run is otherwise silent, and silence reads as progress.
+Every brief reports to OM Chat over the OpenMarket MCP server's rooms tools (`room_*`, `doc_*`), unless the work is unshippable or the user says not to. An unattended run is otherwise silent, and silence reads as progress.
 
 **How the run builds it** — three steps, in this order:
 
@@ -255,7 +257,7 @@ Every brief reports to OM Chat over the `openmarket-chat` MCP tools, unless the 
 Below 40 words there was nothing worth interrupting for; over 100 nobody reads it.
 
 - **A post never precedes its sweep.** Green means every acceptance row came back landed with evidence, on a sweep whose identity gate passed. A phase that hit the attempt cap is named as still red, not omitted.
-- **The destination comes from the user, the resource string comes from the server.** They paste the channel and topic (procedure step 5); `session_grants` (read-only, no consent side effects) confirms it and yields the canonical resource string that goes in the brief — `room_post` wants that, not a display title. `82eae63a1bd3` (`#chat`, space `openmarket`) is the default when they don't name one. Verify the `post` capability while writing: a missing grant means the run stalls at 3am waiting for consent.
+- **The destination comes from the user, the resource string comes from the server.** They paste the channel and topic (procedure step 7); `session_grants` (read-only, no consent side effects) confirms it and yields the canonical resource string that goes in the brief — `room_post` wants that, not a display title. `82eae63a1bd3` (`#chat`, space `openmarket`) is the default when they don't name one. Verify the `post` capability while writing: a missing grant means the run stalls at 3am waiting for consent.
 - **Route to the right topic.** Where the work belongs to a topic, list them with `room_topic_list` and confirm the posting tool's schema advertises the topic field before assuming it takes one. Creating a topic needs `contribute` on the room — knock for it while writing the brief. If more than one channel is in scope, the brief names each destination against the phases it covers.
 - **`room_post` posts as the bot. `om room say` posts as Ryan.** Say which.
 - **It may only claim what was verified.** Backend work a browser cannot show, and any fix whose link to the original report is still an open question, must be worded honestly or left out.
@@ -273,13 +275,15 @@ Below 40 words there was nothing worth interrupting for; over 100 nobody reads i
 | Small enough to just do | None — say so | Not everything needs a loop; the simplest thing that works wins |
 | Phases that each need a human decision | None — say so | A loop that stops every phase to ask is worse than a checklist |
 
+**The trigger is the first word of the paste line, not the whole of it.** Whichever one you pick, the resolved brief, plan and evidence paths and the worktree clause still follow it — a `/goal` or `/schedule` paste line lands in the same contextless session a `/loop` one does.
+
 **`/loop` runs on this machine.** Sleep, shutdown, or a closed lid stops it mid-phase, which for an overnight run means waking up to a half-applied plan and a leaked browser. Say so in the brief when the run is expected to go long: either the machine stays awake, or the work belongs in `/schedule`.
 
 **Always give the brief a turn cap or phase count.** An unbounded loop burns tokens on work nobody is reading. State the ceiling and what to do on hitting it: report, don't continue.
 
 ## Token discipline
 
-An unattended run pays for every word it generates, and most of them are scaffolding nobody reads. The brief's first instruction is `/caveman:caveman full`, which compresses the run's own reasoning and internal writing for the rest of the session.
+An unattended run pays for every word it generates, and most of them are scaffolding nobody reads. The brief turns compression on with `/caveman:caveman full` as soon as the worktree is cut, which compresses the run's own reasoning and internal writing for the rest of the session.
 
 | Compressed | Left as normal prose |
 |---|---|
@@ -302,9 +306,15 @@ Write these sections, in this order. Each is a slot to fill, not a suggestion.
 
 ```markdown
 # <Name> — runnable brief
-Paste line: /loop <one sentence naming the work>
+Paste line: /loop <one sentence naming the work>. Read this brief first and
+follow it: "<resolved absolute path to this file>". Source plan:
+"<resolved absolute path>". Evidence dir: "<resolved absolute path>".
+Land every change in a new git worktree on a new feature branch cut from a
+freshly-pulled default branch; never commit to the default branch, and never
+work in Ryan's own checkout.
 (no interval — self-paced. Runs locally: keep the machine awake.)
-First action: /caveman:caveman full — internal work only. The completion post,
+First action: cut that worktree — Ground truth names the path, the branch and
+the base. Then /caveman:caveman full — internal work only. The completion post,
 the findings log, and commit messages stay normal prose.
 
 ## Requirements — CURRENT, EXPECTED, and the oracle
@@ -324,10 +334,14 @@ a mechanical test defect may be corrected in a logged test-only commit that
 re-validates the gate mode; and that a semantic spec error stops the run.
 
 ## Ground truth
-Repos and worktrees (path, branch, base, clean?), the spec-of-record path,
-what already landed (commit shas), what is deliberately NOT in scope.
-One branch per repo, one worktree for the whole run.
-The install command known to work, and that a failed install stops the run.
+Per repo: the source repo path, the worktree path the run creates, the feature
+branch it cuts there, and the base branch read from `origin/HEAD` — fetched and
+fast-forwarded before the cut, with the base SHA recorded so the run's diff
+stays interpretable. Then the spec-of-record path, what already landed (commit
+shas), and what is deliberately NOT in scope.
+One branch per repo, one worktree for the whole run, cut before phase 1.
+The install command known to work, run in the new worktree before the first
+gate, and that a failed install stops the run.
 
 ## Environment traps
 One line each. Install commands that break things. Files that must be
@@ -406,9 +420,10 @@ Two lists, and the difference matters more than either.
 
 CLEARED IN DAYLIGHT — brief-generation blockers. The brief does not ship
 until every one is resolved, so the run never meets them: unconfirmed
-EXPECTED, a gate mode that cannot be validated, an unresolved worktree or
-branch, a failing install, a duplicate-vault ambiguity, a missing posting
-grant, a verification that only a human can perform.
+EXPECTED, a gate mode that cannot be validated, an undecided worktree path,
+feature branch or base branch, a failing install, a plan that depends on
+uncommitted work in Ryan's checkout, a duplicate-vault ambiguity, a missing
+posting grant, a verification that only a human can perform.
 
 RUNTIME — the run halts and reports only for: a semantic spec error, a
 product decision the spec session did not settle, a third failed sweep on one
@@ -426,6 +441,9 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 ## Rules for the brief you write
 
 - **Copy facts, don't cite them.** "See the handoff" fails in a fresh session. Paste the constraint.
+- **The paste line is the whole handover, and it assumes a session that knows nothing.** It is the one part guaranteed to arrive, so two things are always in it and neither is paraphrased, shortened, or left to the brief body:
+  - **The file paths, resolved and quoted.** This brief, the source plan, and the evidence directory, each as a real absolute path — `~/.claude/plans` is a symlink, so resolve it, and quote every one because the vault's path contains spaces. A fresh session cannot find a file it was not handed.
+  - **The worktree clause.** Changes land in a new git worktree on a new feature branch cut from a freshly-pulled default branch; the default branch and Ryan's own checkout are off limits.
 - **Every requirement arrives with Ryan's expected result attached**, verbatim, plus how it was established. No expected result, no phase.
 - **Every phase's done-condition is its spec going green**, and that spec was red first for a recorded reason.
 - **Every phase ends in a verification command**, not "check it works".
@@ -434,7 +452,7 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 - **Decisions already made go in as decisions**, not options. A brief that reopens a settled question wastes the run.
 - **Scope fences are explicit.** Say what must NOT be touched; that is where autonomous runs do their damage.
 - **Verification is quantitative.** A command plus an expected number, not "looks right". A check the run genuinely cannot perform — hardware, a third-party account, a human judgement call — is a stop condition, not a phase. "Ryan will look at it" is not one of those.
-- **One worktree per repo, one branch, for the whole run.** Say it explicitly and forbid `git worktree add` and per-phase checkouts. Phases stack as commits on one branch. A fresh session will otherwise isolate a phase and build against a tree missing the earlier phases' changes — which fails quietly, not loudly. Name the phase pairs that touch the same file, so the ordering constraint is visible.
+- **One worktree per repo, one branch, for the whole run — cut once, as the run's first action.** The run creates it from the path, branch and base the brief names; every later `git worktree add` and per-phase checkout is forbidden. Phases stack as commits on that one branch. A fresh session will otherwise isolate a phase and build against a tree missing the earlier phases' changes — which fails quietly, not loudly. Name the phase pairs that touch the same file, so the ordering constraint is visible.
 - **Pilot without blocking.** "Execute phase 1 and report before continuing" is a contradiction in an unattended run: if it waits for review the night ends after one phase, and if it doesn't it was never a pilot. Instead, when the plan is large or the repo is unfamiliar, make phase 1 a **self-judged canary** — it posts its result immediately and continues, and it *stops the run* only on a stated tripwire (its gate mode could not be validated, or the environment turned out different from the brief). Ryan wakes to either a finished run or a run that stopped at phase 1 with a reason.
 - **Feed lessons back.** If the run discovers a trap, it belongs in the plan's Environment traps for next time — fixing the instance without recording it means the next run pays again.
 
@@ -458,6 +476,10 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 | Treating a spec that passes pre-implementation as a green phase | Either the requirement was already met, the spec is wrong, or it isn't running — and the run can't tell which |
 | Linking the spec instead of copying its constraints | Fresh session can't see it; invents its own interpretation |
 | Omitting the worktree path, or not forbidding per-phase worktrees | A later phase builds against a tree missing the earlier ones; fails quietly |
+| A paste line with no worktree clause | The run commits straight onto the default branch, inside Ryan's own checkout, overnight |
+| A paste line carrying `~` paths, an unresolved symlink, or a leftover placeholder | The fresh session cannot find the brief it was told to follow, and improvises from the sentence alone |
+| Assuming the default branch is `main`, or cutting from a stale local copy of it | Breaks outright on a `master`/`develop` repo, or lands the whole run on a base weeks behind origin |
+| A new worktree used before its install | The first gate fails on missing dependencies and reads as a code failure |
 | Building from a stale copy of the plan | Implements a superseded fix; the cite that was corrected is the one it follows |
 | Dropping the plan's unknowns | Run "fixes" a bug the report was never about, and closes it |
 | "Run the tests" with no command or baseline | Any red result reads as catastrophe or gets ignored |
