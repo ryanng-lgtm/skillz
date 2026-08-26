@@ -385,6 +385,16 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 
 - `backtest_news`
   - discloses `disclosures[]` — The run's honesty notes: asset defaulting, the classify lane's context-replay mode, sparse-corpus warnings.
+- `news_attach`
+  - discloses `eventWatch.notify_style` — The created watch's delivery style: agent (the agent's take, the default) or alert (one-way, the opt-down)
+  - discloses `eventWatch.classifier_llm_unavailable` — The watch filters every event through an LLM and none resolves on this host — the reason why. Nothing reaches the user while this is set: events arrive, classification fails, and each one is stored as an error row. Say so plainly and send them to `om init` in a terminal (no action connects an LLM). It is not a failed attach — the watch exists and starts working the moment a credential does.
+  - discloses `eventWatch.brief_auto_scheduled` — Creating this watch also switched the daily brief ON (their first feed's default-on): a news_digest schedule now exists. The brief lands at brief_time_label each day, quiet days skip, and news_brief mode=schedule_off (or `om news brief --schedule off`) stops it for good.
+  - discloses `eventWatch.brief_time_label` — When the auto-created daily brief lands ("08:00", machine-local time).
+  - discloses `eventWatch.brief_auto_declined` — The daily brief was not switched on with this first feed: several channels are configured and none is the default, so a destination would have to be guessed. Say so in one line and offer to schedule it — news_brief mode=schedule_set with `channel` (a name, id, or 'none' to keep it local).
+  - discloses `eventWatch.agent_undeliverable` — The watch is agent-style (the default) but this host has no live agent chat. With a channel bound, fires fall back to plain alerts; when notify_unavailable is ALSO set there is no fallback — fires render only as inline cards in om chat. Tell the user `om setup telegram` (then a daemon restart) enables the agent's take
+- `news_brief`
+  - discloses `brief.body_md` — The briefing markdown: story-grouped items deduplicated across feeds, major developments first, with a quiet note for feeds with nothing new. Relay it to the user as-is; do not re-summarize away detail. When generator=fallback it is a labeled raw per-feed fire list instead, whose '(raw rollup: ...)' first line states what THAT run did and carries no setup advice — what to do about it depends on what is configured now, so read llm_error and the user's current state before advising anything. The body's relative ages are frozen at body_ages_at (created_at on older briefs): never repeat one as though it were measured now.
+  - on `not_found` — No stored brief matched: follow the error's own hint (list or re-select a stored one, or mode 'generate' when none exists); if nothing exists at all, the events live in event_watch_events / event_journal_search — and in alert_events on a home whose watches all shadow alerts.
 
 <!-- AUTO: END RESULT CONTRACT -->
 

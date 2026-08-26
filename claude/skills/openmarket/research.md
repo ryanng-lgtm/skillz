@@ -260,6 +260,8 @@ What a reply must carry from each result-bearing action here; the per-branch gui
   - discloses `chart.url` — Live view link for the projected workspace. · Live view link to open and watch, when a workspace exists.
   - discloses `suggestions[]` — The honest next steps when no graded history exists in the window: what the vendor backfill found, then arm, paper-trade, or backfill.
   - discloses `choices.window_label` — The window actually replayed, and why: as asked, defaulted from the bar cadence, or clamped to the plan's history depth.
+  - on `asset_market_mismatch` — The asset series and the strategy's pinned market are different markets. Backtest the market the strategy actually trades, or pin the strategy to the venue whose series you meant — never re-run the same pair hoping for a different answer.
+  - on `license_display_only` — The asset sits on a display-only venue (CME, CME_MINI, CBOT, CBOT_MINI, NYMEX, COMEX, CFE): the data licence permits display, not research, so no window, interval or retry changes the answer. Say the venue is licence-blocked for research and offer a licensed venue for the same asset.
 - `backtest_spec`
   - discloses `chart.url` — Live view link for the projected workspace. · Live view link to open and watch, when a workspace exists.
 - `backtest_sweep`

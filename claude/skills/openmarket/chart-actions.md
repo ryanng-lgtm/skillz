@@ -657,8 +657,28 @@ The wire contract lives in code, not a standalone doc: envelope shapes in `packa
 
 What a reply must carry from each result-bearing action here; the per-branch guidance itself rides on the tool result.
 
+- `chart_indicator_add`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+- `chart_indicator_preview`
+  - on `NO_CHANGE` — NO_CHANGE on a preview push is not a success: the push was refused and the stored preview was tombstoned at the same revision, so the pane renders nothing. Say the preview did not land, and re-run it to supersede rather than reporting it as already shown.
+- `chart_indicator_remove`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+- `chart_indicator_update`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+- `chart_interval`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
 - `chart_keep`
   - discloses `disclosures[]` — Guard notes the keep proceeded under: market notes (the rename-in-place path discloses a pane-vs-pins mismatch or several recorded markets instead of refusing, and both paths disclose venue-spelling differences, stale or unreadable pane reads, and unparsable pin markets), a template note when a clone was seeded from defaults, and a warning when the name matches a workspace id only this machine's ledger still knows. Relay them.
+- `chart_layout`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+- `chart_plot_type`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+- `chart_symbol`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+- `chart_sync`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+- `chart_view`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
 
 <!-- AUTO: END RESULT CONTRACT -->
 

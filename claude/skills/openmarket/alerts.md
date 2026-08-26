@@ -296,7 +296,7 @@ The on_fire.execute block: venues, size.mode per venue, limit_px vs limit_price,
 
 Alerts may include an `on_fire.execute` block. Its presence is the user's authorization for the runner to submit an order when the alert fires; omit the block for notification-only alerts. Two venues are supported: Hyperliquid (paired with `om setup hyperliquid`) and Polymarket CLOB (paired with `om setup polymarket`). The `venue` field in the block selects which one fires. Works on both the compiled binary and source installs — the vault master key lives at `~/.openmarket/vault.key` (mode 0600) with optional `OM_VAULT_KEY` env-var override for CI / ops. Auto-execution happens only on live ticks; what a mid-gap trigger does instead is in §"Reliability".
 
-**Decision rule for the agent:** if the user's phrasing is *"do X when Y"* (a condition triggers the action), author an alert with `on_fire.execute` — this is the right skill. If the user's phrasing is *"do X now"* (no condition, just a one-shot action like a resting bid, a position open, or an exit), load the orders skill with `skill_read("orders")` and use `order_place` instead. Don't wrap a one-shot intent in a synthetic always-true alert — it's slower and pollutes the alert list. The decision is by *user intent*, not by JSON shape: the same `execute` block lands on either path.
+**Decision rule for the agent:** author `on_fire.execute` only when X is a TRADE the user asked you to place — *"buy 0.1 BTC when it drops under 60k"*. A conditional phrasing alone is not that authorization: *"tell me when BTC crosses 100k"* is also "do X when Y", and it is a notification-only alert with no execute block. When the trade is asked for, this is the right skill. If the user's phrasing is *"do X now"* (no condition, just a one-shot action like a resting bid, a position open, or an exit), load the orders skill with `skill_read("orders")` and use `order_place` instead. Don't wrap a one-shot intent in a synthetic always-true alert — it's slower and pollutes the alert list. The decision is by *user intent*, not by JSON shape: the same `execute` block lands on either path.
 
 ```json
 {
@@ -1265,10 +1265,59 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 
 - `alert_create`
   - discloses `routing_note` — Where the alert's fires post, in one sentence, with the command that moves it.
+  - discloses `condition_text` — The condition the daemon accepted, rendered the way every human surface renders it (`om alert list`, the fire card): metric, operator, threshold, venue and market per leg, compounds joined by AND / OR / NOT, and a script condition as `script: <path>`. A Polymarket leg reads as the venue's own question wherever the selector carries a `displayName` — the create resolves one, so the id's hex spelling is the fallback, not the norm.
   - discloses `readings[]` — Where every metric leg of the accepted condition stands right now — the value in the units the alert compares, and the signed distance to the threshold. This is the arming sentence's material; a leg that could not be read carries `unavailable` with the reason instead of a value, and never blocks the create.
   - discloses `cooldown_note` — How often the armed alert may speak, in one quotable sentence.
   - discloses `expiry_note` — When this alert ends, for an alert whose condition names Polymarket markets and nothing else: the market's own close, applied to the stored spec, or the reason it is armed without one. An author who stated an expiry keeps that answer and still gets a sentence when the venue reports the market already settled, or when a leaf binds no market at all. Absent on a create whose condition reaches any other venue, and on a script condition, which has no market to end with.
   - discloses `saturation_notice` — Advisory when active script alerts exceed the concurrent script pool.
+- `alert_hosted_create`
+  - discloses `status` — Engine status as the platform reports it (armed, paused, expired, ...); `unknown` means the platform's answer carried none.
+  - discloses `rule_labels[]` — One label per rule, so twin alerts are tellable apart without a get-by-id.
+  - discloses `chart_url` — The chart the indicator lives on.
+  - discloses `last_error` — The engine's last evaluation error for this alert, as the platform reports it.
+  - discloses `expires_at` — ISO timestamp after which the platform stops delivering; null runs until removed.
+  - on `hosted_alert_failed` — The platform answered with a failure: relay its message; do not report the alert as armed or retry blindly.
+  - on `hosted_alert_limit` — The platform refused on its own limits: relay its message as the reason; do not retry or work around it by splitting or renaming the alert.
+  - on `hosted_alert_not_found` — The platform answered not-found with its own message: relay it as given; do not re-target another id or script.
+  - on `hosted_alert_refused` — The platform decides entitlement and script visibility: relay its reason as given; do not recast it as a local failure or retry by another route.
+  - on `hosted_alerts_unsupported` — This gateway serves no hosted-alerts route: say hosted alerts are unavailable here; do not fall back to a daemon alert on the indicator (om has no kScript engine) or a WRUN port.
+  - on `not_logged_in` — The platform rejected the stored key (signed out, revoked or expired): say so and point at `om login` or auth_relogin; nothing on the platform changed.
+- `alert_hosted_history`
+  - on `hosted_alert_failed` — The platform answered with a failure: relay its message; do not report the alert as armed or retry blindly.
+  - on `hosted_alert_limit` — The platform refused on its own limits: relay its message as the reason; do not retry or work around it by splitting or renaming the alert.
+  - on `hosted_alert_not_found` — The platform answered not-found with its own message: relay it as given; do not re-target another id or script.
+  - on `hosted_alert_refused` — The platform decides entitlement and script visibility: relay its reason as given; do not recast it as a local failure or retry by another route.
+  - on `hosted_alerts_unsupported` — This gateway serves no hosted-alerts route: say hosted alerts are unavailable here; do not fall back to a daemon alert on the indicator (om has no kScript engine) or a WRUN port.
+  - on `not_logged_in` — The platform rejected the stored key (signed out, revoked or expired): say so and point at `om login` or auth_relogin; nothing on the platform changed.
+- `alert_hosted_list`
+  - discloses `alerts[].status` — Engine status as the platform reports it (armed, paused, expired, ...); `unknown` means the platform's answer carried none.
+  - discloses `alerts[].last_error` — The engine's last evaluation error for this alert, as the platform reports it.
+  - on `hosted_alert_failed` — The platform answered with a failure: relay its message; do not report the alert as armed or retry blindly.
+  - on `hosted_alert_limit` — The platform refused on its own limits: relay its message as the reason; do not retry or work around it by splitting or renaming the alert.
+  - on `hosted_alert_not_found` — The platform answered not-found with its own message: relay it as given; do not re-target another id or script.
+  - on `hosted_alert_refused` — The platform decides entitlement and script visibility: relay its reason as given; do not recast it as a local failure or retry by another route.
+  - on `hosted_alerts_unsupported` — This gateway serves no hosted-alerts route: say hosted alerts are unavailable here; do not fall back to a daemon alert on the indicator (om has no kScript engine) or a WRUN port.
+  - on `not_logged_in` — The platform rejected the stored key (signed out, revoked or expired): say so and point at `om login` or auth_relogin; nothing on the platform changed.
+- `alert_hosted_pause`
+  - discloses `status` — The engine's state word after the change, as the platform reports it — or the requested state when the platform's 2xx carried no state word (the request took; the final word was not reported).
+  - on `hosted_alert_failed` — The platform answered with a failure: relay its message; do not report the alert as armed or retry blindly.
+  - on `hosted_alert_limit` — The platform refused on its own limits: relay its message as the reason; do not retry or work around it by splitting or renaming the alert.
+  - on `hosted_alert_not_found` — No hosted alert has that id — or this gateway serves no hosted-alerts route, which answers the same way: run alert_hosted_list (it tells the two apart) and retry with a real id; never guess.
+  - on `hosted_alert_refused` — The platform decides entitlement and script visibility: relay its reason as given; do not recast it as a local failure or retry by another route.
+  - on `not_logged_in` — The platform rejected the stored key (signed out, revoked or expired): say so and point at `om login` or auth_relogin; nothing on the platform changed.
+- `alert_hosted_remove`
+  - on `hosted_alert_failed` — The platform answered with a failure: relay its message; do not report the alert as armed or retry blindly.
+  - on `hosted_alert_limit` — The platform refused on its own limits: relay its message as the reason; do not retry or work around it by splitting or renaming the alert.
+  - on `hosted_alert_not_found` — No hosted alert has that id — or this gateway serves no hosted-alerts route, which answers the same way: run alert_hosted_list (it tells the two apart) and retry with a real id; never guess.
+  - on `hosted_alert_refused` — The platform decides entitlement and script visibility: relay its reason as given; do not recast it as a local failure or retry by another route.
+  - on `not_logged_in` — The platform rejected the stored key (signed out, revoked or expired): say so and point at `om login` or auth_relogin; nothing on the platform changed.
+- `alert_hosted_resume`
+  - discloses `status` — The engine's state word after the change, as the platform reports it — or the requested state when the platform's 2xx carried no state word (the request took; the final word was not reported).
+  - on `hosted_alert_failed` — The platform answered with a failure: relay its message; do not report the alert as armed or retry blindly.
+  - on `hosted_alert_limit` — The platform refused on its own limits: relay its message as the reason; do not retry or work around it by splitting or renaming the alert.
+  - on `hosted_alert_not_found` — No hosted alert has that id — or this gateway serves no hosted-alerts route, which answers the same way: run alert_hosted_list (it tells the two apart) and retry with a real id; never guess.
+  - on `hosted_alert_refused` — The platform decides entitlement and script visibility: relay its reason as given; do not recast it as a local failure or retry by another route.
+  - on `not_logged_in` — The platform rejected the stored key (signed out, revoked or expired): say so and point at `om login` or auth_relogin; nothing on the platform changed.
 - `alert_import`
   - discloses `routing_note` — Where the alert's fires post, in one sentence, with the command that moves it.
   - discloses `saturation_notice` — Advisory when active script alerts exceed the concurrent script pool.

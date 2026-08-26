@@ -170,6 +170,17 @@ om chart drawing schema LongPosition --format text
 date -u -j -f '%Y-%m-%d %H:%M:%S' '2026-05-15 00:00:00' +%s
 ```
 
+<!-- AUTO: RESULT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
+
+## Result contract
+
+What a reply must carry from each result-bearing action here; the per-branch guidance itself rides on the tool result.
+
+- `chart_drawing_remove`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+
+<!-- AUTO: END RESULT CONTRACT -->
+
 <!-- AUTO: COMMAND REFERENCE — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
 ## Command reference
