@@ -381,6 +381,8 @@ The CLI emits structured JSON errors with `--format json`; in text mode they pri
 
 ## Command reference
 
+Every `om` command this skill covers, one line each with its action name — check exact verbs and spellings here.
+
 - `om execute history` (action: `execute_history`) — Read the execution receipts triggered by a specific alert, newest-first.
 - `om execute list` (action: `execute_list`) — List execution receipts ordered newest-first.
 - `om execute summary` (action: `execute_summary`) — Aggregate execution receipt counts by status, plus total notional.
