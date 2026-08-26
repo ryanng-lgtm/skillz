@@ -34,6 +34,7 @@ Routing:
 - ONE named question → the structured choice in §"Polymarket alerts" (never auto-pick a market); a THEME → decompose it in the turn it was asked, no question first (§"Grouping legs under one named watch").
 - Plotting fires on a chart → `skill_read("news", section = "Plotting events on charts")` carries the doctrine; would-have-fired replays → `skill_read("research")`, catch-up is not a replay; the list and history surfaces span event watches too — their own verbs are in `skill_read("event-watches")`.
 - `group` rides `alert_create` / `alert_import` / `news_create` / `event_watch_create`; `news_follow` / `news_fork` / `news_add` refuse it, so their leg joins through `event_watch_edit {id_or_slug, group}` in the same turn.
+- "How reliable is alert X" / "did it fire" / "did my alerts miss anything while I was down" → `alert_stats`, §"Alert receipts"; raw event rows and error debugging stay `alert_events` (§"Alert history").
 
 Quick routing — the common asks, the call, the defaults to assume, and what to disclose:
 
@@ -49,7 +50,8 @@ Quick routing — the common asks, the call, the defaults to assume, and what to
 | "trail 5% below the high since I armed it" | `alert_create_script` → `alert_test_script` | remembered state → a script; show the body first, it cards, declare `markets` (§"Script alerts") |
 | "what alerts do I have?" | `alert_list` | render `ID \| Label \| Condition \| Status` with humanized enums; no follow-ups |
 | "pause / resume / delete alert 3" | `alert_pause` / `alert_resume` / `alert_remove` | by id, report once; delete cards; "everything" = per-id calls after one count-bearing confirmation |
-| "did alert 3 fire? why isn't it firing?" | `alert_events` | `alert_id` scope, `kind: "error"` over 24h before speculating; script alerts pair it with `alert_state_show` |
+| "why isn't alert 3 firing?" | `alert_events` | `alert_id` scope, `kind: "error"` over 24h before speculating; script alerts pair it with `alert_state_show` |
+| "did alert 6 fire? how reliable is it? what did I miss while down?" | `alert_stats` | 7d window (30 on ask); quote fires, late fires, per-channel delivery and detected gaps; counts are floors when `data_complete` is false, never an uptime % (§"Alert receipts") |
 | "test / preview alert 3" | `alert_test_fire` | synthetic values to the alert's own channels; never bulk |
 | "change alert 3 to 4500" | (no edit tool) | prepare the change, hand the user the exact `om alert edit …` command or offer remove + re-create (§"Edit an alert") |
 
@@ -997,6 +999,22 @@ Fires, errors and state changes per alert or across all: alert_events scopes and
 **Rendering in chat**: render one line per event in plain English — kind, relative time, one-phrase hint (fire label / error stage+message / state transition). Cap at the most recent 5 unless the user asked for more. For empty results say so once (*"No events in the last 24h."*) — no scaffolding, no trailing follow-ups.
 
 **Debugging shortcut.** When the user asks *"why isn't my alert firing?"*, call `alert_events` with `kind: "error"` over the last 24 hours before speculating — the answer is usually there (schema rejection at evaluation time, missing market data, channel auth failure). For script alerts pair it with `alert_state_show` so you see both "did it run" and "what did it remember".
+
+## Alert receipts
+
+alert_stats answers reliability, did-it-fire and missed-while-down asks; honesty fields (data_complete floors, gaps-detected-never-uptime, unreadable disclosure) bind the prose.
+
+*"How reliable is alert 6?"*, *"did my funding alert actually fire this week?"*, *"did my alerts miss anything while my laptop was closed?"* → `alert_stats` (`id` scopes to one alert, omit for the fleet; `window_days` 7 by default, 30 on ask). Read-only, computed from the local ledgers (fire events, catch-up runs, delivery outbox, runtime health). Answer from its rows; never hand-derive reliability counts from raw `alert_events` rows when this one call carries them. `alert_events` stays the row-by-row lens (§"Alert history").
+
+Render prose, not a field dump: per alert, fires in the window with late (catch-up) fires named, when it last fired, per-channel delivered/failed with `last_error` quoted, and broken state with when the error episode started. Three honesty rules bind the wording:
+
+- `data_complete: false` means retention no longer covers the whole window: every count on that row is a floor, so say "at least N", never a total.
+- The `daemon` block is downtime DETECTED by catch-up (gap count, total down time, late fires pushed). Report it as detected gaps; NEVER convert it to an uptime or coverage percentage, because downtime nothing detected stays invisible by construction.
+- `unreadable_count > 0` means spec files this build cannot parse exist and are excluded from the rows; disclose that, and never call them absent or deleted.
+
+"Did I miss anything while I was down?" = the daemon gap facts plus each alert's late fires: a late fire DID fire (caught up on a closed bar), so name it rather than saying nothing happened. Windows catch-up could not verify are not on this wire; the panel's downtime view carries the span-by-span story, so offer it.
+
+In the TUI, `/alerts` opens the alerts panel (list, per-alert card, downtime view on `g`) over these same numbers. On every other surface answer in prose from `alert_list` / `alert_stats`; from a terminal, `om alert show <id>` prints the same Fires/Delivery/Health lines and `om alert list` the FIRES 7d column.
 
 ## Test fire
 
