@@ -107,12 +107,12 @@ Successful JSON output mirrors `chart_indicator_add`:
 
 ## Workflow — user asks to draw a tool
 
-Auto path: parse tool, resolve workspace and market, run. Add path (user-named exact levels only): schema roles, anchors, preview + confirm, run; failures defined in §"Errors".
+Auto path: parse tool, resolve workspace and market, run. Add path (user-named exact levels only): schema roles, anchors, run; failures defined in §"Errors".
 
 **Default to `chart_drawing_auto`** — it computes the anchors from market data so you don't have to resolve coordinates:
 
 1. **Parse intent** — tool, chart, and (if mentioned) trend direction.
-2. **Resolve the workspace id**, and the chart's symbol/exchange/interval (`chart_refresh`).
+2. **Resolve the workspace id**, and the chart's symbol/exchange/interval (`chart_refresh`; `chart_show` when the user named the workspace).
 3. **Execute** `chart_drawing_auto` with the tool, the pane's market identity, and its interval.
    - On `ok: true` → *"Drew a `<Tool>` on chart 0 — version `<N>`."*
    - On "not enough candles" → widen `lookback` or set `interval`.
@@ -125,8 +125,7 @@ Only when the user names **exact** price/time levels, use `chart_drawing_add`:
    - For specific bar timestamps, read the chart's viewport / OHLC from `chart_refresh` first.
    - For named price levels, the user usually gives the number directly.
    - For ambiguous anchors, ask via structured question — anchor errors are silent (the drawing lands on the wrong bar with no feedback).
-4. **Preview + confirm** showing the anchors in human time + price.
-5. **Execute** `chart_drawing_add` with the role-tagged anchors.
+4. **Execute** `chart_drawing_add` with the role-tagged anchors — no preview, no confirmation; name the anchors in human time + price in the outcome line.
    - On `ok: true` → *"Drew a `<Tool>` on chart 0 — version `<N>`."*
    - `CLIENT_VALIDATION` / server `VALIDATION` → the shapes and recoveries are defined in §"Errors".
 

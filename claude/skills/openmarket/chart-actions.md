@@ -31,11 +31,11 @@ Quick routing — the common asks, each row a recipe (tool + the decisions to ma
 
 **Workspace policy: frictionless, scratch by default.** A target the user NAMED is used as-is (with the consent language first); something already on screen (`here`) is painted, creating nothing. Everything else ad-hoc lands on a SCRATCH canvas: `chart_pins` mints its own fresh-or-same-view day workspace as one, and a bare fresh canvas is `chart_create` with `scratch: true` and no name (48h sliding TTL relay-side, exempt from the plan workspace count, listed only on the dim scratch shelf, zero residue when the user walks away). Never mint a NAMED workspace unless the user named it, and never promote one on your own: `chart_keep` is the user's naming act that makes a scratch permanent IN PLACE, same id, same share link; a follow never promotes anything. When a run reports a scratch mint, disclose the expiry once and name the keep verb once.
 
-> **⚠️ Always read CURRENT state before you answer about — or act on — a chart: `chart_refresh`.**
+> **⚠️ Always read CURRENT state before you answer about — or act on — a chart: `chart_refresh` (a workspace the user NAMES: `chart_show`).**
 >
 > The user can edit the chart manually at any time. Edits made inside a **live session** (the `?live=true` view) do reach the daemon — `chart_status` flips `stateStale: true` — but edits made in the **plain chart UI** (no live session) bypass the bridge entirely: they persist straight to the workspace backend with no push, so any snapshot you hold goes stale with **no signal**. Your conversation transcript is stale in both cases.
 >
-> **`chart_refresh` reads fresh from the source of truth.** Run it:
+> **`chart_refresh` reads fresh from the source of truth** (for a workspace the user NAMES, `chart_show` is that read — no live session needed). Run it:
 > - before **answering any question** about what's on the chart (indicators, symbol, interval, drawings) — *including* before refusing ("there's no RSI") — your last read may predate a manual edit;
 > - immediately before **any persisting action** whose correctness depends on current state — picking a chart by symbol, choosing an indicator/drawing `id` to update or remove, computing drawing anchors from candles.
 >
@@ -146,9 +146,9 @@ List, select, show, refresh, open; the omitted-id active default, friendly-name 
 
 Use `chart_list` for first-run sanity ("does the key work against the gateway?") and to resolve a user-named workspace ("my BTC playground") to its `id`.
 
-`chart_show` is the static, no-session read: use it when the user points you at a SPECIFIC workspace the daemon isn't connected to (a short id or a `openmarket.xyz/chart/<id>` link) and asks you to look at it. For the daemon's CURRENT active workspace, use `chart_refresh` (live) instead.
+`chart_show` is the static, no-session read: use it whenever the user points you at a SPECIFIC workspace (a short id or a `openmarket.xyz/chart/<id>` link) to look at its content or before an edit on it — it needs no live session, and `chart_refresh` on a workspace the daemon has no session for fails with a no-session error that is NOT "workspace missing". `chart_refresh` is the live read: the daemon's CURRENT active workspace with the id omitted, or a named workspace only when the user asks for its LIVE state.
 
-Use `chart_refresh` to answer ANY question about what's currently on a chart. The `workspace.*` payload is opaque pass-through from the gateway's store — read whatever field names actually appear in the JSON; do not invent. Useful traversal:
+Use `chart_refresh` to answer ANY question about what's currently on the active chart (`chart_show` for a workspace the user names). The `workspace.*` payload is opaque pass-through from the gateway's store — read whatever field names actually appear in the JSON; do not invent. Useful traversal:
 
 - `workspace.charts[i]` — per-chart config (symbol, exchange, interval, plot type).
 - `workspace.onchart[]` — price-axis overlays (EMA, SMA, Bollinger Bands).
@@ -196,7 +196,7 @@ Two steps:
    - If they named one for a ONE-OFF action ("also add RSI on Y"), pass that id explicitly for that call only.
    - If they used a friendly name (*"my BTC playground"*), call `chart_list` first to map name → id.
    - If they asked to **work on** a workspace ("switch to X", "do stuff on X from now on"), call `chart_workspace_select` FIRST — it moves the active pointer exactly like the TUI `/workspace` command — then keep omitting the id; later turns inherit it.
-2. **Call `chart_refresh`** (workspace id omitted, or set for a named one-off) and answer from the JSON.
+2. **Call `chart_refresh`** (workspace id omitted; a workspace the user names is read with `chart_show` instead, unless they ask for its LIVE state) and answer from the JSON.
 
 Never answer "what's on my chart / workspace" from `chart_list` (that only enumerates all workspaces — it doesn't say which one is active or what's on it), and never tell the user you aren't on any workspace: the daemon is always connected to one, and `om chart status` reports it.
 
@@ -317,7 +317,7 @@ chart_symbol   { "chartIndex": 1, "symbol": "XRPUSDT", "exchange": "BINANCE_FUTU
 chart_symbol   { "chartIndex": 2, "symbol": "SOLUSDT", "exchange": "BINANCE_FUTURES" }
 // chart 0 already matches — re-sending it just earns a NO_CHANGE
 ```
-4. **One brief preview is enough** — don't confirm each pane separately.
+4. **No confirmation** — chart mutations on the agent's own canvas dispatch immediately; state the outcome once.
 
 ### User asks to seek / pan / zoom
 
@@ -326,15 +326,11 @@ This is the `chart_view` path — ephemeral viewport change, broadcasts to peers
 1. **Parse the target time range** (*"last 24h"*, *"yesterday"*, *"the hour around 2026-05-15 14:00"*).
 2. **Resolve the workspace id** (same default rules — see §"Workspaces").
 3. **Compute `startTime` and `endTime`** in integer epoch MILLISECONDS — a seconds value is schema-valid and lands the viewport in 1970. `endTime` must be after `startTime`. `cursorTimestamp` is optional and defaults to the midpoint, so pass it only when the user named a focus instant.
-4. **One-liner preview + confirm** (low-stakes since ephemeral):
-
-   > *Set chart 0 to view 2026-05-19 → 2026-05-20 (cursor at midday). Ephemeral, no persistence. OK?*
-
-5. **Execute** `chart_view`. Success response has `version: 0` — expected, not an error.
+4. **Execute** `chart_view` — no preview, no confirmation (ephemeral, reversible). Success response has `version: 0` — expected, not an error.
 
 ## Indicators
 
-Add, remove (by `indicatorType` or `everyIndicator`), update, list; RSI/MACD/EMA and every registry native, WRUN ids, single-instance `409 NO_CHANGE`, `VALIDATION`, ask-first.
+Add, remove (by `indicatorType` or `everyIndicator`), update, list; RSI/MACD/EMA and every registry native, WRUN ids, single-instance `409 NO_CHANGE`, `VALIDATION`, defaults.
 
 | Tool (CLI) | Wire action | Requires daemon |
 | --- | --- | --- |
@@ -420,26 +416,9 @@ Five-step flow:
 
 3. **If the chart pane isn't named, pass `chartIndex: 0`** — the field is required, so pane 0 is a deliberate policy default here, not a schema one; the user can correct in a follow-up.
 
-4. **If params aren't named, ask once via the structured-question tool.** Bundle all knobs into one question per indicator. Skip if the user already specified them.
+4. **If params aren't named, use the textbook default** (RSI 14, MACD 12/26/9, EMA 20, BB 20/2) and name it in the outcome line. Param choice is not one of the persona's allowed questions; the user's next message changes it.
 
-   Example — RSI:
-   > Question: *"Which lookback period for RSI?"*
-   > Options: *14 (recommended)* / *7 (faster)* / *21 (slower)* / *Other*
-
-   Example — MACD:
-   > Question: *"Which MACD preset?"*
-   > Options: *12/26/9 (recommended)* / *8/21/5 (faster)* / *5/35/5 (slower)* / *Other*
-
-5. **Plain-language preview + confirm.**
-
-   > *Add indicator to chart:*
-   > - *Workspace: BTC playground*
-   > - *Chart: 0 (BTCUSDT on Binance Futures, 1h)*
-   > - *Indicator: RSI, period 14*
-   >
-   > *OK to add?*
-
-6. **Execute** `chart_indicator_add`. Worked call for RSI(14) on the active chart:
+5. **Execute** `chart_indicator_add` — no preview, no confirmation; chart mutations on the agent's own canvas dispatch immediately. Worked call for RSI(14) on the active chart:
 
 ```jsonc
 chart_indicator_add { "chartIndex": 0, "indicatorType": "RSI", "settings": { "period": 14 } }
@@ -485,7 +464,7 @@ Events beside the candles — news feeds, custom watches, alert fires — in one
 - **Workspace** defaults to the view's own titled day workspace (same view, same day: the same chart), and `fresh: true` mints a new one. `workspace: <id>` and `here: true` target a chart the USER keeps: get their explicit yes before passing either, and expect a chat surface to raise a card for it.
 - **Follow is on.** A plotted view keeps pinning as events land. `unfollow: true` stops it (the pins stay; `source` scopes one member) and `rearm: true` resets a degraded view's delivery health in place. Never re-plot to re-arm — that re-projects and can widen the filter frozen into the binding.
 
-The result carries the live-view URL to share plus one structured summary, so hand the URL over. Pins live with their workspace and only `chart_delete` removes them. Two verbs this is not: `om chart events` reads recent manual chart edits and plots nothing, and `news_chart` is the deprecated spelling kept for legacy follow rows.
+The result carries the live-view URL to share plus one structured summary, so hand the URL over. Pins live with their workspace and only `chart_delete` removes them. Two verbs this is not: `om chart events` reads recent manual chart edits and plots nothing, and `om news chart` is the deprecated CLI-only spelling kept for legacy follow rows.
 
 ## Make chart actions visible — presence-aware live view
 

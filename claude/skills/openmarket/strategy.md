@@ -9,7 +9,7 @@ allowed-tools:
 
 # om strategy
 
-**The agent authors specs only** — it never sets secrets, never pairs a wallet, never starts the daemon — those steps capture credentials, which are the user's to hold; when the feed, signal credentials, wallet, or daemon are missing, route the user to the exact `om setup` / `om config` / `om service install` command. Check `system_status` first.
+**The agent authors specs only** — it never sets secrets, never pairs a wallet, never starts the daemon — those steps capture credentials, which are the user's to hold; when the feed, signal credentials, wallet, or daemon are missing, route the user to the exact `om setup` / `om config` / `om service install` command. Call `system_status` when you are about to claim something is or is not configured — not unconditionally.
 
 **Create disabled; ask before arming — never auto-arm.** `strategy_resume` runs only after the user explicitly says to arm; treat `dry_run`/`live` arming as a capital-affecting confirmation, and never put a strategy in `live` unless the user explicitly asked for real orders and the wallet is paired. Let the run mode default — `paper` when a market is pinned, `observe` when unpinned, both walletless and safe; pass one only when the user asks for a specific rung.
 
@@ -64,9 +64,9 @@ The strategy/alert/order boundary: a standing signal-driven position is this ski
 
 ## Discovery: prerequisites
 
-Check system_status first and route missing setup — data feed, LLM key, data API key, wallet, daemon service — to the user with the exact command.
+What a strategy needs before it runs, and how to route the user to each missing piece; come here when a create or resume names a gap.
 
-ALWAYS check first: call `system_status`. The agent can author the specs but **cannot** set secrets or start the daemon — surface what is missing and tell the user the exact command to run:
+A missing feed, LLM key, data API key, wallet or daemon service surfaces as a typed error; confirm it with `system_status` before claiming the gap — never pre-flight unconditionally. The agent can author the specs but **cannot** set secrets or start the daemon — surface what is missing and tell the user the exact command to run:
 
 | Prerequisite | Needed for | If missing, the user runs |
 | --- | --- | --- |

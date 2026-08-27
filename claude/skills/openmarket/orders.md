@@ -43,11 +43,11 @@ Same as the alerts skill — the daemon must be reachable (or, for `om order pla
 | --- | --- |
 | `OM_API_KEY` | OpenMarket Data API auth. Captured by `om init` (stored in `~/.openmarket/om.sqlite`) or exported. |
 
-Execution credentials live in the local vault (`~/.openmarket/om.sqlite`, sealed with a master key at `~/.openmarket/vault.key` — mode 0600, same filesystem trust as channel tokens). Operator-managed; assume configured. Hyperliquid is paired with `om setup hyperliquid`; Polymarket execution requires the Deposit Wallet flow. Pair with `om setup polymarket` (auto-derives the signer's Deposit Wallet from the EOA), or deploy a fresh one headlessly with `om setup polymarket --create-deposit-wallet`.
+Execution credentials live in the local vault (`~/.openmarket/om.sqlite`, sealed with a master key at `~/.openmarket/vault.key` — mode 0600, same filesystem trust as channel tokens). Operator-managed. Do not pre-flight unconditionally: call `system_status` only when you are about to claim something about pairing state; otherwise proceed and let the order's typed error name anything missing. Hyperliquid is paired with `om setup hyperliquid`; Polymarket execution requires the Deposit Wallet flow. Pair with `om setup polymarket` (auto-derives the signer's Deposit Wallet from the EOA), or deploy a fresh one headlessly with `om setup polymarket --create-deposit-wallet`.
 
 ## Discovery: is the venue paired?
 
-ALWAYS run this first when the user asks to place an order. It's a single fast check and saves a confusing "venue not paired" failure later:
+Run this when you are about to claim pairing state, or after a typed pairing failure — a single fast check, not an unconditional pre-flight:
 
 ```bash
 om status --format json
@@ -250,10 +250,10 @@ This nudge is identical to the alerts skill's brackets nudge — keep the UX con
 The user must see exactly one explicit confirmation gate before any capital-committing call. How that gate is produced depends on the surface reading this skill:
 
 **Typed-action path (in-house `om` chat, where `order_place` / `order_place_polymarket` / `order_twap` exist as tools you can call):**
-Use this path for Hyperliquid only. Write a one-line plain-English summary AND call the tool in the same turn. The runtime intercepts the call and shows a readline-style `[Y/n]` banner with the resolved args (type y/yes/n/no + Enter, empty Enter takes the capital-Y default). That banner IS the gate. Do NOT ask "submit?" in text and wait for "yes", that's a second prompt for the same decision and produces a worse UX. If the user declines, the tool returns `"User declined this action."`. Acknowledge in one line and ask what they want instead.
+Use this path for Hyperliquid only. Write a one-line plain-English summary AND call the tool in the same turn. The runtime intercepts the call and shows a readline-style `[Y/n]` banner with the resolved args (type y/yes/n/no + Enter, empty Enter takes the capital-Y default). That banner IS the gate. Do NOT ask "submit?" in text and wait for "yes", that's a second prompt for the same decision and produces a worse UX. If the user declines, the tool returns `"User declined this action."`. Acknowledge in one line and move on — no "what instead?" question; the next steps carry the alternatives, and the same shape is refused for the rest of the turn.
 
 **Bash path (Claude Code / Codex / Cursor / any external agent shelling `om *` via a Bash tool):**
-The CLI's interactive `[y/N]` prompt is not reliably answerable from a Bash tool, most will hang or EOF to default-N. Confirm via your own structured-question UI first (`AskUserQuestion` in Claude Code, equivalents elsewhere), THEN run `om order place ... --yes`. Passing `--yes` here is correct, not a safety bypass: the safety happened in the agent UI moments earlier.
+The CLI's interactive `[y/N]` prompt is not reliably answerable from a Bash tool, most will hang or EOF to default-N. Confirm via your own structured-question UI first, THEN run `om order place ... --yes`. Passing `--yes` here is correct, not a safety bypass: the safety happened in the agent UI moments earlier.
 
 Useful preview lines (build the right one for the action):
 
@@ -355,7 +355,7 @@ The CLI emits structured JSON errors with `--format json`; in text mode they pri
 
 ## Behaviors to follow
 
-- **Exactly one explicit confirmation gate.** Typed-action path: just call the tool (runtime shows `[Y/n]`). Bash path: confirm via `AskUserQuestion` first, then pass `--yes`. The thing to avoid is ZERO gates (auto-submit) or hanging on a CLI prompt your Bash tool can't answer. Do not double-prompt by also asking "submit?" in text before the gate, that's the regression this rule exists to prevent.
+- **Exactly one explicit confirmation gate.** Typed-action path: just call the tool (runtime shows `[Y/n]`). Bash path: confirm via your structured-question UI first, then pass `--yes`. The thing to avoid is ZERO gates (auto-submit) or hanging on a CLI prompt your Bash tool can't answer. Do not double-prompt by also asking "submit?" in text before the gate, that's the regression this rule exists to prevent.
 - **NEVER guess at the sizing mode.** Ambiguous "100 of BTC" → ask via structured question.
 - **NEVER guess at the asset name.** Strip exchange suffixes; verify against HL's universe if there's any doubt.
 - **NEVER auto-apply a stop-loss level the user didn't specify.** Suggest a range, let the user choose.

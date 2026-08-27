@@ -36,7 +36,7 @@ For "does this roughly make sense" questions, the one-shot verb is the right too
 
 When a user finishes creating a strategy or a signal, offer to run this one-shot backtest before they arm anything: a quick eyeball of historical behavior is the natural next step and costs one tool call. Never run it unprompted on money-moving surfaces; offering is enough. When the result comes back, present the return against the buy-and-hold benchmark and the honesty notes (warnings) rather than the raw number alone, and mention that `backtest_no_history` results carry real next steps (arm the watch, paper mode, deeper backfill) instead of inventing data.
 
-**Chart projection needs no venue, no pairing, no pinned market.** A fresh `backtest_run` auto-renders the ephemeral Strategy Tester panel when a human is watching the one live workspace the daemon can write to (disclosed as `chart.auto`). For "show that backtest on the chart" after the fact, rerun `backtest_run` with the same target plus `open_chart=<workspace id>` (an explicit `open_chart` also unlocks the persistent marker fallback). Never refuse projection over venue or pairing state.
+**Chart projection needs no venue, no pairing, no pinned market.** With `open_chart` omitted, `backtest_run` renders onto the strategy's OWN workspace (created or reused as "OM · <slug>"), and the result always carries a `chart` block saying where it landed or what stands in the way; pass `open_chart=<workspace id>` to project onto a specific workspace instead (reruns are cheap: text verdicts replay from the durable decision cache). Never refuse projection over venue or pairing state.
 
 Use this skill when:
 
