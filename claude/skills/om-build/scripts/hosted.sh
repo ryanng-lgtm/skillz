@@ -10,10 +10,15 @@
 
 set -uo pipefail
 
-MONO=~/github/openmarket-internal
-GUI=~/github/openmarket-chat
+die_early() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
+
+# Paths default to this box's layout; override to run it anywhere else.
+MONO=${OM_MONO:-$HOME/github/openmarket-internal}
+GUI=${OM_GUI:-$HOME/github/openmarket-chat}
 SLOT="$MONO/packages/cli/assets/rooms-gui"
-PLIST=~/Library/LaunchAgents/xyz.openmarket.runner.plist
+PLIST=${OM_PLIST:-$HOME/Library/LaunchAgents/xyz.openmarket.runner.plist}
+[ -d "$MONO" ] || die_early "monorepo not at $MONO (set OM_MONO)"
+[ -d "$GUI" ]  || die_early "GUI repo not at $GUI (set OM_GUI)"
 HEALTH=http://127.0.0.1:31337/healthz
 ROOMS=http://127.0.0.1:31337/rooms/
 
