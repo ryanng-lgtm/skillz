@@ -55,8 +55,12 @@ done
 # been repointed at the repo build tree before (openmarket-chat #603).
 TARGET=$(sed -n '/ProgramArguments/,/<\/array>/p' "$PLIST" 2>/dev/null \
          | grep -o '<string>[^<]*om</string>' | head -1 | sed 's/<[^>]*>//g')
-[ -n "$TARGET" ] || TARGET=$(realpath /opt/homebrew/bin/om 2>/dev/null)
-[ -n "$TARGET" ] || die "cannot determine the daemon binary from $PLIST or PATH"
+[ -n "$TARGET" ] || TARGET=/opt/homebrew/bin/om
+[ -e "$TARGET" ] || die "cannot determine the daemon binary from $PLIST or PATH"
+# Resolve it. The plist normally names /opt/homebrew/bin/om, which is a SYMLINK,
+# and macOS `stat -f` is lstat -- it would report the link's own inode (size 49,
+# the target path string) and check [1] could never match the running binary.
+TARGET=$(realpath "$TARGET")
 case "$TARGET" in *dist/om) MODE=repo ;; *) MODE=versioned ;; esac
 say "daemon target:         $TARGET  [$MODE]"
 case "$TARGET" in *"/Cellar/openmarket/"*) die "target is a Homebrew install -- see SKILL.md hard rules" ;; esac
