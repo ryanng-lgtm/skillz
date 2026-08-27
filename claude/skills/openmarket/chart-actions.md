@@ -138,7 +138,7 @@ List, select, show, refresh, open; the omitted-id active default, friendly-name 
 
 | Tool (CLI) | Purpose | Requires daemon |
 | --- | --- | --- |
-| `chart_list` (`om chart list`) | List workspaces accessible to the API key. Direct REST call. | **no** |
+| `chart_list` (`om chart list`) | List the account's workspaces: the same names and ids the user sees in the web app. Direct REST call. `mine: true` lists this agent's own housekeeping ledger instead (a subset), never the user's list. | **no** |
 | `chart_workspace_select` (`om chart select`) | Make a workspace the ACTIVE chart-actions target: persists the default and repoints the live bridge (the same switch as the TUI `/workspace` command, minus its restart fallback: a failed live repoint reports the remedy and rolls the default back instead of bouncing the daemon). Accepts a short id or share-link URL. Selecting a workspace the user does not own joins it READ-ONLY (VIEWER). | yes |
 | `chart_refresh` (`om chart refresh`) | Read the LIVE workspace snapshot: force a fresh `STATE_SYNC` from the gateway and print it (charts, viewport, theme, version). | yes |
 | `chart_show` (`om chart show`) | Read **any** workspace's content by short id or share-link URL, WITHOUT joining a live session. Direct REST call; read-only; does not change the active workspace. | **no** |
@@ -169,6 +169,19 @@ When you report what's on a chart, walk **every** `onchart[]`/`offchart[]` entry
 Call `chart_list`. Render each as `<name> (id: <id>)` if name is present, else just `<id>`. Don't dump raw JSON to the user.
 
 If the response is empty, say so plainly: *"No workspaces under this API key."*.
+
+### User asks "delete my workspaces" / "delete all my workspaces" / "clean up my workspaces"
+
+Two inventories exist and only one of them is the user's:
+
+- `chart_list` (no arguments) is the account's own list: the names the user sees in the web app. This is the list a user means.
+- `chart_list` with `mine: true` is this agent's housekeeping ledger: the scratch canvases, bare-plot day charts, feed and backtest charts it minted itself. A subset, usually a small one, and never the answer to "all my workspaces".
+
+Three steps, one list:
+
+1. Call `chart_list` (no arguments), show the names with the count, and ask for consent over THAT list.
+2. After consent, pass those ids to `chart_delete` (`targets`, up to 50 per call; batch a bigger account). Do not re-list with `mine: true` between the consent and the call: the batch the user approved is the batch that runs.
+3. Report from the result, not from memory. `deleted` is how many went; `remaining` is the account's count afterwards, read from the same list as step 1. If the user asked for all and `remaining` is not zero, say which are left (`refused_session_active` is the workspace with a live stream: end the stream or leave it) and re-run with their ids.
 
 ### User asks "what workspace am I / are you on?"
 
@@ -699,7 +712,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart interval` (action: `chart_interval`) — Change a chart pane's candle interval (1m, 5m, 15m, 1h, 4h, 1d, 1w, ...).
 - `om chart keep` (action: `chart_keep`) — Keep the current scratch chart under a name.
 - `om chart layout` (action: `chart_layout`) — Change the multi-chart layout / grid.
-- `om chart list` (action: `chart_list`) — List workspaces accessible to the configured collab API key (REST direct — works even when the daemon is down).
+- `om chart list` (action: `chart_list`) — List every chart workspace the account owns (REST direct, so it works even when the daemon is down): the same list, names and ids, the user sees in the web app.
 - `om chart open` (action: `chart_open`) — Open a workspace's live chart view (openmarket.xyz/chart/<id>?live=true) in a browser on this machine, and optionally wait for a human viewer to join the session.
 - `om chart plot-type` (action: `chart_plot_type`) — Change a chart pane's plot type (candlestick, line, bar, area, ...).
 - `om chart refresh` (action: `chart_refresh`) — Read the LIVE workspace state by issuing REQUEST_STATE_SYNC over the bridge WS and returning the fresh snapshot.
