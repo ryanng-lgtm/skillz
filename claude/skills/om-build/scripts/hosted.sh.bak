@@ -10,8 +10,8 @@
 
 set -uo pipefail
 
-MONO=${OM_MONO:-$HOME/Documents/GitLab/openmarket-internal}
-GUI=${OM_GUI:-$HOME/Documents/GitLab/openmarket-chat}
+MONO=~/github/openmarket-internal
+GUI=~/github/openmarket-chat
 SLOT="$MONO/packages/cli/assets/rooms-gui"
 PLIST=~/Library/LaunchAgents/xyz.openmarket.runner.plist
 HEALTH=http://127.0.0.1:31337/healthz
@@ -71,7 +71,7 @@ pid=$(printf '%s' "$health" | sed -n 's/.*"pid":\([0-9]*\).*/\1/p')
 if [ -z "$pid" ]; then
   flag "daemon not answering on 31337"
 else
-  disk=$(stat -Lf '%i' "$TARGET" 2>/dev/null)
+  disk=$(stat -f '%i' "$TARGET" 2>/dev/null)
   # match /om$, NOT /bin\/om/ -- the narrow pattern silently misses a repo-tree
   # daemon and reports an empty inode as if the daemon were sick.
   live=$(lsof -p "$pid" 2>/dev/null | awk '$4=="txt" && $NF ~ /\/om$/ {print $(NF-1); exit}')
@@ -189,7 +189,7 @@ else
   mkdir -p "$(dirname "$DEST")"
   mv "$OUT" "$DEST" || die "mv into $DEST"      # mv, never cp
   chmod +x "$DEST"
-  ln -sfn "$DEST" "$TARGET" || die "symlink repoint"
+  ln -sfn "$DEST" /opt/homebrew/bin/om || die "symlink repoint"
   say "installed:             $DEST"
   om service restart >/dev/null 2>&1 || die "service restart"
 fi
