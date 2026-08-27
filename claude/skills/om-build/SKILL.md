@@ -113,6 +113,36 @@ placeholder shell at `/rooms` (`packages/cli/src/dashboard/rooms-gui.ts:1-32`) â
 which looks exactly like the GUI broke. Steps 1, 2 and 6 reproduce locally what
 `.github/workflows/release.yml:196-240` does in CI.
 
+### Run the script, not the steps
+
+Everything in this target is one command. It is the same sequence every time, so
+it lives in a script rather than in an agent's context:
+
+```bash
+~/.claude/skills/om-build/scripts/hosted.sh            # gate, build, install, verify
+~/.claude/skills/om-build/scripts/hosted.sh --gate     # gate only -- is there anything to do?
+~/.claude/skills/om-build/scripts/hosted.sh --force    # build even when the gate says SKIP
+~/.claude/skills/om-build/scripts/hosted.sh --no-gui   # daemon only; /rooms serves the placeholder
+```
+
+It exits 0 on success **and** on SKIP, non-zero only on a real failure, and it
+restores the GUI stubs on every exit path including Ctrl-C. Read its output and
+report; the steps below are the reference for what it does and why, and the thing
+to fall back on when it fails.
+
+**Three judgment calls it deliberately does not make.** Each one is a decision
+about someone else's repo, so it reports and stops rather than acting:
+
+- **It never pulls.** A `PROTOCOL SKEW` line means the GUI pins a newer
+  `rooms-client` than the monorepo has, which breaks sign-in -- pull the monorepo
+  and run again. Skew the other way (linked newer) is a benign superset.
+- **It never switches branches**, and prints what each repo is on so a build off
+  a feature branch is never silently reported as `main`.
+- **It never rewrites the launchd plist.** It reads the plist to find the daemon
+  binary and adapts: a `dist/om` target means launchd runs the build tree, so it
+  stops the service before compiling (the compile output *is* the running
+  binary); anything else gets the version-directory install and a symlink flip.
+
 ### Hard rules
 
 - **The staged GUI assets are never committed.** They are a working-tree
