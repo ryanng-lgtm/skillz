@@ -8,127 +8,128 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# om metric
+# Metrics
 
-Three subcommands, all backed by the same metric registry the alert engine uses (so values you read here are exactly what an alert would fire on). The registry covers both **price-class metrics** (price, delta_pct, delta_abs, volume, funding_rate, open_interest) and **indicators** (RSI, EMA, MACD, Bollinger Bands, ATR, Stochastic, etc.) under one surface.
+Three tools: `metric_get` (one symbol, one or many metrics — §"Compute"), `metric_screen` (many symbols, one metric — §"Scan"), `metric_list` (what exists). Metric ids and their params: §"Technical indicators". Failures and skipped rows: §"Errors". Arming what you just read: §"Alerts". Shell surface: §"CLI equivalents".
 
-```
-om metric list   [--metric NAME ...] [--format json|text]
-om metric get    --metric NAME[:k=v,k=v] ...
-                 --symbol SYM --exchange ID
-                 [--interval INT] [--quote QUOTE]
-                 [--format json|text]
-om metric screen --metric NAME[:k=v,k=v]
-                 --exchange ID
-                 ( --top-n N --by FIELD | --symbol SYM ... )
-                 [--filter EXPR] [--sort KIND] [--limit N]
-                 [--interval INT] [--quote QUOTE]
-                 [--format json|text]
-```
+**Never answer a price question with `metric_get`.** For "what's BTC at" / "price of SOL" / 24h-change questions call the `markets` tool — `lastPrice` plus a sparkline-ready `prices` array in one call; `metric_get` accepts `price` only so an alert spec can be sanity-checked.
 
-## When to use which
+**Never loop `metric_get` across a list of symbols.** One `metric_screen` call replaces N gets; a loop burns the per-turn tool budget before answering. The one exception — a few gets after a screen has already narrowed the field — is in §"Scan".
 
-| Question shape | Tool |
+Always read values through these tools; never recompute indicator math locally — you have no candle series in context, so local math would be invented.
+
+Chart-only indicators (CCI, MFI, OBV, VWAP, ADL, ADX, PSAR, Ichimoku) are not computable here — they exist only as chart overlays via `chart_indicator_add`.
+
+Prediction markets leave this surface entirely: route to the `polymarket_*` tools.
+
+Never present one venue's numbers as another's: when the requested venue can't serve a metric, refuse with the venue named, or state the substitution explicitly.
+
+Quick routing — the common asks, the call, the defaults to assume, and the offer:
+
+| Ask | Call | What to assume or avoid — disclose it, then offer |
+| --- | --- | --- |
+| "what's BTC at?" / price / 24h change | `markets` | never `metric_get`; offer an alert at a level |
+| "what's RSI on BTC?" | `metric_get`, one query | rsi(14), HOUR; bare coin → Binance spot listing ("BTC on Binance", `BTCUSDT`); offer the alert at 70/30 and the chart |
+| "the 200-day SMA on BTC" | `metric_get`, one query | sma with `period` from the ask, DAY; offer the alert at the cross |
+| "MACD and EMA on ETH, 4h" | `metric_get`, several `queries[]` in ONE call | macd 12/26/9 (three ids — §"Technical indicators"), ema(20), FOUR_HOURS |
+| "Bollinger Bands on SOL" | `metric_get`, three `queries[]` | bb_upper/bb_middle/bb_lower (20, 2); offer the chart overlay |
+| "find oversold perps" / vague scan | `metric_screen` | top 25 by VOLUME_24H, rsi(14) lt:30; disclose the scanned scope, don't ask first; offer the alert and a scheduled rerun |
+| "compare RSI across BTC, ETH, SOL" | one `metric_screen`, `universe.kind: symbols` | never a per-symbol `metric_get` loop |
+| "alert me when …" | `alert_create` | a screen is a one-shot snapshot, not a watch |
+
+Reply shape: the first line answers with the value, its defaults in words, and freshness — "BTC RSI(14) on the hourly is 61.2 (Binance, 2 minutes ago)" — then two to four offers tailored to what was read (the alert at the threshold just compared, the chart, the scheduled rerun). Venue and interval names in user text are words — "Binance Futures", "hourly" — never registry ids; raw ids and JSON never reach the user.
+
+Unsure a metric name exists in this build? Probe `metric_list` first; if it's absent, say so and stop — never guess a metric id.
+
+
+## Compute
+
+One symbol's metric values with metric_get: parameter defaults, venue and canonical intervals, discovery via metric_list, worked examples.
+
+`metric_get` takes `queries` (each `{ metric, params }`) and one shared `selector` (`{ symbol, exchange, interval, quote }`). Several metrics on one symbol belong in ONE call — queries sharing a data type share a single fetch.
+
+What to send, per field:
+
+| Field | Behavior |
 | --- | --- |
-| "What's BTC at?" / "price of SOL" / "ETH 24h change" | **`markets`, not this skill.** Returns lastPrice + sparkline-ready `prices` array. |
-| "How's AAPL / Apple stock?" (equities) | **`symbol_resolve` first; then on the bound POLYGON market: venue-scoped `markets` (exchange + symbolFilter) for price/sparkline, `points` for history, `metric_get` for indicators.** Bare unscoped tickers match only tokenized-crypto perps; equity listings are unranked (no top_n). FX/index/CME bound markets are names-only: data verbs refuse with the boundary named. |
-| "What's RSI on BTC?" (one symbol) | `get` |
-| "Give me MACD and EMA on ETH 4h" (one symbol, many metrics) | `get` (multi-metric form) |
-| "Find oversold majors" / "which alts are above the upper BB?" (many symbols, one metric) | `screen` |
-| "Compare RSI across BTC, ETH, SOL" | `screen` with `--symbol` for each |
-| "Top 25 by volume with RSI below 30" | `screen` with `--top-n` |
+| `queries[].metric` | From the user request (`rsi`). Registry ids only — the probe rule in the intro; the full id list is §"Technical indicators". |
+| `queries[].params` | Optional wherever §"Technical indicators" shows numbers: omit them and the documented values apply (`rsi` 14, `macd` 12/26/9, `bb_*` 20/2), filled before validation and echoed back on the value so you can state what was read. A partial object keeps the keys you sent and fills the rest. Send params when the ask means something other than the textbook setting — "RSI 7", "the 50-day SMA" — verbatim, and don't ask just to confirm a default. Three ids document no value and are rejected with `invalid_query` without one: `volume_sma` (`period`), `rolling_high` / `rolling_low` (`bars`). |
+| `selector.symbol` | Required, venue-raw. The coin comes from the user; a bare coin name resolves to its default listing — BTC/ETH/SOL price-class reads = Binance spot (`BTCUSDT`), funding/OI/basis = Binance perps, US equities = the primary listing via `symbol_resolve`. State the resolved listing in one line ("BTC on Binance"). The `symbols` tool enumerates a coin's listings when the wording doesn't fit the defaults. |
+| `selector.exchange` | Required. From the user when named. Canonical IDs via the `exchanges` tool; "Binance Futures" maps to `BINANCE_FUTURES`, "Bybit" to `BYBIT`. Otherwise apply the venue default for the ask (spot `BINANCE` for price-class reads, `BINANCE_FUTURES` for funding/OI/basis) and disclose it in the reply. A read never blocks on a venue question — ask only when the choice commits real money. |
+| `selector.interval` | Defaults to `HOUR`. Map a mentioned timeframe to its canonical token — the interval enum is inline in the tool schema; the `enum` tool lists all. |
+| `selector.quote` | Defaults to `USD`. Override only when the user explicitly asks for a quote currency. |
 
-**Never loop `get` across a list of symbols.** That was the pattern this skill exists to replace: each iteration consumes a tool-call slot and the LLM hits its per-turn budget before answering. One `screen` call replaces N `get` calls.
+Discovery: `metric_list` returns every available metric with `{ name, type, params }`. Call it when the user asks what metrics exist, when a name might not exist in this build (a proprietary plugin may register new ones), or to confirm an unfamiliar metric's param shape. For the standard set (§"Technical indicators"), skip the list call and use the documented values. They're stable.
 
-**Screens assume the metric follows the universe symbol.** A `wrun/...` metric whose package pins its inputs to fixed markets computes the same value for every universe row (a fully pinned package) or mixes the universe's venue-native symbols with a foreign pinned leg. Screen with WRUN metrics only when the package's primary input follows the selector (the marketplace skill's pin rules say which shapes do).
+Worked calls:
 
-**Never call `metric get --metric price` for a chat reply.** The action accepts `price` as a metric only so an alert spec using `metric: "price"` can be sanity-checked here. For "what's BTC at" / "price of SOL" / 24h-change questions, route to the `markets` tool: it returns a `prices` array (renders as a sparkline) and a populated `lastPrice` in one call. `metric get` returns a bare scalar and no chart context.
-
-## Discovery: `om metric list`
-
-Returns every available metric with `{ name, type, params }`. Use this when:
-
-- The user asks "what metrics can I get?" / "what indicators can I get?"
-- You're unsure whether a metric name exists in this build (a proprietary plugin may register new ones).
-- You need to confirm the param shape for an unfamiliar metric.
-
-For the standard set (everything in the table below), skip the `list` call and use the defaults. They're stable.
-
-```bash
-om metric list                       # all
-om metric list --metric rsi --metric macd
-om metric list --format text         # column table
-```
-
-## Compute: `om metric get`
-
-Two equivalent forms, mutually exclusive:
-
-```bash
-# Single metric, mirrors `om alert create`.
-om metric get --metric rsi --params period=14 \
-  --symbol BTCUSDT --exchange BINANCE_FUTURES --interval HOUR
-
-# Multi-metric, compact 'name:k=v,k=v' form, repeatable. Metrics that share
-# a data type share a single fetch.
-om metric get \
-  --metric rsi:period=14 \
-  --metric ema:period=20 \
-  --metric macd:fast=12,slow=26,signal=9 \
-  --symbol BTCUSDT --exchange BINANCE_FUTURES --interval HOUR
-```
-
-`--params` is only legal with a single bare `--metric` (no colon). For multi-metric, use the colon form.
-
-Default JSON output:
+User: **"Give me the 4h MACD for ETH"** → one `metric_get`, three queries:
 
 ```json
 {
-  "asOf": "2026-05-21T14:00:00.000Z",
-  "selector": {
-    "symbol": "BTCUSDT",
-    "exchange": "BINANCE_FUTURES",
-    "interval": "HOUR",
-    "quote": "USD"
-  },
-  "values": [
-    { "metric": "rsi", "params": { "period": 14 }, "value": 67.34, "ok": true }
-  ]
+  "queries": [
+    { "metric": "macd", "params": { "fast": 12, "slow": 26, "signal": 9 } },
+    { "metric": "macd_signal", "params": { "fast": 12, "slow": 26, "signal": 9 } },
+    { "metric": "macd_histogram", "params": { "fast": 12, "slow": 26, "signal": 9 } }
+  ],
+  "selector": { "symbol": "ETHUSDT", "exchange": "BINANCE", "interval": "FOUR_HOURS" }
 }
 ```
 
-`ok: false` means the metric couldn't compute (insufficient bars, fetch failure). `value` is `null` in that case. The accompanying stderr line names the metric, read it for the reason.
+(`quote` omitted — the USD default applies; omit `interval` and the HOUR default applies the same way. No venue was named, so the price-class default — Binance spot — applies and is disclosed; had the user said "on Binance Futures", the selector would carry `BINANCE_FUTURES`.)
 
-## Scan: `om metric screen`
+User: **"Is BTC overbought right now? 1-hour."** → `metric_get` rsi(14) on `BTCUSDT`/`BINANCE`/`HOUR`, then compare the value to 70 (overbought) / 30 (oversold) thresholds in your reply — never report a bare number for an overbought/oversold question.
 
-Use this for any **many-symbols, one-metric** question: "find oversold majors", "which alts have RSI > 70", "top 25 by volume with funding above 0.01%". One `screen` call replaces N `get` calls and stays within the agent's per-turn tool-call budget.
+User: **"What's CVD on BTC?"** (proprietary; may or may not be in this build) → `metric_list` filtered to `cvd` first. If empty, tell the user "cvd isn't registered in this build" and stop. If present, use the params the list reports.
 
-```bash
-# Top 25 perps by 24h volume on Binance Futures with 4h RSI < 30.
-om metric screen \
-  --metric rsi:period=14 \
-  --exchange BINANCE_FUTURES \
-  --interval FOUR_HOURS \
-  --top-n 25 --by VOLUME_24H \
-  --filter lt:30
+Result shape: `{ asOf, selector, values: [{ metric, params, value, ok, data_age_seconds }] }`. Freshness rides each value as `data_age_seconds` — say that as relative time ("2 minutes ago"), never `asOf`, which is only the request moment: two metrics in one call age independently, and an undated market number reads as current when it may not be. It counts from the newest observation behind the value, which is the bar's CLOSE, so a still-forming bar reads `0` — its window runs to the answering instant — and that zero means "as of now", not "unknown". `ok` and per-metric failures are defined in §"Errors".
 
-# Explicit symbol list. No /v1/markets call; skips straight to fan-out.
-om metric screen \
-  --metric rsi:period=14 \
-  --exchange BINANCE_FUTURES \
-  --symbol BTCUSDT --symbol ETHUSDT --symbol SOLUSDT
-```
+## Technical indicators
+
+The full built-in registry: every metric id with its params and unit — the Stochastic, Bollinger and MACD ids, rolling highs and lows, and the funding fraction unit.
+
+| id | params | unit | answers |
+| --- | --- | --- | --- |
+| `price` | — | price | alert-spec sanity checks ONLY — price chat routes to `markets` |
+| `delta_pct` | bars (optional, default 1) | percent points | % change over the last N bars |
+| `delta_abs` | bars (optional, default 1) | price | absolute change over the last N bars |
+| `volume` | — | quote-dependent | last-bar volume |
+| `funding_rate` | — | **fraction** (0.01% = `0.0001`) | perp funding |
+| `open_interest` | — | quote-dependent | open interest |
+| `open_interest_delta_pct` | bars (optional, default 1) | percent points | OI change over N bars |
+| `rsi` | period (14) | score 0–100 | overbought / oversold |
+| `sma` | period (20) | price | simple moving average |
+| `ema` | period (20) | price | exponential moving average |
+| `atr` | period (14) | price | volatility range |
+| `volume_sma` | period | quote-dependent | volume vs its average (the prior `period` bars, current bar excluded), with `volume` |
+| `rolling_high` | bars | price | breakout level (high of the prior N bars) |
+| `rolling_low` | bars | price | breakdown level (low of the prior N bars) |
+| `macd` / `macd_signal` / `macd_histogram` | fast, slow, signal (12/26/9) | price | the MACD family — send all three ids for "MACD"; slow must exceed fast |
+| `bb_upper` / `bb_middle` / `bb_lower` / `bb_width` | period, stddev (20/2) | price | the Bollinger family — no metric is named `bollinger`; `bb_middle` takes both params and computes from `period` alone |
+| `stoch_k` / `stoch_d` | period, smoothing (14/3) | score 0–100 | the Stochastic pair — no metric is named `stochastic` |
+
+The parenthesized numbers are what a paramless call reads: omit `params`, or any single key of it, and they fill before validation, so a bare `rsi` is RSI(14) and its value comes back carrying `period: 14`. Send params when the ask means something else. Rows naming a bare param with no number (`volume_sma`, `rolling_high`, `rolling_low`) have no conventional value — take it from the ask ("20-bar rolling high"); when the ask is silent, choose a sensible window, say which, and send it. Those three are the rows a missing param fails: `invalid_query` before any fetch, with the metric and the offending key named. The delta rows' `bars` is optional (default 1), and the four params-less rows (`price`, `volume`, `funding_rate`, `open_interest`) need no params object at all.
+
+Installed WRUN packages add their own `wrun/@scope/name/output` ids per machine — `metric_list` is the discovery surface for those; they never appear in this table.
+
+## Scan
+
+Scan many symbols on one metric with metric_screen: universe forms, filter/sort/limit and scanned.matched, skipped rows, and how to scope and drill down on a vague scan.
+
+Use this for any **many-symbols, one-metric** question: "find oversold majors", "which alts have RSI > 70", "top 25 by volume with funding above 0.01%". One `metric_screen` call replaces N `metric_get` calls and stays within the per-turn tool budget. Mind the units when the ask is percent-worded: `funding_rate` is a fraction, so "above 0.01%" filters at `gt:0.0001` — copying `0.01` literally is a hundredfold overshoot that matches nothing.
+
+`metric_screen` takes one `metric` (+ `params`, `interval`), a `universe`, and optional `filter` / `sort` / `limit`.
 
 ### Universe
 
-Pick **exactly one** form:
+Exactly one form — the schema is a discriminated union on `universe.kind`:
 
 | Form | Use when |
 | --- | --- |
-| `--top-n N --by FIELD` | The user wants "top N by X" or didn't specify a universe and you're defaulting on their behalf (default: `--top-n 25 --by VOLUME_24H`). |
-| `--symbol SYM ...` (repeatable) | The user gave you a specific list, or you're drilling down on candidates from a prior screen. |
+| `{ "kind": "top_n", "exchange": …, "n": 25, "by": "VOLUME_24H" }` | The user wants "top N by X" or didn't specify a universe and you're defaulting on their behalf (default: top 25 by `VOLUME_24H`). |
+| `{ "kind": "symbols", "exchange": …, "symbols": ["BTCUSDT", …] }` | The user gave you a specific list, or you're drilling down on candidates from a prior screen. |
 
-Ranking fields for `--by` (server does the sort + paging):
+Ranking fields for `by` (server does the sort + paging):
 
 - `VOLUME_24H`: most common; "find oversold majors" maps to top-N by volume.
 - `PRICE_CHANGE_24H`: biggest movers up/down.
@@ -136,59 +137,81 @@ Ranking fields for `--by` (server does the sort + paging):
 - `MARKET_SYMBOL_MARKETCAP`: by coin marketcap.
 - `AVAILABLE_SINCE`: newest listings.
 
-Optional `--direction SORT_DIRECTION_ASC|SORT_DIRECTION_DESC` (default DESC), `--category SPOT|PERPETUAL` (repeatable), `--type DATA_TYPE` (repeatable).
+Optional narrowing on the top_n form: `direction` (`SORT_DIRECTION_ASC`|`SORT_DIRECTION_DESC`, default DESC), `categories` (`SPOT`|`PERPETUAL`), `types` (data types).
+
+**Screens assume the metric follows the universe symbol.** A `wrun/...` metric whose package pins its inputs to fixed markets computes the same value for every universe row (a fully pinned package) or mixes the universe's venue-native symbols with a foreign pinned leg. Screen with WRUN metrics only when the package's primary input follows the selector (the marketplace skill's pin rules say which shapes do). Load `skill_read("marketplace")` for those pin rules.
 
 ### Filter, sort, limit
 
-`--filter` forms:
+`filter` is `{ op, value }` or `{ op: "between", range: [lo, hi] }`:
 
 | Form | Meaning |
 | --- | --- |
-| `lt:30` / `lte:30` | value strictly / inclusively below threshold |
-| `gt:70` / `gte:70` | value strictly / inclusively above threshold |
-| `between:30..70` | value within inclusive range |
+| `lt` / `lte` + `value` | metric strictly / inclusively below the threshold |
+| `gt` / `gte` + `value` | metric strictly / inclusively above the threshold |
+| `between` + `range: [lo, hi]` | metric within the inclusive range — ascending order, low first |
 
-`--sort`:
+`sort`: `value_asc` (lowest first), `value_desc` (highest first), or `distance` (closest to the filter threshold — the most marginal pass — first; requires `filter`). Default sort is `value_asc` for `lt`/`lte`/`between`, `value_desc` for `gt`/`gte` — the "most extreme passing value first" ordering.
 
-- `value_asc`: lowest value first.
-- `value_desc`: highest value first.
-- `distance`: closest to the filter threshold (most marginal pass) first. Requires `--filter`.
+`limit` clamps the rows returned (default 10). `scanned.matched` shows total passing values regardless of limit, so report "20 of 100 oversold, showing top 10".
 
-Default sort is `value_asc` for `lt`/`lte`/`between`, `value_desc` for `gt`/`gte`. The obvious "most extreme passing value first" ordering.
+### Reading and reporting a scan
 
-`--limit N` clamps the rows returned (default 10). `scanned.matched` shows total passing values regardless of limit, so the agent can report "20 of 100 oversold, showing top 10".
+Result shape (compact — every field name verbatim):
 
-### Output shape
-
-```json
-{
-  "asOf": "...",
-  "metric": "rsi",
-  "selector": { "exchange": "BINANCE_FUTURES", "interval": "FOUR_HOURS", "quote": "USD" },
-  "universe": {
-    "resolved_count": 25,
-    "description": "top 25 by VOLUME_24H DESC on BINANCE_FUTURES"
-  },
-  "scanned": {
-    "count": 25,
-    "matched": 4,
-    "took_ms": 3120,
-    "partial": false
-  },
-  "rows": [
-    { "ok": true, "symbol": "SOLUSDT", "value": 27.1, "distanceToThreshold": 2.9, "rankValue": 1500000000 }
-  ],
-  "skipped": [
-    { "symbol": "NEWUSDT", "reason": "insufficient_data" }
-  ]
-}
+```
+{ asOf, metric, selector: { exchange, interval, quote },
+  universe: { resolved_count, description },   // e.g. "top 25 by VOLUME_24H DESC on BINANCE_FUTURES"
+  scanned: { count, matched, took_ms, partial },
+  rows: [ { ok, symbol, value, distanceToThreshold, rankValue, data_age_seconds } ],
+  nearest: { symbol, value, distanceToThreshold },   // only when a filter matched nothing
+  skipped: [ { symbol, reason } ] }
 ```
 
-Always echo the `universe.description` in your reply so the user knows the scope you scanned. Example: *"Scanned top 25 by 24h volume on Binance Futures (4h RSI). Four are oversold: SOL (27.1), TRX (28.3), ..."*
+Always state the scanned scope in your reply, in words — translate `universe.description`, never paste it: *"Scanned top 25 by 24h volume on Binance Futures (4h RSI). Four are oversold: SOL (27.1), TRX (28.3), ..."* Freshness is per row here — `data_age_seconds`, said as relative time, `0` on a bar still forming — because a thin market's bar lags a liquid one's in the same scan.
 
-`partial: true` means the 10s wall-clock budget tripped before every resolved symbol completed; the remaining ones moved to `skipped` with `reason: budget_exceeded`. Tell the user.
+When `scanned.matched` is 0, never reply a bare "none found": the same call carries `nearest`, the closest value that missed the filter among the symbols scanned, so report it — "none under 30 right now; closest SOL at 34" — and offer the alert at the threshold instead. A second scan buys nothing. `nearest` is absent only when every symbol landed in `skipped`, which is a scan failure to report as one.
 
-### `skipped` reasons (per-symbol, non-fatal)
+Per-symbol misses land in `skipped` with a `reason` (e.g. `budget_exceeded`), and `partial: true` means the scan was cut short — §"Errors" defines every reason and what to tell the user.
+
+### Scoping when the user is vague
+
+For "find oversold majors", "scan for X", "you find out", "just pick", or "you decide":
+
+1. **Default and disclose — don't ask, don't re-ask. Default to** top 25 by `VOLUME_24H` on the most relevant exchange. Disclose what you scanned in the reply, and offer to change the ranking (price change / OI change / marketcap) or switch to a specific symbol list.
+2. **Honor whatever size the user gives.** `n: 500` is fine; API budget is the user's concern.
+
+### Drilldown pattern (compound conditions)
+
+For "oversold AND high volume" or similar AND-of-conditions, compose two calls instead of asking for a multi-condition tool: step 1, `metric_screen` on the primary metric narrowed with `filter` + `limit` (say, top 50 by volume, rsi lt:30, limit 5); step 2, drill down on those few candidates with a second metric via `metric_get` — one get per candidate is fine here, N is small after the narrowing, which is the one sanctioned exception to the never-loop rule.
+
+For cross-exchange comparisons ("RSI on BTC across Binance and Bybit"), screen once per exchange with the same `universe.symbols` list and compare the two results.
+
+### Don't use a screen for
+
+- **Subjective questions** ("good entries", "safe bets"): ask the user to pick a metric and threshold first.
+- **Historical / point-in-time** ("yesterday's oversold"): a screen reads the latest bar only and nothing here reads the past — say so rather than answering from the current value. An alert watches forward, so offer it for the standing version of the ask, not as the answer.
+- **Pair / ratio / spread metrics** ("ETH/BTC ratio", "funding spread"): not a single-metric screen.
+
+## Errors
+
+Every failure shape on this surface: typed codes (invalid_query, tier_forbidden) and their recovery, per-metric ok:false, skipped reasons, partial scans.
+
+`metric_get` and `metric_screen` return these typed error codes via the standard JSON envelope (stderr on the CLI) on failure; `metric_list` reads the in-binary registry and returns none of them. On a screen they bail the whole request rather than landing in `skipped`: they would fail for every symbol, so trying the rest is pointless.
+
+| code | Meaning | Recovery — and what to say |
+| --- | --- | --- |
+| `invalid_query` | Unknown metric name, an out-of-range param value, a missing param on the three rows that document none (`volume_sma`, `rolling_high`, `rolling_low`), a period whose window exceeds the lookback cap, or an unknown interval. | Fix what the message names, or call `metric_list` to confirm the metric exists and what it takes. An indicator you simply left params off reads its documented default, so a rejection on a params key is about the VALUE, never the omission. Tell the user what was corrected when it changes their ask. |
+| `unsupported_exchange_for_metrics` | Exchange has no OHLCV-style data (e.g. POLYMARKET). | Route to the right action surface; for prediction markets use the `polymarket_*` tools. Name the boundary in words ("Polymarket has odds, not candles"). |
+| `unsupported_universe_for_exchange` | A `top_n` universe on a venue with no ranked listings — POLYGON (equity listings serve, ranking stats don't), POLYGON_FX, POLYGON_INDICES, FX_OTC, CME (entitlement-gated). | Re-screen with `universe.kind: "symbols"` and an explicit list; `symbol_resolve` finds the venue spellings. Say the venue can't be *ranked*, never that it has no data. |
+| `missing_api_key` | No credential at all. | Tell the user to run `om init` (a guest key normally mints itself; this usually means the auth service was unreachable). |
+| `api_key_invalid` | The key is dead (401). | Call `auth_relogin`: it returns an approval URL + code to relay; the user approves in a signed-in browser and the machine heals itself. Say what's happening in words while the flow runs. Do NOT suggest minting/pasting keys first. |
+| `tier_forbidden` | Plan does not cover the request (403); the key is fine. | Name the plan wall in words and give the upgrade path in one line — the user can run `om upgrade --show` or check their plan on openmarket.xyz. Never suggest replacing the key or re-logging in. When the wall is the history lookback behind a long interval (a 4h indicator needs days of candles), rerun the same request once at the nearest interval the plan serves and lead the answer with the substitution: "ran it on the 1h — the 4h window needs more history than this plan reaches". The user asked for the scan, not the interval. |
+| Upstream code (e.g. `rate_limited`, `not_found`) | Forwarded from the OpenMarket Data API; on a screen, `rate_limited` at top level is the universe resolution call itself. | Wait and retry, or refine the selector. |
+
+Per-metric compute failures (insufficient bars, malformed bar data) surface as `ok: false, value: null` in the response; they don't fail the whole request. The accompanying stderr line names the metric — read it for the reason before replying.
+
+Per-symbol skip reasons on a screen (non-fatal — the row moves to `skipped`, the scan continues):
 
 | reason | meaning |
 | --- | --- |
@@ -198,147 +221,41 @@ Always echo the `universe.description` in your reply so the user knows the scope
 | `budget_exceeded` | The overall 10s wall-clock budget tripped before this symbol fetched. |
 | `fetch_failed` | Generic upstream error (5xx, network). |
 
-### Errors that bail the whole screen
+`partial: true` on a scan means the 10s wall-clock budget tripped before every resolved symbol completed; the remaining ones moved to `skipped` with `reason: budget_exceeded`. Summarize skips and partial scans in words — "scanned 18 of 25 before the time budget; want me to rerun the remainder?" — raw reason codes never reach the user.
 
-These come back as a typed `ActionError` on stderr (exit non-zero), not as `skipped` rows. They'd fail for every symbol so trying is pointless:
+## Alerts
 
-| code | Meaning | Recovery |
-| --- | --- | --- |
-| `invalid_query` | Unknown metric name, missing param, etc. | `om metric list`; fix the name/params. |
-| `unsupported_exchange_for_metrics` | Exchange has no OHLCV-style data (e.g. POLYMARKET). | Route to the right action surface; for prediction markets use the `polymarket_*` actions. |
-| `missing_api_key` | No credential at all. | Tell the user to run `om init` (a guest key normally mints itself; this usually means the auth service was unreachable). |
-| `api_key_invalid` | The key is dead (401). | Call `auth_relogin`: it returns an approval URL + code to relay; the user approves in a signed-in browser and the machine heals itself. Do NOT suggest minting/pasting keys first. |
-| `tier_forbidden` | Plan does not cover the request (403); the key is fine. | Never suggest replacing the key or re-logging in. Point at `om upgrade --show` / their plan on openmarket.xyz. |
-| `rate_limited` (top-level) | Upstream rate limit on the universe resolution call itself. | Wait and retry. |
+alert_create shares this registry and validators — read the live value before arming, take the spec from skill_read("alerts"), and offer the chart and scheduled-rerun follow-ups.
 
-### Scoping when the user is vague
+`metric_get` uses **the same metric registry, the same parameter validators, and the same data-fetch path** the alert engine uses. If you can compute it here, you can alert on it via `alert_create` with the same metric name and the same params shape — `skill_read("alerts")` carries the spec. If a metric doesn't show up in `metric_list`, it can't be used in an alert either.
 
-For "find oversold majors", "scan for X", or "you decide":
+A common pattern: read the metric's current value with `metric_get`, then write the alert with thresholds informed by that value — offer it at the threshold the reply just compared against (70/30 for RSI).
 
-1. **Ask once** with concrete options if the universe is genuinely ambiguous:
-   *"Want me to scan top 25 by 24h volume on Binance Futures, a different ranking (price change / OI change / marketcap), or a specific symbol list?"*
-2. **If the user has already delegated** ("you find out", "just pick", "scan some"), don't re-ask. Default to `--top-n 25 --by VOLUME_24H` on the most relevant exchange. Disclose what you scanned in the reply.
-3. **Honor whatever size the user gives.** `--top-n 500` is fine; API budget is the user's concern.
+The other two follow-ups a metric answer earns: the chart (a computed indicator can be shown, not just told — the chart indicator tools overlay RSI/EMA/Bollinger on the symbol's chart) and the standing rerun ("same scan daily at 08:00" routes to the schedule tools, never a re-ask).
 
-### Drilldown pattern (compound conditions)
+## CLI equivalents
 
-For "oversold AND high volume" or similar AND-of-conditions, compose two calls instead of asking for a multi-condition tool:
+The om command forms of these tools — flag syntax, the two --metric forms, and the command-to-action mapping.
 
-```bash
-# Step 1: screen on the primary metric, narrow to candidates.
-om metric screen \
-  --metric rsi:period=14 --exchange BINANCE_FUTURES --interval FOUR_HOURS \
-  --top-n 50 --by VOLUME_24H --filter lt:30 --limit 5
-# result might be SOLUSDT, TRXUSDT, XRPUSDT, ...
-
-# Step 2: drill down on those candidates with a second metric.
-om metric get \
-  --metric volume \
-  --symbol SOLUSDT --exchange BINANCE_FUTURES --interval FOUR_HOURS
-# (one `get` per candidate; N is small now, well within budget)
+```
+om metric list   [--metric NAME ...] [--format json|text]
+om metric get    --metric NAME[:k=v,k=v] ... [--params k=v,k=v]
+                 --symbol SYM --exchange ID
+                 [--interval INT] [--quote QUOTE]
+                 [--format json|yaml|text]
+om metric screen --metric NAME[:k=v,k=v] [--params k=v,k=v]
+                 --exchange ID
+                 ( --top-n N --by FIELD | --symbol SYM ... )
+                 [--filter EXPR] [--sort KIND] [--limit N]
+                 [--interval INT] [--quote QUOTE]
+                 [--format json|text]
 ```
 
-For cross-exchange comparisons ("RSI on BTC across Binance and Bybit"), call `screen` once per exchange with `--symbol BTCUSDT` and compare the two results.
+`om metric get` takes two equivalent, mutually exclusive forms: a single bare `--metric` with `--params` (the shape `om alert create` mirrors), or the repeatable compact `--metric name:k=v,k=v` colon form for several metrics. `--params` is only legal with a single bare `--metric` (no colon); for multi-metric, use the colon form.
 
-### Don't use `screen` for
-
-- **Subjective questions** ("good entries", "safe bets"): ask the user to pick a metric and threshold first.
-- **Historical / point-in-time** ("yesterday's oversold"): `screen` is current-snapshot only. Offer `om alert create` instead.
-- **Pair / ratio / spread metrics** ("ETH/BTC ratio", "funding spread"): not a single-metric screen.
-- **Polymarket / prediction markets**: use `polymarket_market_summary` etc.
-- **"Watch / alert me / notify when"**: that's `om alert create`, not a screen.
-
-## Parameter defaults
-
-Each metric's canonical defaults live in its tool-schema description (the same place the LLM reads when picking the metric). When the user names params explicitly ("RSI 7", "the 50-day SMA"), use those values verbatim; otherwise apply the documented default silently. Don't ask just to confirm a textbook default.
-
-## What to ask, what to default, what to require
-
-For a request like "get the RSI for BTCUSDT on Binance Futures":
-
-| Field | Behavior |
-| --- | --- |
-| `--metric` | From the user request (`rsi`). |
-| `--params` | Use the default from the table (`period=14`). Don't ask. |
-| `--symbol` | Required. Must come from the user. If they said "BTC" alone, ask whether they mean `BTCUSDT`, `BTCUSDC`, etc., or run `om symbols --coin BTC --exchange BINANCE_FUTURES` to enumerate. |
-| `--exchange` | Required. From the user. Canonical IDs via `om exchanges`. Common synonyms: "Binance Futures" maps to `BINANCE_FUTURES`, "Bybit" to `BYBIT`. If ambiguous, ask. |
-| `--interval` | Defaults to `HOUR`. If the user mentions a timeframe ("4h", "5m", "daily"), map to a canonical interval and pass `--interval`. |
-| `--quote` | Defaults to `USD`. Override only if the user explicitly asks for a quote currency. |
-
-Canonical intervals (`om enum --interval` for the full list):
-`MINUTE`, `FIVE_MINUTES`, `FIFTEEN_MINUTES`, `THIRTY_MINUTES`, `HOUR`, `FOUR_HOURS`, `DAY`, `WEEK`.
-
-Mapping common phrases: "1m" maps to `MINUTE`, "5m" to `FIVE_MINUTES`, "15m" to `FIFTEEN_MINUTES`, "30m" to `THIRTY_MINUTES`, "1h" / "hourly" to `HOUR`, "4h" to `FOUR_HOURS`, "daily" / "1d" to `DAY`, "weekly" to `WEEK`.
-
-## Worked examples
-
-User: **"What's the RSI on BTC Binance Futures?"**
-
-```bash
-om metric get \
-  --metric rsi --params period=14 \
-  --symbol BTCUSDT --exchange BINANCE_FUTURES
-# (--interval defaults to HOUR)
-```
-
-User: **"Give me the 4h MACD for ETH"**
-
-```bash
-om metric get \
-  --metric macd:fast=12,slow=26,signal=9 \
-  --metric macd_signal:fast=12,slow=26,signal=9 \
-  --metric macd_histogram:fast=12,slow=26,signal=9 \
-  --symbol ETHUSDT --exchange BINANCE_FUTURES --interval FOUR_HOURS
-```
-
-User: **"Is BTC overbought right now? 1-hour."**
-
-```bash
-om metric get \
-  --metric rsi:period=14 \
-  --symbol BTCUSDT --exchange BINANCE_FUTURES --interval HOUR
-# Compare value to 70 (overbought) / 30 (oversold) thresholds in your reply.
-```
-
-User: **"Show me Bollinger Bands on SOL"**
-
-```bash
-om metric get \
-  --metric bb_upper:period=20,stddev=2 \
-  --metric bb_middle:period=20,stddev=2 \
-  --metric bb_lower:period=20,stddev=2 \
-  --symbol SOLUSDT --exchange BINANCE_FUTURES
-```
-
-User: **"What's CVD on BTC?"** (proprietary indicator; may or may not be in this build)
-
-```bash
-om metric list --metric cvd
-# If empty, tell the user "cvd isn't registered in this build" and stop.
-# If present, use the params reported by list.
-```
-
-## Errors you should recognize
-
-The action returns these typed error codes via the standard JSON envelope (stderr) on non-zero exit:
-
-| code | Meaning | Recovery |
-| --- | --- | --- |
-| `invalid_query` | Unknown metric name, missing/invalid param, or unknown interval. | Re-prompt for the param, or call `om metric list` to confirm the metric exists. |
-| `missing_api_key` | `OM_API_KEY` not set. | Tell the user to run `om init` or `export OM_API_KEY=...`. |
-| Upstream code (e.g. `rate_limited`, `not_found`) | Forwarded from the OpenMarket Data API. | Wait + retry, or refine the selector. |
-
-Per-metric compute failures (insufficient bars, malformed bar data) surface as `ok: false, value: null` in the response; they don't fail the whole request. Read the stderr hint to know which metric and why.
-
-## Relationship to `om alert`
-
-`om metric get` uses **the same metric registry, the same parameter validators, and the same data-fetch path** the alert engine uses. If you can compute it here, you can alert on it via `om alert create --metric <same name> --params <same shape>` (see `alerts.md`). If a metric doesn't show up in `om metric list`, it can't be used in an alert either.
-
-A common pattern: use `om metric get` to sanity-check what the metric currently reads, then write an alert with thresholds informed by that value.
+CLI filters are the compact spellings of the same fields: `--filter lt:30`, `--filter between:30..70`, `--top-n 25 --by VOLUME_24H`. JSON output (`--format json`) is byte-identical to the tool results shown above. The command-to-action mapping:
 
 <!-- AUTO: COMMAND REFERENCE — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
-
-## Command reference
 
 - `om metric get` (action: `metric_get`) — Compute one or more named scalar values over the latest candle window for a (symbol, exchange, interval) tuple.
 - `om metric list` (action: `metric_list`) — List every available scalar metric — name, source data type, and accepted parameter names.

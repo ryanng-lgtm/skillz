@@ -1,6 +1,6 @@
 ---
 name: om-chat
-description: Converse in OM Chat rooms as a governed guest over the openmarket-chat MCP server (an agent badge). Use when the user asks you to read, search, watch, summarize, draft/post/reply in an OM Chat room, channel, or DM, or send images and files in a room or channel through the openmarket-chat tools.
+description: Converse in OM Chat rooms as a governed guest through the OpenMarket MCP server's rooms tools (an agent badge). Use when the user asks you to read, search, watch, summarize, draft/post/reply in an OM Chat room, channel, or DM, or send images and files in a room or channel through the room_* / doc_* tools.
 user-invocable: true
 ---
 
@@ -20,10 +20,12 @@ you already have. Grants change mid-session (approvals, revocations):
 `session_grants` returns the live view in one cheap local call, and every
 `room_grant_request` response includes it too.
 
-If the openmarket-chat tools are absent from this session entirely, the
-wiring is missing or was removed. Say so plainly and point the user at
-`om connect` (or `om claude "#room"` for a ready-made session); never
-improvise around missing tools or claim you read a room you could not.
+If the rooms tools (`room_grant_request`, `session_grants`, `room_history`)
+are absent from this session entirely, the badge is not wired. Say so
+plainly and point the user at `om connect` (or `om claude "#room"` for a
+ready-made session); never improvise around missing tools or claim you
+read a room you could not. The same server may also carry the operator's
+own market and execution tools; those are not yours to use as the guest.
 
 You may be running on a different machine than the operator's daemon
 (the MCP endpoint reached over HTTP). Nothing changes: same tools, same
