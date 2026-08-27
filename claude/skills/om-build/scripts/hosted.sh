@@ -107,6 +107,22 @@ if [ "$pin" = "$pkg" ]; then say "match"
 elif [ "$(printf '%s\n%s' "$pin" "$pkg" | sort -V | head -1)" = "$pin" ]; then say "linked newer (superset), benign"
 else say "SKEW"; flag "PROTOCOL SKEW: GUI pins $pin, linked is OLDER at $pkg"; fi
 
+# [8] the GUI must actually be linked to the monorepo source. A registry
+# fallback makes [7] meaningless: the published package keeps an old protocol
+# era under the same package number (SKILL.md: compare constants, not the
+# package field). The build section links it if this flags.
+LINK=$( cd "$GUI" && bun tools/link-rooms-client.ts --status 2>/dev/null | grep -o 'LINKED -> .*' )
+say "  [8] rooms-client: ${LINK:-NOT LINKED (registry copy)}"
+[ -n "$LINK" ] || flag "rooms-client is not linked to the monorepo source"
+
+# [9] protocol constants, not package numbers: the linked dist/version.js must
+# carry the version being installed, or the GUI ships last release's wire
+# contract even when every mtime check above is clean.
+RC_CONST=$(grep -o 'VERSION = "[0-9][0-9.]*"' "$MONO/packages/rooms-client/dist/version.js" 2>/dev/null | head -1 | grep -o '[0-9][0-9.]*')
+say "  [9] constants: linked dist=${RC_CONST:-<none>} source=$src_ver"
+RC_CONST_STALE=0
+[ "$RC_CONST" = "$src_ver" ] || { RC_CONST_STALE=1; flag "rooms-client dist constants ${RC_CONST:-missing} != source $src_ver"; }
+
 say ""
 if [ "$need" -eq 0 ]; then
   say "SKIP -- nothing to build (daemon $run_ver, pid $pid, stamp ${served#rooms.js?v=})"
@@ -121,10 +137,17 @@ fi
 if [ "$NO_GUI" = 0 ]; then
   say ""; say "== build =="
   ( cd "$MONO" && bun install ) >/dev/null 2>&1 || die "monorepo bun install"
-  if [ "${RC_STALE:-0}" != 0 ] || [ "$src_ver" != "$run_ver" ]; then
+  if [ -z "$LINK" ]; then
+    # gate [8] flagged a registry copy; link to the monorepo source (SKILL.md:
+    # stay linked -- the published package's constants trail the daemon's era)
+    ( cd "$GUI" && OM_REPO="$MONO" bun run rooms-client:link ) >/dev/null 2>&1 || die "rooms-client:link"
+    say "rooms-client:          linked to monorepo source"
+  fi
+  if [ -z "$LINK" ] || [ "${RC_STALE:-0}" != 0 ] || [ "${RC_CONST_STALE:-0}" != 0 ] || [ "$src_ver" != "$run_ver" ]; then
     # tsc exits 2 on three known TS2835 imports but still emits -- don't gate on it
     ( cd "$MONO/packages/rooms-client" && bun run build ) >/dev/null 2>&1
-    grep -q 'VERSION' "$MONO/packages/rooms-client/dist/version.js" || die "rooms-client build emitted nothing"
+    grep -q "VERSION = \"$src_ver\"" "$MONO/packages/rooms-client/dist/version.js" \
+      || die "rooms-client dist constants still != $src_ver after rebuild"
     say "rooms-client:          $(grep -o '"[0-9][0-9.]*"' "$MONO/packages/rooms-client/dist/version.js" | head -1 | tr -d '"')"
   fi
 
