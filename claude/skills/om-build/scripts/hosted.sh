@@ -156,8 +156,26 @@ if [ "$NO_GUI" = 0 ]; then
   fi
 
   ( cd "$GUI" && bun install ) >/dev/null 2>&1 || die "GUI bun install"
-  STAMPLINE=$( cd "$GUI" && bun run build 2>&1 | grep 'stamp-asset-versions OK' )
-  [ -n "$STAMPLINE" ] || die "GUI build produced no stamp line"
+  # bun install restores the PINNED registry copy and clobbers the symlink, so
+  # the link has to be re-asserted AFTER it, not only before: a GUI branch using
+  # rooms-client APIs newer than its pin otherwise builds against the old
+  # package and dies on missing exports.
+  if [ -z "$(link_status)" ]; then
+    ( cd "$GUI" && OM_REPO="$MONO" bun run rooms-client:link ) >/dev/null 2>&1 \
+      || die "rooms-client:link (re-link after GUI bun install)"
+    say "rooms-client:          re-linked after bun install"
+  fi
+  BUILDLOG=$(mktemp)
+  ( cd "$GUI" && bun run build ) >"$BUILDLOG" 2>&1
+  STAMPLINE=$(grep 'stamp-asset-versions OK' "$BUILDLOG")
+  if [ -z "$STAMPLINE" ]; then
+    # The reason lives in the build output; dying without it made every GUI
+    # build failure read identically.
+    say ""; say "-- last 20 lines of the GUI build --"; tail -20 "$BUILDLOG"
+    rm -f "$BUILDLOG"
+    die "GUI build produced no stamp line"
+  fi
+  rm -f "$BUILDLOG"
   STAMP=$(printf '%s' "$STAMPLINE" | grep -o '?v=[a-f0-9]*' | cut -d= -f2)
   say "stamp:                 $STAMP"
   for f in dist/assets/rooms.js dist/assets/rooms.css dist/index.html dist/sw.js dist/manifest.webmanifest; do
