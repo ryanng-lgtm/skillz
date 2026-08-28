@@ -111,7 +111,11 @@ else say "SKEW"; flag "PROTOCOL SKEW: GUI pins $pin, linked is OLDER at $pkg"; f
 # fallback makes [7] meaningless: the published package keeps an old protocol
 # era under the same package number (SKILL.md: compare constants, not the
 # package field). The build section links it if this flags.
-LINK=$( cd "$GUI" && bun tools/link-rooms-client.ts --status 2>/dev/null | grep -o 'LINKED -> .*' )
+# Matched case-insensitively: the tool answers "rooms-client: linked -> /path
+# (built)" in lower case, so an upper-case pattern read NOT LINKED even with the
+# link in place, and every run relinked and rebuilt rooms-client for nothing.
+link_status() { ( cd "$GUI" && bun tools/link-rooms-client.ts --status 2>/dev/null | grep -oi 'linked -> .*' ); }
+LINK=$(link_status)
 say "  [8] rooms-client: ${LINK:-NOT LINKED (registry copy)}"
 [ -n "$LINK" ] || flag "rooms-client is not linked to the monorepo source"
 
