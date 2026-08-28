@@ -88,6 +88,27 @@ The runner accepts a full condition tree. The outermost `condition` field is one
 - `{ "metric": <metricName>, "selector": { ... } }` — live metric reference
 - `{ "expr": "multiply"|"divide"|"add"|"subtract"|"abs", "args": [...valueExpr] }` — arithmetic
 
+### The `event` condition leaf
+
+`{ "event": { "stream": "<address|watch id|slug>", "within": "24h", "min_count": 2 } }` is a leaf
+like any other: nest it under `all`/`any`/`not` or use it alone. It counts qualifying LIVE
+committed rows on the named stream (received live, inbound-door, or relay from a followed stream;
+imported/backfill/catch-up rows never count) inside the trailing window, above a per-alert
+watermark pinned at first evaluation, and is true at `min_count` (default 1). One fire per tick,
+watermark advances with the fire (a still-true window never re-fires), and the fire context lists
+the matched event ids. An address resolves through the local bindings (own > follow > install >
+fork). An event-only condition needs no market selector. `on_fire.execute` on an event-leaf alert
+is refused (`event_leaf_cannot_execute`), at create/edit AND at dispatch, UNLESS the spec carries
+the explicit consent literal `on_fire.allow_followed_fires: true`. Only that literal counts (absent
+or anything else keeps the refusal, and the literal is itself refused on a spec with no event leaf
+or no execute block). The risk, in the words every surface prints: a followed fire is another
+daemon's claim, its signature proves who sent it, not that it is right, and an alert that executes
+on followed fires moves the user's money on that claim with no human in between. Author the literal
+only when the user asked for exactly that, knowing it; the approval card then carries that line and
+the human's yes is the consent. Never add the literal to get past the refusal on your own; relay the
+refusal and ask. The stored consent is stated on `om alert show` ("executes on followed fires:
+consented"), and an edit that drops the literal stops the executions.
+
 ### Supported metrics
 
 The set of valid `metric` values and their parameter shapes lives in the tool-schema description (the `metric_get` / `alert_create` action's `metric` enum carries each name's meaning, default params, and value semantics inline). For the alert author flow, the things that aren't in the schema:
@@ -154,7 +175,7 @@ The set of valid `metric` values and their parameter shapes lives in the tool-sc
 
 - BOTH sides must contain at least one metric reference. A metric against a plain constant is the single-leaf spelling: use `{"metric", "selector", "op", "value"}` instead.
 - Every metric reference on either side must declare the SAME explicit `selector.interval` (the cross is bar-to-bar).
-- WRUN package metrics (`wrun/...`) cannot be edge-compare operands.
+- WRUN package metrics (`wrun/...`) CAN be `crosses_above` / `crosses_below` operands (their readings carry the bar-open pair the cross needs), under the same rules as builtins: every metric operand declares `selector.interval`, and all intervals are equal. One extra rule: if the package's primary input pins its own interval, that pin must equal the `selector.interval` (the create bounces with code `wrun_edge_primary_interval_mismatch` otherwise, because such an alert could never fire).
 - An edge (leaf or Compare) can never sit under `"not"` (the save rejects it with code `edge_under_not`); a negated transition is true on nearly every tick and is never what the user means. Rephrase the fire condition as the cross the user actually wants.
 
 At runtime both sides must sit on the same bar pair: a venue lagging one bar behind makes the alert abstain for that tick (named in `alert_events` as an error, no fire). Same-market comparisons never hit this; tell the user about it only if they ask for a CROSS across two venues with different bar phases (e.g. CME session bars vs UTC crypto bars), which can never align and will surface as a broken-alert page.
@@ -297,7 +318,7 @@ A CHART indicator (kScript, including marketplace `kscript-indicator` packages) 
 
 The on_fire.execute block: venues, size.mode per venue, limit_px vs limit_price, caps (max_size, max_fires, expires_at), the stop-loss question, and why execution never catches up.
 
-Alerts may include an `on_fire.execute` block. Its presence is the user's authorization for the runner to submit an order when the alert fires; omit the block for notification-only alerts. Two venues are supported: Hyperliquid (paired with `om setup hyperliquid`) and Polymarket CLOB (paired with `om setup polymarket`). The `venue` field in the block selects which one fires. Works on both the compiled binary and source installs — the vault master key lives at `~/.openmarket/vault.key` (mode 0600) with optional `OM_VAULT_KEY` env-var override for CI / ops. Auto-execution happens only on live ticks; what a mid-gap trigger does instead is in §"Reliability".
+Alerts may include an `on_fire.execute` block. Its presence is the user's authorization for the runner to submit an order when the alert fires; omit the block for notification-only alerts. Two venues are supported: Hyperliquid (paired with `om setup hyperliquid`) and Polymarket CLOB (paired with `om setup polymarket`). The `venue` field in the block selects which one fires. A create whose venue has no paired account arms all the same and discloses `venue_note` on its result: every fire records a blocked order and no trade reaches the venue until it is paired, so relay that note with its pair command rather than reading it as a failed create. Works on both the compiled binary and source installs — the vault master key lives at `~/.openmarket/vault.key` (mode 0600) with optional `OM_VAULT_KEY` env-var override for CI / ops. Auto-execution happens only on live ticks; what a mid-gap trigger does instead is in §"Reliability".
 
 **Decision rule for the agent:** author `on_fire.execute` only when X is a TRADE the user asked you to place — *"buy 0.1 BTC when it drops under 60k"*. A conditional phrasing alone is not that authorization: *"tell me when BTC crosses 100k"* is also "do X when Y", and it is a notification-only alert with no execute block. When the trade is asked for, this is the right skill. If the user's phrasing is *"do X now"* (no condition, just a one-shot action like a resting bid, a position open, or an exit), load the orders skill with `skill_read("orders")` and use `order_place` instead. Don't wrap a one-shot intent in a synthetic always-true alert — it's slower and pollutes the alert list. The decision is by *user intent*, not by JSON shape: the same `execute` block lands on either path.
 
@@ -321,6 +342,8 @@ Alerts may include an `on_fire.execute` block. Its presence is the user's author
 `size.mode` controls interpretation. For Hyperliquid: `base` is coin size, `quote` is approximate USD notional, `pct_equity` is percent of HL account equity, and `position` (perp) closes a percentage of an existing position (percent points, never 0–1 fractions: `50` closes half, `100` closes all, `1` closes just 1%). For Polymarket: `shares` is outcome-token units, `quote` is pUSD notional, `pct_equity` is percent of paired pUSD balance, and `position` closes a percentage of an existing outcome-token position (sell-side only; same percent points). `order_type: "limit"` requires `limit_px` (HL) or `limit_price` (Polymarket, 0–1 probability); HL market orders are sent as aggressive IOC limits, Polymarket market orders use FAK. `caps.max_size` is a per-fire notional ceiling, `caps.max_fires` defaults to 1, and `caps.expires_at` is an ISO timestamp after which execution is blocked even if the alert condition still fires. The runner also has a global daily notional ceiling, shared across venues.
 
 When authoring an alert with `on_fire.execute`, if the user has not provided `brackets.stop_loss_px`, ask via the structured-question tool: "Add a stop-loss?" with a recommended yes option. Do not silently add a stop. The executor does not reconcile against pre-existing positions or pending orders; `reduce_only` is the user's tool for close-only intent, and repeated fires can stack exposure unless capped.
+
+**Executing on a stream's fires is an explicit opt-in.** An execute block on an alert whose condition carries an `event` leaf is refused unless `on_fire.allow_followed_fires: true` sits beside it (§"The `event` condition leaf" carries the rule and the risk line). The pairing means an order placed on another daemon's claim: only author it when the user asked for exactly that and heard the risk, and let the approval card's followed-fires line be the consent. From a terminal the same consent is `--allow-followed-fires` on `om alert import` / `om alert edit`, which prints the risk and asks.
 
 ## Create an alert
 
@@ -1046,6 +1069,18 @@ An alert that fails 3 consecutive evaluation passes is marked broken, and the ru
 
 **A quota refusal (HTTP 429) is an ACCOUNT condition, never a broken alert.** A rate-limited read does not count toward any alert's failure run and writes no per-alert error row: the alerts whose reads were refused did not evaluate at all, which is a fact about the key, not about the spec. The daemon posts one warning per episode naming the account and `om usage`, the list surface carries an account line above the per-alert disclosures while the last pass saw the account throttled, and runner status carries the same observation as `data_account`. When a user asks why an alert has gone quiet and the account line is present, answer with the quota, not with the alert — `usage` is the surface, and the episode clears itself once ten minutes pass with no refusal. Auth failures (401 / 403) are different and still accumulate the per-alert run.
 
+## Sharing an alert as a stream
+
+`stream_share` publishes an alert's recipe and signed fires under `@scope/name`; followers install paused and never inherit channels or execution.
+
+`stream_share` (`om share <alert-ref>`) packages the alert's recipe plus signed fire history
+under `@scope/name`; dry-run by default, `live: true` mints the relay lane on the alert's shadow
+watch so followers fold new fires live. Disclose on every live share: lanes are space-scoped
+(readable only by the author's space members). Installed alert packs land PAUSED and never carry
+channels or `on_fire.execute`. Author-side stats are the author's own activity; follower-side
+receipts are relay-stamped and `relay_age` is publisher-claimed — label them that way, never as
+verified reality.
+
 ## Charts and catalysts
 
 A price alert on an event-watch-tagged market appends a Possible catalyst line; alert fires mirror into the event store and pin onto charts via chart_pins (sources kind alert).
@@ -1167,7 +1202,7 @@ Each alert is a JSON file at `~/.openmarket/alerts/<id>.json`; the runner re-rea
 
 Channel credentials (Telegram bot token / chat-id, Discord webhook URL) live in `~/.openmarket/om.sqlite` — paired via `om init` or `om setup <channel>`. The runner reads them per tick; there are no per-channel env vars to set.
 
-Operator-managed. Do not pre-flight unconditionally: call `system_status` only when you are about to claim something about what is configured; otherwise proceed and let the create's typed error name anything missing.
+Operator-managed. Do not pre-flight unconditionally: call `system_status` only when you are about to claim something about what is configured; otherwise proceed and let the create's own result name anything missing — a typed error, or a disclosed note such as `venue_note` on an execute-armed create whose venue has no paired account.
 
 ### From JSON (the LLM path — used by the workflow above)
 
@@ -1211,6 +1246,7 @@ The terminal spellings of the fields the sections above name — for a shell use
 
 - Create / edit fields: `--fire-mode once|recurring` · `--cooldown <1h|30m|none>` · `--expires <1h|7d|2w|ISO|never>` (a duration needs its unit) · `--latency standard|fast` · `--quote USD|COIN` · `--display-name "<question>"` · `--group "<label>"` / `--clear-group` · `--channel <name>` (repeatable; `default` re-materializes the default) / `--add-channel` / `--remove-channel` / `--clear-channels`.
 - `om alert edit <id>`: the single-leaf flags (`--symbol`, `--exchange`, `--metric`, `--interval`, `--params`, `--op`, `--value`, `--label`) or `--condition-file <path|->` for a whole tree; the two modes are exclusive. Data-identity flags re-arm; the rest preserve fire history.
+- `--allow-followed-fires` on `om alert import` / `om alert edit` (pairs with `--condition-file`): the consent for `on_fire.execute` on an event-leaf alert. It prints the risk line and asks to confirm (`-y` skips the prompt), then stores `on_fire.allow_followed_fires: true`; without it such a spec is refused, whatever the file says. It re-arms nothing.
 - `om alert list`: `--symbol` / `--exchange` / `--metric` (repeatable) · `--enabled` / `--disabled` · `--never-fired` · `--fired-since <24h|ISO>` · `--include-expired` · `--kind metric|event-watch` (omit for both). The text view merges metric alerts and event watches under a `KIND` column; `--format json` returns `alerts` beside `event_watches`.
 - `om alert history <id>` / `om alert events [--alert <id>]`: `--kind <k>` (repeatable, OR; metric kinds or the event-watch outcomes `irrelevant` / `duplicate` / `corroboration` / `update` / `major_update` — `error` matches both) · `--since <24h|ISO>` · `--limit <n>` · `--format json` (metric rows in `events`, watch rows in `event_watch_events`, interleaved newest-first in the text view). The lifecycle verbs `om alert pause|resume|remove|show <id>` accept an event-watch id or slug and run the watch engine's own verb; `--purge-events` is metric-only and is refused on a watch.
 - Bulk: `--every-alert` on `om alert remove` / `pause` / `resume`; `--pack @scope/name[@version]` on `pause` / `resume` (resume skips unsafe descendants and exits nonzero).
@@ -1254,6 +1290,7 @@ What a reply must carry from each result-bearing action here; the per-branch gui
   - discloses `readings[]` — Where every metric leg of the accepted condition stands right now — the value in the units the alert compares, and the signed distance to the threshold. This is the arming sentence's material; a leg that could not be read carries `unavailable` with the reason instead of a value, and never blocks the create.
   - discloses `cooldown_note` — How often the armed alert may speak, in one quotable sentence.
   - discloses `expiry_note` — When this alert ends, for an alert whose condition names Polymarket markets and nothing else: the market's own close, applied to the stored spec, or the reason it is armed without one. An author who stated an expiry keeps that answer and still gets a sentence when the venue reports the market already settled, or when a leaf binds no market at all. Absent on a create whose condition reaches any other venue, and on a script condition, which has no market to end with.
+  - discloses `venue_note` — Present when the spec's `on_fire.execute` names a venue with no paired account. The alert is written and stays written; each fire records a blocked order and no trade reaches the venue until it is paired, with `om setup <venue>` (or `/setup` in om chat). The note's own wording says which side of `enabled` the alert is on — armed, or waiting to be enabled before any of this happens. Absent on an alert with no execute block, and on one whose execute venue already has an account.
   - discloses `saturation_notice` — Advisory when active script alerts exceed the concurrent script pool.
 - `alert_hosted_create`
   - discloses `status` — Engine status as the platform reports it (armed, paused, expired, ...); `unknown` means the platform's answer carried none.
@@ -1305,6 +1342,7 @@ What a reply must carry from each result-bearing action here; the per-branch gui
   - on `not_logged_in` — The platform rejected the stored key (signed out, revoked or expired): say so and point at `om login` or auth_relogin; nothing on the platform changed.
 - `alert_import`
   - discloses `routing_note` — Where the alert's fires post, in one sentence, with the command that moves it.
+  - discloses `venue_note` — Present when the spec's `on_fire.execute` names a venue with no paired account. The alert is written and stays written; each fire records a blocked order and no trade reaches the venue until it is paired, with `om setup <venue>` (or `/setup` in om chat). The note's own wording says which side of `enabled` the alert is on — armed, or waiting to be enabled before any of this happens. Absent on an alert with no execute block, and on one whose execute venue already has an account.
   - discloses `saturation_notice` — Advisory when active script alerts exceed the concurrent script pool.
 - `alert_list`
   - discloses `alerts[].status` — The alert's state, as `om alert list` prints it.
@@ -1341,10 +1379,18 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om alert remove` (action: `alert_remove`) — Remove a single alert by id.
 - `om alert resume` (action: `alert_resume`) — Resume one paused alert by id, or arm every alert installed from a package (`package: @scope/name[@version]`; pack alerts install paused).
 - `om alert schema` (action: `alert_schema`) — Return the AlertSpec input schema as JSON Schema (draft 2020-12), suitable for LLM tool-use input_schema.
+- `om alert share` (action: `alert_share`) — Share one of your alerts as a followable topic: enrolls this home's scope signing key, creates the topic at the store, publishes the alert's recipe as an alert-recipe-pack under your scope with the signed proof, and reports the saga state.
 - `om alert show` — Show one alert by id, whichever kind it is: a metric alert's spec and state, or an event watch (routed by id/slug)
 - `om alert state clear` (action: `alert_state_clear`) — Wipe a custom-script alert's persistent memory.
 - `om alert state show` (action: `alert_state_show`) — Return the JSON state blob a custom-script alert last persisted via next_state.
 - `om alert test fire` (action: `alert_test_fire`) — Send a sample fire message to the alert's own routed destinations (its `channels[]`) — the same places a real fire would go, and nowhere else.
+- `om alert unshare` (action: `alert_unshare`) — Stop sharing an alert: closes EVERY open topic it was shared under at the store (followers stop receiving fires; the published packages stay installable) and keeps the local share history.
 - `om alert watch` — (bespoke; see narrative above)
+
+- `om fires` (action: `topic_fires`) — Read the verified fires stored for a followed alert topic, newest first.
+
+- `om follow` (action: `topic_follow`) — Follow a shared alert topic by its published package: binds the registry version's signed coordinates to the store topic (both must agree and the topic must be active), subscribes, and lets the follower daemon store verified fires locally.
+
+- `om unfollow` (action: `topic_unfollow`) — Stop following a shared alert topic: unsubscribes at the store and keeps the stored fires as inactive history.
 
 <!-- AUTO: END COMMAND REFERENCE -->

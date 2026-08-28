@@ -10,7 +10,7 @@ allowed-tools:
 
 # Metrics
 
-Three tools: `metric_get` (one symbol, one or many metrics — §"Compute"), `metric_screen` (many symbols, one metric — §"Scan"), `metric_list` (what exists). Metric ids and their params: §"Technical indicators". Failures and skipped rows: §"Errors". Arming what you just read: §"Alerts". Shell surface: §"CLI equivalents".
+Four tools: `metric_get` (one symbol, one or many metrics — §"Compute"), `metric_series` (one symbol, ONE metric, per-bar history: §"Series"), `metric_screen` (many symbols, one metric — §"Scan"), `metric_list` (what exists). Metric ids and their params: §"Technical indicators". Failures and skipped rows: §"Errors". Arming what you just read: §"Alerts". Shell surface: §"CLI equivalents".
 
 **Never answer a price question with `metric_get`.** For "what's BTC at" / "price of SOL" / 24h-change questions call the `markets` tool — `lastPrice` plus a sparkline-ready `prices` array in one call; `metric_get` accepts `price` only so an alert spec can be sanity-checked.
 
@@ -112,6 +112,16 @@ The parenthesized numbers are what a paramless call reads: omit `params`, or any
 
 Installed WRUN packages add their own `wrun/@scope/name/output` ids per machine — `metric_list` is the discovery surface for those; they never appear in this table.
 
+## Series
+
+One metric's per-bar history with metric_series: the trend/context sibling of metric_get, when to reach for it, and how to read the pairs.
+
+`metric_series` takes ONE `metric` (+ `params`, `sourceBindings` for bindable WRUN odds inputs), the same `selector` as `metric_get`, and `bars` (how many most-recent bars, 1 to 500, default 30). It answers "how has it moved", where `metric_get` answers "what is it now": "RSI over the last day", "is funding trending up", "how close has RSI been to 70". Same registry, same validators, same data path, so every point equals what `metric_get` would have answered at that bar's live read.
+
+Result shape: `{ asOf, selector, metric, params, series }` where `series` is `[barOpenSec, value]` pairs (epoch seconds), oldest first. Warm-up and not-ready bars are omitted, so the array can be shorter than `bars`; the newest pair reads the still-forming bar and moves until that bar closes. Timestamps let you speak in time ("since 14:00 UTC"); never paste raw epoch seconds to the user.
+
+Boundaries, same as the rest of this surface: price history routes to `markets` (its `prices` array is the price sparkline), one metric per call (several metrics = several calls), and a many-symbols question is a §"Scan", not a per-symbol series loop. A series is still a snapshot of the past: for the standing version of the ask, offer the alert.
+
 ## Scan
 
 Scan many symbols on one metric with metric_screen: universe forms, filter/sort/limit and scanned.matched, skipped rows, and how to scope and drill down on a vague scan.
@@ -139,7 +149,7 @@ Ranking fields for `by` (server does the sort + paging):
 
 Optional narrowing on the top_n form: `direction` (`SORT_DIRECTION_ASC`|`SORT_DIRECTION_DESC`, default DESC), `categories` (`SPOT`|`PERPETUAL`), `types` (data types).
 
-**Screens assume the metric follows the universe symbol.** A `wrun/...` metric whose package pins its inputs to fixed markets computes the same value for every universe row (a fully pinned package) or mixes the universe's venue-native symbols with a foreign pinned leg. Screen with WRUN metrics only when the package's primary input follows the selector (the marketplace skill's pin rules say which shapes do). Load `skill_read("marketplace")` for those pin rules.
+**Screens assume the metric follows the universe symbol.** A `wrun/...` metric whose package pins its inputs to fixed markets computes the same value for every universe row (a fully pinned package) or mixes the universe's venue-native symbols with a foreign pinned leg. Screen with WRUN metrics only when the package's primary input follows the selector (the wrun skill's pin rules say which shapes do). Load `skill_read("wrun")` for those pin rules.
 
 ### Filter, sort, limit
 
@@ -243,6 +253,10 @@ om metric get    --metric NAME[:k=v,k=v] ... [--params k=v,k=v]
                  --symbol SYM --exchange ID
                  [--interval INT] [--quote QUOTE]
                  [--format json|yaml|text]
+om metric series --metric NAME[:k=v,k=v] [--params k=v,k=v]
+                 --symbol SYM --exchange ID [--bars N]
+                 [--interval INT] [--quote QUOTE]
+                 [--format json|text]
 om metric screen --metric NAME[:k=v,k=v] [--params k=v,k=v]
                  --exchange ID
                  ( --top-n N --by FIELD | --symbol SYM ... )
@@ -251,7 +265,7 @@ om metric screen --metric NAME[:k=v,k=v] [--params k=v,k=v]
                  [--format json|text]
 ```
 
-`om metric get` takes two equivalent, mutually exclusive forms: a single bare `--metric` with `--params` (the shape `om alert create` mirrors), or the repeatable compact `--metric name:k=v,k=v` colon form for several metrics. `--params` is only legal with a single bare `--metric` (no colon); for multi-metric, use the colon form.
+`om metric get` takes two equivalent, mutually exclusive forms: a single bare `--metric` with `--params` (the shape `om alert create` mirrors), or the repeatable compact `--metric name:k=v,k=v` colon form for several metrics. `--params` is only legal with a single bare `--metric` (no colon); for multi-metric, use the colon form. `om metric series` takes the same two forms but exactly one metric, and its text mode renders the series as a sparkline.
 
 CLI filters are the compact spellings of the same fields: `--filter lt:30`, `--filter between:30..70`, `--top-n 25 --by VOLUME_24H`. JSON output (`--format json`) is byte-identical to the tool results shown above. The command-to-action mapping:
 
@@ -260,5 +274,6 @@ CLI filters are the compact spellings of the same fields: `--filter lt:30`, `--f
 - `om metric get` (action: `metric_get`) — Compute one or more named scalar values over the latest candle window for a (symbol, exchange, interval) tuple.
 - `om metric list` (action: `metric_list`) — List every available scalar metric — name, source data type, and accepted parameter names.
 - `om metric screen` (action: `metric_screen`) — screen a universe of symbols on a single scalar metric (price, delta_pct, volume, funding_rate, open_interest, RSI, MACD, EMA, ATR, etc.).
+- `om metric series` (action: `metric_series`) — Per-bar HISTORY of one scalar metric over the last N bars for a (symbol, exchange, interval) tuple, as [barOpenSec, value] pairs, oldest first, newest = the still-forming bar.
 
 <!-- AUTO: END COMMAND REFERENCE -->

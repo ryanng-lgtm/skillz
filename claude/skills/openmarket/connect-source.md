@@ -44,10 +44,24 @@ Then build the glue that feeds the door. Build everything you can reach yourself
 ## The five lanes
 
 1. **Vendor-covered.** Check before building: a named PUBLIC place a vendor already carries (government releases, agency feeds, big public accounts) is a vendor feed wearing a URL. `om news catalog` and a follow/add beat any glue, and the result is maintained by someone else. Glue for a covered source is waste; route it back to `news.md`.
-2. **Public poller.** A public page or endpoint no vendor carries: write the poller yourself (a few lines that fetch, diff against the last seen marker, and push only what is new via `om event push <watch> --text ...`), and put it on a cadence with the machine's own scheduler (cron, a launchd or systemd timer) on a box that can reach both the page and the daemon. Pass `occurred_at` and a stable `id` per item so retries dedupe and history lands in source-time order.
+2. **Public poller.** A public page or endpoint no vendor carries: first check the declared poller below (a well-formed RSS, Atom, or JSON feed needs no glue at all); otherwise write the poller yourself (a few lines that fetch, diff against the last seen marker, and push only what is new via `om event push <watch> --text ...`), and put it on a cadence with the machine's own scheduler (cron, a launchd or systemd timer) on a box that can reach both the page and the daemon. Pass `occurred_at` and a stable `id` per item so retries dedupe and history lands in source-time order.
 3. **Webhook, one paste.** The source can already POST (CI systems, internal scanners, SaaS webhook settings): the door IS the webhook target. Hand one paste for their settings page: the endpoint URL and the `Authorization: Bearer <token>` header, complete, nothing to assemble.
 4. **Email rule.** The information arrives in their inbox: hand one paste for their mail provider's rule or script box that turns a matching message into a door POST (subject or sender filter, body as `text`). A provider that can only forward, never POST, gets local glue below (a small fetcher on the user's side of the mailbox) instead of a rule.
 5. **Local glue.** Anything already on their machine (a log, a folder, a process, a pipe): a few lines that tail or scan and push. Local glue needs no token at all: `om event push` authenticates as the operator, and with the daemon down an `accept_all` push is still written through the same store path.
+
+## The declared poller: lane 2 without the glue
+
+When the public place is already a well-formed feed (RSS, Atom, or a JSON list of records), do not write lane-2 glue: declare the feed on the watch itself and the daemon's own fixed fetcher polls it. Create the watch with a `poller` source instead of `--inbound`:
+
+```json
+{ "adapter": "poller", "stream_ref": { "adapter": "poller", "channel": "feed",
+  "extra": { "url": "https://example.com/releases.atom", "format": "atom", "every_sec": "900" } } }
+```
+
+- `format` is one of `rss`, `atom`, `json`; `every_sec` is the cadence, an integer from 60 to 86400. When the feed's field names are nonstandard, add a field map: `title_key`, `time_key`, `id_key`, `body_key`, `items_key` (element names for RSS and Atom, dot paths into the document for JSON, for example `items_key: "data.rows"`).
+- No script exists and none travels: a shared or installed pack that carries this source is run by the SAME fixed fetcher on every installer's daemon, which is why the consent card says it "fetches from your machine". Pass `occurred_at`-style timestamps through `time_key` so items land in source-time order; items older than the live window (six hours, or twice the cadence if longer) journal quietly as catch-up instead of pinging.
+- The fetcher is deliberately narrow, and the limits route for you: https only, private and link-local hosts refused on every poll and every redirect, no cookies and no auth headers ever, one document per poll capped at 2 MiB. A feed behind a login is not a public source (lane 4 or 5); a page that is not one of the three formats needs lane-2 glue, because the declared poller never scrapes HTML.
+- First open sweeps the feed's current items silently so a fresh watch does not ping on the backlog; history enters on request via `om event-watch backfill`.
 
 ## The one-paste contract
 

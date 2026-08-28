@@ -21,6 +21,7 @@ Guardrails that hold whichever section you read:
 - `status: budget_paused` is a question, never a completion — relay the choice and always include the resume command; never summarize a budget stop as done (§"Backfill").
 - `om event-watch remove` preserves the journal but destroys the watch's stored events, backbone, snapshots, chart binding and room shares — it confirms first, as does rotate-token (§"Lifecycle").
 - Only pull the journal that is relevant to the user's question. Do not bulk-load every journal into prompt context.
+- An X account is watched keyless through the `x` adapter (`extra.handle`, a 5-minute timeline poll); `om event-watch show` prints its backend coverage, and `Coverage: partial` means silence from it is not evidence of no posts; a `known gap since` note on that line is a window the poller moved past during a flood without reading, which no `om event-watch` verb clears (a backfill that reads it would), so the watch stays incomplete over that window even while its state reads ok. Live X search across X (an xAI credential: SuperGrok / X Premium subscription or API key) stays the escalation beyond one handle's timeline, reached through `web_research`, never by the poller. Create the watch either way; if the result carries `x_search_hint`, relay it once and never nag afterward.
 
 Routing:
 
@@ -45,11 +46,13 @@ Create from a concrete stream ref — for news feeds check the auto-attached wat
 
 `om news` feed acquisitions (follow/add/create/fork) auto-attach a per-feed event-watch by default, so for news/social streams check `om event-watch list` before creating one by hand — the watch may already exist (auto-created watches carry an `origin` field naming the provider + feed). Manual creation remains the path for `openmarket` market streams and backfill.
 
-Never hand-build a stream ref to watch a news feed. `om news follow` / `om news create` already attach a correctly scoped watch; a hand-built one is how a watch ends up consuming the WHOLE vendor feed instead of the one feed the user asked for. A news stream ref is only complete with its per-feed id — `attention` and `attention-briefs` need `extra.subscription_id`, `synoptic` needs `extra.stream_id` (all available from `om news list --format json`). An adapter-wide ref like `{"adapter":"attention-briefs","channel":"briefs"}` is rejected at creation.
+Never hand-build a stream ref to watch a news feed. `om news follow` / `om news create` already attach a correctly scoped watch; a hand-built one is how a watch ends up consuming the WHOLE vendor feed instead of the one feed the user asked for. A news stream ref is only complete with its per-feed id: `attention` and `attention-briefs` need `extra.subscription_id`, `synoptic` needs `extra.stream_id` (all available from `om news list --format json`), and the keyless `x` adapter needs `extra.handle`, one X account per watch (`{"adapter":"x","channel":"posts","extra":{"handle":"DeItaone"}}`; case does not matter and a leading @ is fine). An adapter-wide ref like `{"adapter":"attention-briefs","channel":"briefs"}` is rejected at creation.
 
 **Repairing a feed that has no watch is its own verb: `news_attach`.** When the user already holds the feed but nothing consumes it (`eventWatchLinked: false`, or a `feed_unwatched` warning from `watching_overview`), that is the call — not `event_watch_create`. It attaches exactly what an acquisition would (the feed's own trigger becomes the goal, the user's classifier and routing settings apply) and is idempotent, so a feed that is already covered reports `exists` and nothing is written. `event_watch_create` on a news stream ref fills a missing `channel` and claims the watch for news when the feed is demonstrably the user's, but the claim depends on the vendor's owned list being readable at that moment, and an offline create leaves the watch hand-built, which `news_delete` will not retire. One call that cannot get either wrong beats two that can; the feed-side doctrine is news.md §"After any acquisition, verify the pair".
 
-Creating a vendor-fed watch requires a concrete source stream from a registered listener adapter. Ask for the missing source detail if the user has not supplied it; do not invent adapter credentials or stream identifiers. Current production adapters include `openmarket` market streams, `synoptic` news/social streams, and the `attention` / `attention-briefs` news feeds.
+Creating a vendor-fed watch requires a concrete source stream from a registered listener adapter. Ask for the missing source detail if the user has not supplied it; do not invent adapter credentials or stream identifiers. Current production adapters include `openmarket` market streams, `synoptic` news/social streams, the `attention` / `attention-briefs` news feeds, the keyless `feed` poller, and the keyless `x` account timelines (`extra.handle`; the runtime row's `collection_state` reports the backend's coverage every poll).
+
+A `feed` watch polls one public URL with no credential: an RSS 2.0 / RSS 1.0 / Atom feed (a Google News search RSS, a YouTube channel feed, a podcast feed), a JSON Feed, or an EDGAR per-CIK submissions JSON (`https://data.sec.gov/submissions/CIK##########.json`). Its stream ref is exactly `{"adapter":"feed","channel":"items","extra":{"url":"<normalized http(s) URL>"}}`: creation requires the normalized spelling (lowercase scheme and host, no default port, no userinfo, no fragment) and the refusal quotes the spelling to use. The first poll sweeps the feed's current entries silently (`swept=<n>`, nothing fires), and every entry that appears afterwards is an event; entries the feed drops while the daemon is down are gone for good, and `event_watch_backfill` answers `backfill_unsupported` for this adapter. Feed text is a stranger's writing, so the classifier and overview prompts frame it as untrusted data and the notification quotes the source text inside a fence. Polls run every five minutes by default (`OM_FEED_POLL_INTERVAL_MS`, 60s floor); a URL on `127.0.0.0/8` is refused unless the test-rig switch `OM_FEED_ALLOW_LOOPBACK=1` is set.
 
 A watch whose events the user pushes themselves takes no stream ref: `om event-watch create --inbound` opens a door at `POST /ingest/v1/<watch-id>` (also reachable as `om event push`), bounded by `--ingest-daily-cap <n>` (default 2000 accepted pushes per UTC day; a typed 429 above it). The door starts closed — no token hash, a uniform 401 on every request — until `om event-watch rotate-token <id>` mints the token on a stdio surface, which prints it once.
 
@@ -149,6 +152,8 @@ Use `om event-watch edit <id-or-slug>` to change an existing watch in place (goa
 
 Use `--market <EXCHANGE:SYMBOL>` (repeatable) to tag the watch with related markets. Tags are metadata for price-alert catalyst pairing: when a price alert fires on a tagged market, the fire notification appends this watch's freshest accepted event as a "Possible catalyst" line. They never change what the watch matches.
 
+`--brief-alert-fires` / `--no-brief-alert-fires` is the per-watch switch for relayed alert fires (rows of kind `om_alert`: the author's price-alert fires on a followed or installed alert stream). Off is the default and needs no flag: those rows stay out of the daily brief, the news lookups and the possible-catalyst lines, because a price move is not news. On admits them, labeled with the stream address, and `event_watch_show` states the switch either way (`brief_alert_fires`). Accepted on any watch; inert on one that never holds such rows.
+
 ## Lifecycle
 
 Pause, resume, remove — remove preserves the journal, destroys stored events, backbone, snapshots, shares, and confirms first; alert shadows refuse (`event_watch_alert_managed`).
@@ -158,6 +163,36 @@ Pause, resume, remove — remove preserves the journal, destroys stored events, 
 - `om event-watch remove <id-or-slug>` removes the spec and preserves its journal. It also destroys the watch's stored events, its backbone, every snapshot it holds (the lived synthesis passes and any materialized backtest lineage), its chart binding and any room shares bound to it, so it confirms first and prints what it destroyed; `--yes` is the scripted form. `om event-watch rotate-token` confirms the same way, because rotating revokes the token every live producer is pushing with. Both raise an approval card in chat.
 - Deleting, removing, or unfollowing a news feed retires the watch it auto-attached and keeps that watch's journal; the result names it as `removedWatch`. A hand-built watch on the same stream is never auto-retired — it comes back as `keptWatch`, and `om event-watch remove <id>` is its explicit cleanup.
 - **Alert shadow watches are alert-managed.** Every price alert mirrors its fires into the journal through a shadow watch, which is what makes alert fires chartable via `chart_pins` (news.md §"Plotting events on charts"). Shadows take no generic lifecycle and no generic edit: `event_watch_pause` / `event_watch_resume` / `event_watch_remove` / `event_watch_edit` on one refuses with `event_watch_alert_managed`, naming the alert verb to use instead (an accepted edit would evaporate anyway — the mirror rebuilds the shadow spec from the alert). Drive the ALERT (`om alert pause` / `resume` / `remove`) and the shadow follows; never route around the refusal.
+
+## Streams: share, follow, fork, stats
+
+A watch (or alert) shared under a registry address `@scope/name` is a stream: rule plus signed history as a one-member package, plus a relay lane on a live share.
+
+- `stream_share` (`om share <ref>`): dry-run by default (zero network); `live: true` mints the
+  lane, stamps `stream: {address, role: "own"}` and publishes. Preview first, always: answer a
+  share ask with a `dry_run: true` call and relay the preview (address, version, history count,
+  and the space-scope line) before any live call; the live share is a second call the user asked
+  for after seeing the preview. Never make the first call a live one. Disclose on every live share:
+  **lanes are space-scoped** — readable only by members of the author's space. Scope comes from
+  `scope` or the `registry_scope` setting (`missing_scope` otherwise).
+- `stream_follow` (`om follow <address>`): creates a PAUSED accept_all watch fed by the author's
+  signed relay postcards (0 LLM calls, execution never); resume it to start folding. `stream_unfollow`
+  removes the follow, journal preserved. News-vendor follows stay on `news_follow`.
+  `brief_alert_fires` (`om follow --brief-alert-fires`, default off) admits the author's alert fires
+  into the daily brief and catalyst notes, labeled with the address; the consent card states it
+  when on, and `event_watch_edit` flips it later (§"Edit a watch").
+- `om install @scope/pack[#member]` lands members PAUSED with silent history import;
+  `om fork <source>` copies one member into an owned watch with `lineage.forked_from` only.
+- `om event-watch stats <ref> [--window <days>] [--format json]` is the receipts view. Label the
+  numbers exactly: `relay_age` is publisher-claimed, uptime is heartbeat-sampled, follower counts
+  are unknown, lanes are space-scoped. Author-side numbers are the author's own activity;
+  follower-side receipts are relay-stamped. Never grade them as verified reality.
+- `event_watch_show` prints the lane block (address, room, pending, BLOCKED state); a postcard
+  failing 8 deliveries blocks its lane instead of skipping a sequence number, and
+  `event_watch_lane_retry` clears the block.
+- `om event-watch export <ref>` writes canonical stream-event JSONL (door-only keys and foreign
+  relay rows never leave); `om event push <watch> --file <jsonl|csv>` imports files as silent
+  history with idempotent dedupe. The two round-trip.
 
 <!-- AUTO: COMMAND REFERENCE — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
@@ -178,6 +213,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om event-watch create` (action: `event_watch_create`) — Create a daemon-owned event watch from a natural-language goal and a structured stream reference.
 - `om event-watch edit` (action: `event_watch_edit`) — Update a watch's goal, filters, extra guidance, classifier, notify, overview, or related-market tags.
 - `om event-watch events` (action: `event_watch_events`) — Query structured SQLite event rows by outcome, time, source, confidence, and notification state.
+- `om event-watch export` (action: `event_watch_export`) — Export one watch's accepted event rows as canonical stream-event lines (JSONL), the shape a shared pack ships as history and `om event push --file` reads back.
 - `om event-watch list` (action: `event_watch_list`) — List configured event watches with their daemon runtime status.
 - `om event-watch pause` (action: `event_watch_pause`) — Disable one event watch by id or slug — consuming strategies are NOT auto-paused: entries stop arming (a paused watch produces no events) while managed exits stay enforced.
 - `om event-watch reclassify` (action: `event_watch_reclassify`) — Re-run the classifier over event rows this watch already stored with outcome `error` (a failed classification, e.g. a missing or expired LLM credential), using each row's retained raw text and source context.
@@ -185,6 +221,15 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om event-watch resume` (action: `event_watch_resume`) — Re-enable one paused event watch by id or slug — event flow returns automatically and consuming strategies need no re-arm.
 - `om event-watch rotate-token` (action: `event_watch_rotate_token`) — Mint a fresh ingest token for an inbound event watch and invalidate the old one immediately (rotation IS revocation: only the token's sha256 is stored, so the previous token stops authorizing the instant the new hash lands).
 - `om event-watch show` (action: `event_watch_show`) — Show one event watch spec and its daemon runtime status by id or slug, plus the signals and strategies that depend on it (the blast radius of a later pause or remove).
+- `om event-watch stats` (action: `event_watch_stats`) — Stream receipts for one event watch, computed on read from the local ledgers: window activity by arrival lane (live/relay/catchup/imported/backfill), and, for a followed stream, relay-stamp receipts (fires by transport, relay_age labeled publisher-claimed, future-timestamp flags, heartbeat-sampled uptime) plus the author-side lane block for a live-shared one.
 - `om event-watch synthesize` (action: `event_watch_synthesize`) — Refresh one event watch's overview.md from its accepted event history.
+
+- `om follow` (action: `stream_follow`) — Follow a live-shared stream: create a PAUSED event watch fed by the author's fires over their relay lane.
+
+- `om fork` — (bespoke; see narrative above)
+
+- `om share` (action: `stream_share`) — Share an event watch or alert as a package under its stream address: publish it over its ref with its accepted history, and with live=true mint a relay lane so followers receive future fires.
+
+- `om unfollow` (action: `stream_unfollow`) — Stop following a stream: remove the follow watch (its stored events go with it; the journal is preserved, exactly the event_watch_remove contract) and drop the durable lane cursor so a later re-follow starts clean.
 
 <!-- AUTO: END COMMAND REFERENCE -->

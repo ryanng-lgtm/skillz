@@ -43,11 +43,11 @@ Same as the alerts skill — the daemon must be reachable (or, for `om order pla
 | --- | --- |
 | `OM_API_KEY` | OpenMarket Data API auth. Captured by `om init` (stored in `~/.openmarket/om.sqlite`) or exported. |
 
-Execution credentials live in the local vault (`~/.openmarket/om.sqlite`, sealed with a master key at `~/.openmarket/vault.key` — mode 0600, same filesystem trust as channel tokens). Operator-managed. Do not pre-flight unconditionally: call `system_status` only when you are about to claim something about pairing state; otherwise proceed and let the order's typed error name anything missing. Hyperliquid is paired with `om setup hyperliquid`; Polymarket execution requires the Deposit Wallet flow. Pair with `om setup polymarket` (auto-derives the signer's Deposit Wallet from the EOA), or deploy a fresh one headlessly with `om setup polymarket --create-deposit-wallet`.
+Execution credentials live in the local vault (`~/.openmarket/om.sqlite`, sealed with a master key at `~/.openmarket/vault.key` — mode 0600, same filesystem trust as channel tokens). Operator-managed. Reads, resolution and discovery never pre-flight: call `system_status` only when about to claim something about pairing state, and let a typed error name anything missing. Placing an order is the exception — it checks once before the preview (workflow step 1), because the preview names the network and the confirmation gate is never spent on an unpaired venue. Hyperliquid is paired with `om setup hyperliquid`; Polymarket execution requires the Deposit Wallet flow. Pair with `om setup polymarket` (auto-derives the signer's Deposit Wallet from the EOA), or deploy a fresh one headlessly with `om setup polymarket --create-deposit-wallet`.
 
 ## Discovery: is the venue paired?
 
-Run this when you are about to claim pairing state, or after a typed pairing failure — a single fast check, not an unconditional pre-flight:
+Run this once before placing an order — the preview names the network (mainnet vs testnet), which only this check can supply, and a confirmation gate spent on an unpaired venue is a wasted yes. On every other path (reads, resolution, discovery) run it only when about to claim pairing state or after a typed pairing failure. It is a fast local read, never a venue call:
 
 ```bash
 om status --format json
@@ -90,12 +90,18 @@ Read-only account commands surface live state from the paired execution account.
 
 | Command | Returns | When to call |
 | --- | --- | --- |
-| `om hyperliquid balance` | Perp equity, free margin, withdrawable; spot token balances | Before sizing with `pct_equity` (resolve $ amount upfront), before any "how much can I afford" question |
-| `om hyperliquid positions` | Open perp positions: size, side, entry, unrealized PnL, liquidation price, leverage | Before "close my position" / "reduce my X" / `reduce_only` orders; for "how am I doing?" queries |
-| `om hyperliquid orders` | Resting orders, perp + spot, with oid, price, size, age | Before "cancel my bid" / "modify my limit"; for "what's pending?" queries |
+| `om hyperliquid balance` | Perp equity, free margin, withdrawable; spot token balances; per-dex perp equity for each HIP-3 dex the account holds value or margin on | Before sizing with `pct_equity` (resolve $ amount upfront), before any "how much can I afford" question |
+| `om hyperliquid positions` | Open perp positions on every dex — canonical and HIP-3: size, side, entry, unrealized PnL, liquidation price, leverage | Before "close my position" / "reduce my X" / `reduce_only` orders; for "how am I doing?" queries |
+| `om hyperliquid orders` | Resting orders on every dex, perp + spot, with oid, price, size, age | Before "cancel my bid" / "modify my limit"; for "what's pending?" queries |
 | `om hyperliquid fills` | Recent fills with side, price, fee, closed PnL, taker/maker | For "what did I trade today?" / PnL retrospectives |
 | `om hyperliquid funding` | Funding payments received and paid | For "what funding did I pay?" — relevant when holding leveraged perp positions |
 | `om hyperliquid fees` | Current fee tier (perp + spot, maker + taker, referral discount) | When the user asks about their fee rate or volume tier |
+
+Those three reads sweep the canonical perp dex plus every deployed HIP-3 dex, so an `xyz:TSLA` position or resting order is visible without being asked for. HIP-3 rows carry the dex-qualified coin name, which is what keeps a merged list unambiguous. `--dex <name>` narrows any of them to that one dex, and `canonical` is the reserved name of the canonical (nameless) dex, so `--dex canonical` reads the plain perp account on its own. A scoped read carries that scope's rows and no others: the account's spot orders belong to the canonical scope, so `--dex canonical` is where they show, never under a HIP-3 banner. The balance read's per-dex section appears only when some HIP-3 dex actually holds value.
+
+A dex that cannot be reached fails the whole listing loudly — a partial account picture is never presented as a complete one. The refusal names every scope that failed and then the scopes that do answer, spelled as the argument this surface takes (`--dex xyz` on the CLI, `dex` on the tools): retry with one of the values it lists, `canonical` included, never with the scope that just refused. Tell the user which dex is missing, because a scoped read is a partial picture by construction.
+
+The two account actions take the same scope: `om hyperliquid leverage <asset> <n>` and `om hyperliquid margin <asset> <usd>` accept `--dex <name>` (or `--dex canonical`), and a dex-qualified `xyz:TSLA` asset names its own dex without the flag. Asset ids live in a separate space per dex, so a symbol two dexes both carry is two markets: name the dex when the position being managed is a HIP-3 one, or the change lands on the canonical market of the same name.
 
 Modern Hyperliquid accounts are usually unified: spot USDC backs perp positions directly, so do not infer that a perp-side `$0` display means the user needs a spot/perp transfer when spot USDC is present. Do not preemptively suggest `om hyperliquid transfer` before a perp order just to "fund perps"; on unified accounts the transfer is unnecessary and HL will reject it with messages such as *"Action disabled when unified account is active"* or *"Must deposit before performing actions"*. Treat either message as confirmation that the account is unified, skip the transfer, and continue with the perp-order workflow if the requested order otherwise makes sense.
 
@@ -174,6 +180,12 @@ Polymarket prices are probabilities in `(0, 1)` and must align to the market tic
 
 The mode is the single most important field to get right. Get it wrong and you'll submit 100 BTC when the user meant $100.
 
+Hyperliquid trades a minimum order value of **$10**. It binds every order type, every market including HIP-3, and reduce-only closes as tightly as opens, so a request worth less than $10 is not worth proposing: a quote-mode order under the floor is refused locally, before the venue is called and before a confirmation gate is spent on it. When the user asks for "buy $5 of BTC", say the floor and offer $10 — or a base-mode size, if what they meant was a quantity.
+
+Just above the floor, the venue's lot grid decides the size: every quote-mode order — market or limit, perp or spot — is stepped onto that grid until it clears $10 at both prices the venue could value it by. The step is bounded at **1.5× the value asked for**, so on a coarse grid a requested $10 legitimately goes out worth up to $14.99. `om order place` resolves that figure from public reads before it asks, so the confirm line and the order form name the size that goes out and the value it carries, with the requested figure beside them whenever the grid moved it. A market order's figure is quoted at a mid the placement re-reads, so it is stated with a `~`; a limit order divides by the caller's own limit price and is exact. Where the public reads do not answer, the confirmation states the requested value instead and the placement raises its own refusals. On the typed-action path the same duty is yours: state the value that goes out — bounded by 1.5× — and not only the one requested. The receipt records what actually went out either way.
+
+Two shapes refuse instead of stepping — a market whose smallest expressible size is worth more than 1.5× the request (the refusal names that size), and an order whose `caps.max_size` / `--max-size` sits below the size the floor needs (the refusal names the cap). Both raise ahead of the confirmation, alongside the sub-$10 refusal, so a yes is never spent on an order that cannot go out. All three are deterministic: the recovery is a different number, never a retry.
+
 | User wording | `size.mode` | `size.value` example |
 | --- | --- | --- |
 | *"$100 of BTC"* | `quote` | `100` (USD notional) |
@@ -202,6 +214,11 @@ HL uses coin symbols (`BTC`, `ETH`, `SOL`, `HYPE`, …), not exchange-style rawS
 | *"BTC-USD"* | `BTC` |
 | *"BTC perp"* | `BTC` |
 | *"hype" / "HYPE token"* | `HYPE` |
+| *"TSLA on the xyz dex"* | `xyz:TSLA` (or `TSLA` with `--dex xyz`) |
+
+HIP-3 markets live on a builder-deployed dex and their names are dex-qualified. Three spellings reach the same market, all of them case-insensitive: `--instrument "TSLA on xyz"` (the resolver route, and the one to reach for whenever the user named the market in human form), `--asset xyz:TSLA` on its own (the `dex:` prefix is what carries the routing), and `--asset TSLA --dex xyz`. An `--asset` prefix that names one dex while `--dex` names another is refused rather than guessed at. `om resolve` prints both forms: its `order` object (`asset`, `hl_dex`) is the paste-ready spec fragment and its `cli` field is the same instrument as flags.
+
+For anything the user phrased in human form — a company name, "TSLA on HIP-3", a half-remembered ticker — resolve first (§"Discovery: which instrument did the user mean?") rather than assembling a qualified name yourself: a bare ticker several dexes carry is ambiguous by design and comes back as candidates.
 
 If unsure, verify against HL's universe before submitting. The runner caches it once per process; checking is cheap.
 
@@ -211,7 +228,7 @@ Follow these steps in order. Do not skip the preview; do not pass `--yes` withou
 
 ### 1. Confirm venue is paired
 
-`om status --format json` → if `venues[]` empty, stop and route to `om setup hyperliquid`.
+`om status --format json` → if the venue this order needs is absent from `venues[]`, stop and route to the setup command for that venue: `om setup hyperliquid`, or `om setup polymarket` for a CLOB order.
 
 ### 2. Parse intent
 
@@ -274,6 +291,14 @@ om order place \
   --stop-loss 92000 --yes
 ```
 
+A HIP-3 market is the same call with the dex-qualified asset name (`--asset TSLA --dex xyz` and `--instrument "TSLA on xyz"` name the same market):
+
+```bash
+om order place \
+  --asset xyz:TSLA --side buy --type market \
+  --size 250 --size-mode quote --yes
+```
+
 For the JSON form (brackets, caps, anything more elaborate):
 
 ```bash
@@ -317,7 +342,7 @@ Do not tail with "want me to place another?" or any follow-up question unless th
 
 ## Workflow when an order needs to be cancelled
 
-Use `om order cancel <oid>` or `om order cancel-cloid <cloid>`. If the id matches an execution receipt, the receipt's venue controls routing. Hyperliquid can cancel by numeric oid or cloid; Polymarket cancels by the stored CLOB order id. If a Polymarket receipt has no CLOB order id because the SDK response was dropped or the pinned SDK did not return one, the CLI will say clientOrderId cancellation is unavailable; ask the user for the CLOB order id from `om polymarket-account orders` and cancel by that id.
+Use `om order cancel <oid>` or `om order cancel-cloid <cloid>`. The resting-order lookup searches every dex and routes the cancel to the dex it finds the order on, so an order resting on a HIP-3 market cancels by its id alone, and one unreachable dex does not block a cancel for an order found elsewhere. `--dex <name>` scopes the search to that one dex, `--dex canonical` to the canonical one. `--asset` skips the lookup altogether and routes on the name given, so a dex-qualified `--asset xyz:TSLA` goes to `xyz` on its own. A cloid matches by hex value, so the casing it is typed in does not matter. When a scope the search needed could not be read, the message names it: on `cancel` and `cancel-cloid` the way past it is `--asset`, which reaches the order without the search at all, while `modify` and `batch-modify` reach an order only through the search, so their recovery is retrying once that scope answers. If the id matches an execution receipt, the receipt's venue controls routing. Hyperliquid can cancel by numeric oid or cloid; Polymarket cancels by the stored CLOB order id. If a Polymarket receipt has no CLOB order id because the SDK response was dropped or the pinned SDK did not return one, the CLI will say clientOrderId cancellation is unavailable; ask the user for the CLOB order id from `om polymarket-account orders` and cancel by that id.
 
 For a recurring auto-execute alert the user wants to stop submitting, use `om alert pause <id>` or `om alert remove <id>`. That's the alerts skill, not this one. If the user says "cancel my order", clarify whether they mean a resting venue order or the alert that may submit more.
 
@@ -343,6 +368,10 @@ The CLI emits structured JSON errors with `--format json`; in text mode they pri
 | --- | --- | --- |
 | `venue_not_paired` (exit 4) | Requested venue not paired | Run `om setup hyperliquid` or `om setup polymarket`. Stop ordering until paired. |
 | `order_place_failed` with *"Hyperliquid asset not found"* | Asset name wrong | Re-prompt the user for the asset; check HL's universe; strip exchange suffixes (`BTCUSDT` → `BTC`). |
+| `order_place_failed` with *"Hyperliquid trades a minimum order value of $10 — this order asks for $N. Raise the size to at least $10."* (N is the requested value) | Quote-mode request worth less than $10, refused before any venue call and before the confirmation. `om order place` exits 1 with no receipt; reached through the dispatcher instead (typed action, alert leg) it settles a receipt with status `error` that reserves nothing against the daily ceiling | Not transient — a retry submits the same doomed order. Tell the user the venue floor and ask for a size of $10 or more, or a base-mode quantity. |
+| `order_place_failed` with *"Hyperliquid's lot grid on this market cannot express an order near $N: the smallest order clearing the venue's $10 minimum is worth $M"* | Quote-mode request on a market whose smallest $10-clearing size is worth more than 1.5× the request; judged from public reads before the confirmation, nothing signed | Not transient. Quote the $M figure the message names and ask the user for a size at least that big, or a different market. |
+| `order_place_failed` with *"Hyperliquid's $10 order minimum needs a size worth $M on this market's lot grid, above the order's max_size cap of $C"* | The size the $10 floor needs exceeds the order's own `caps.max_size` / `--max-size`; judged from public reads before the confirmation, nothing signed | Not transient. Quote both figures and ask the user to raise the cap to at least $M or leave the order unplaced. |
+| `order_batch_modify_failed` (exit 1), or `ok: false` with `error: batch_modify_partial` on the action | A batch spanning dexes signs one action per dex and stops at the first refusal. The entries before it already rest at NEW oids — HL's modify is cancel-replace — and the payload tags every entry `landed` / `failed` / `not_attempted` with the replacement oid of each landed one | Never re-run the same batch: the venue has replaced those oids. Report the landed entries and their new oids, then batch only the entries that did not land. |
 | `order_place_failed` with *"tick size"* | Polymarket limit price not aligned | Run `om polymarket-account market` or `orderbook`, choose a price aligned to the returned tick size. |
 | `not_supported_on_venue` | Requested operation has no native venue primitive | For Polymarket modify, cancel and re-place manually after preview; for TWAP, use Hyperliquid only. |
 | `order_place_failed` with `limit_px is required` | Limit order without a price | Ask for the limit price. |
@@ -351,7 +380,7 @@ The CLI emits structured JSON errors with `--format json`; in text mode they pri
 | Receipt status `blocked`, reason `max_size` | `caps.max_size` triggered | Tell the user the cap blocked them; ask if they want to raise the cap or lower the size. |
 | Receipt status `blocked`, reason `daily_ceiling` | Global daily notional ceiling hit | Tell the user the ceiling blocked them. Raise it with `om config set execute:daily_ceiling_usd <amount>` if appropriate. |
 | Receipt status `rejected` (from HL) | Venue refused — insufficient margin, bad params, etc. | Inspect the `raw_response` field of the receipt for HL's error text. Surface it back to the user. |
-| Receipt status `error` | Adapter / signing / network failure | Look at the receipt's `raw_response` for the message. Network errors usually self-heal on retry; signing errors mean the API wallet key is malformed (rare). |
+| Receipt status `error` | Adapter / signing / network failure, or a sizing refusal that never reached the venue (order minimum, lot grid, size cap — the rows above). A refusal that provably signed nothing leaves `notional_usd` null, so it spends none of the day's ceiling | Read the receipt's `raw_response` first and let the message decide: a sizing refusal is deterministic, so change the number rather than retry. Network errors usually self-heal on retry; signing errors mean the API wallet key is malformed (rare). |
 
 ## Behaviors to follow
 
@@ -363,7 +392,7 @@ The CLI emits structured JSON errors with `--format json`; in text mode they pri
 - **NEVER suggest a spot/perp transfer solely because perp-side balance reads `$0`.** Unified Hyperliquid accounts use spot USDC as perp collateral directly; only transfer if the user explicitly asks for it.
 - **DO mention the network** (mainnet vs testnet) in the preview. The user should always know which network their money is on.
 - **DO show the receipt summary** after submission so the user sees what landed.
-- **DO route to `om setup hyperliquid` immediately** if the venue isn't paired. Don't try to be clever.
+- **DO route to the unpaired venue's own setup command immediately** — `om setup hyperliquid`, or `om setup polymarket` for a CLOB order. Don't try to be clever.
 
 ## Behaviors to avoid
 
@@ -400,7 +429,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om hyperliquid twap-fills` (action: `hyperliquid_twap_fills`) — Individual slice fills from TWAP orders.
 - `om hyperliquid twap-history` (action: `hyperliquid_twap_history`) — Past TWAP orders on the paired account (active, finished, terminated, or errored).
 
-- `om order batch-modify` (action: `order_batch_modify`) — Modify N resting Hyperliquid orders in a single signed action.
+- `om order batch-modify` (action: `order_batch_modify`) — Modify N resting Hyperliquid orders in one signed action per perp DEX.
 - `om order cancel` (action: `order_cancel`) — Cancel a resting order by order id.
 - `om order cancel-cloid` (action: `order_cancel_cloid`) — Cancel a resting order by execution cloid.
 - `om order modify` (action: `order_modify`) — Change the limit price and/or base-asset size of a resting Hyperliquid order.

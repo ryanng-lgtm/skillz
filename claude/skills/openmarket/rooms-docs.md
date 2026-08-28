@@ -1,20 +1,21 @@
 ---
 name: openmarket-rooms-docs
-description: Work with OM Rooms living docs as the in-room agent — the space library (one head per doc, CAS revisions, om://doc pills) and the doc_* verbs (list/read/search/history/write/move/bulk move/revert/archive/bulk archive/restore/access). Use when a chat user asks about a channel's files, wants a conversation captured into a doc, or asks to edit, rename, file, refile, revert, share, archive, or restrict docs.
+description: Work with OM Rooms living docs as the in-room agent — Markdown and Excalidraw Canvas files, CAS revisions, om://doc pills, and the doc_* / canvas_update verbs. Use when a chat user asks about a channel or topic's files, wants a conversation captured, or asks to edit, draw, rename, file, refile, revert, share, archive, or restrict docs.
 user-invocable: true
 ---
 
 # Rooms docs — the agent playbook
 
-Every server (space) owns one **library** of markdown docs. A doc lives at a vault-style path (`plans/cutover.md`), has ONE current head revision, and an append-only history: every change is a new attributed revision with a note, nothing is ever lost, and any revision can be restored. Channels never hold copies; a doc is shared into chat as a live `om://doc/<docId>@<rev>` pill. Members also mirror the library to disk, so a doc you edit may be edited concurrently from someone's editor.
+Every server (space) owns one **library** of living docs: Markdown notes and Excalidraw Canvas scenes. A doc lives at a vault-style path (`plans/cutover.md` or `Canvas/payment-flow.excalidraw`), has ONE current head revision, and an append-only history: every change is a new attributed revision with a note, nothing is ever lost, and any revision can be restored. Channels and topics file docs without copying them; a doc is shared into chat as a live `om://doc/<docId>@<rev>` pill. Members also mirror the library to disk, so a doc you edit may be edited concurrently from someone's editor.
 
 ## Context you already have
 
 Every in-room turn is seeded with the library index: the docs in this server (path, head rev, last author) and, when the conversation references any, **the docs referenced in THIS channel** (newest first, with the rev each pill pinned). Trust that block before spending tool calls. Resolve a loose mention ("this file", "the plan", "that doc from earlier") in this order:
 
-1. The docs referenced in this channel (newest first): what "this file" almost always means.
-2. The library index (match by path or basename).
-3. `doc_search` (full-text) when neither names it.
+1. When the turn is inside a topic, the topic-scoped docs block (it includes stable docIds for private-topic files).
+2. The docs referenced in this channel (newest first): what "this file" almost always means.
+3. The library index (match by path or basename).
+4. `doc_search` (full-text) when neither names it. Topic-scoped docs are resolved by docId or by their explicit scopeTopicId, not by the space-wide search.
 
 If two docs plausibly match, ask which one rather than guessing.
 
@@ -22,11 +23,12 @@ If two docs plausibly match, ask which one rather than guessing.
 
 | Verb | What it does | Notes |
 | --- | --- | --- |
-| `doc_list` | List a space's docs (filter by folder prefix) | Read-only |
-| `doc_read` | Read content + headRev, by path or docId | Read FIRST; its headRev is your write's baseRev |
+| `doc_list` | List a space's docs (filter by folder prefix, channel, or topic) | Read-only; use topicId for a topic's full set |
+| `doc_read` | Read content + headRev, by path or docId | Read FIRST; Canvas content is the complete Excalidraw scene |
 | `doc_search` | Full-text search the library | Read-only |
 | `doc_history` | Revisions newest-first; pass rev for one revision's content/diff | Read-only |
-| `doc_write` | Create (no baseRev) or update (baseRev required) | Always give a change note; conflicts return the head to merge and retry; an update PROPOSES unless you hold direct write (below) |
+| `doc_write` | Create (no baseRev) or update (baseRev required) Markdown | Never use it for .excalidraw; always give a change note; conflicts return the head to merge and retry |
+| `canvas_update` | Atomically publish a Canvas scene and fitted SVG preview | Existing .excalidraw docs only; read first, preserve the full scene, pass baseRev |
 | `doc_propose` | Suggest a change without writing it: the full content queues for human review | Always safe; the explicit always-queue verb, and the right one for someone else's doc |
 | `doc_move` | Move/rename and/or refile one doc's home channel | Any member; identity, history, pills survive |
 | `doc_move_many` | Bulk move/refile by folder prefix OR exact paths | Prefix preserves subtrees; exact paths use basenames |
@@ -45,13 +47,15 @@ Doc verbs run against the USER's rights, so the server refuses what they cannot 
 
 **Edit a doc.** `doc_read` → change the content → `doc_write` with `baseRev` = the headRev you read and a note saying what changed. On `status: "conflict"` the result carries the current head: merge your change INTO the head content and retry with the new baseRev. Never resend your original text unmerged, that would erase the other author's landed work. On `status: "proposal"` nothing was published: say the edit is queued for the operator and stop.
 
+**Edit or draw in a Canvas.** `doc_read` by docId → parse the complete Excalidraw scene → add/update only the intended elements while preserving the rest → render a complete SVG whose viewBox fits every visible element → `canvas_update` with both full artifacts and the read headRev. Pass `content` as the JSON scene object directly (a JSON-encoded string is also accepted). The complete `elements` array is required; the tool inherits omitted stable envelope, `appState`, and empty `files` fields from the head it just read so rebuilding a drawing cannot fail merely because one unchanged wrapper field was dropped. The scene and preview commit atomically. On `status: "conflict"`, merge the intended element changes into `head.content`, regenerate the preview, and retry at `head.rev`. Never send Canvas JSON through `doc_write`. A credentialed agent without direct write cannot queue this through the Markdown proposal path; report the grant command returned by the tool instead of claiming an edit landed.
+
 **Capture a conversation.** Read the recent slice with `room_history`, write a clean structured doc (a decision/plan record, not a raw transcript) with `doc_write`, pass provenance `{roomId, seqFrom, seqTo}`, then share it. When the ask names one person ("what Henry said"), filter the slice to that handle yourself; the seq window still spans the whole slice.
 
 **Share a doc into the chat.** Put its pill in your message or DRAFT line: `om://doc/<docId>@<rev>`. That is the whole mechanism; the clients render it live.
 
 **Cite a message.** Point at a specific message as `om://msg/<room>/<seq>` (the seq comes from `room_history` results or the `[seq]` on recent-message lines); clients render it as a quoted jump pill. Use it in docs and answers wherever a claim traces to one message.
 
-**File or rename.** `doc_move` with `newPath`, `homeRoom`, or both; folders are implicit (naming `plans/x.md` creates `plans/`). `homeRoom: null` clears channel filing. Prefer the library's existing folders over inventing new ones.
+**File or rename.** `doc_move` with `newPath`, `homeRoom`, or both; use the stable docId for a topic-scoped Canvas. A Canvas title is its filename, so renaming “Beta test canvas” means a path such as `Canvas/Beta test canvas.excalidraw`; keep its current folder and extension. Folders are implicit (naming `plans/x.md` creates `plans/`). `homeRoom: null` clears channel filing. Prefer the library's existing folders over inventing new ones.
 
 ## Bulk operations
 
