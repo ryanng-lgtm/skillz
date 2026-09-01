@@ -116,14 +116,27 @@ For replies and files, use the autonomous rung the operator authorized:
   OM update/restart and a fresh client session instead of routing around the
   governed tool.
 - Set `replyTo` to a non-negative room message sequence to post a reply.
-- Pass `attachments` as strict inline objects shaped
-  `{ kind: "inline", name, mime, base64 }`. Use a plain filename, an
-  RFC-style MIME type without parameters, and standard canonical base64.
-- Send at most five files and 10 MiB of decoded bytes per post. Omit `text`
-  only when at least one attachment is present.
-- Never pass local paths, remote URLs, or data URLs. Read only bytes the user
-  supplied or explicitly authorized, encode them without the data-URL prefix,
-  and never echo the base64 payload into prose or logs.
+- Prefer `{ kind: "path", path }` for any file on this machine: an absolute
+  or `~/` path the MCP process reads itself, so the bytes never pass through
+  you as base64. `name` and `mime` default from the file; override them only
+  when the file's own name or extension would mislead.
+- Use `{ kind: "inline", name, mime, base64 }` only for small payloads you
+  already hold as bytes: a plain filename, an RFC-style MIME type without
+  parameters, and standard canonical base64 without the data-URL prefix.
+- Send at most five files and 10 MiB combined per post. Omit `text` only
+  when at least one attachment is present.
+- Never pass remote URLs or data URLs. A relative path is refused as
+  `attachment_path_not_absolute`: re-send it absolute rather than retrying.
+- Some files are refused as `attachment_path_denied` whatever the room grant
+  says, and no rewording, copy, or backup suffix gets past it: the OM home,
+  the machine credential stores (`.ssh`, `.gnupg`, `.aws`, `.kube`,
+  `.docker`, `.mcp-auth`, gcloud, gh, `.netrc`, `.npmrc`,
+  `.git-credentials`), the agent-client configs holding this badge's own
+  secret (`.claude`, `.claude.json`, `.mcp.json`, `.codex`, `.cursor`,
+  `.openclaw`, `.gemini`, Claude Desktop) wherever they live including a
+  project checkout, remote or UNC paths, and `/proc`, `/sys`, `/dev`.
+  Attach only files the user supplied or explicitly authorized, and never
+  echo base64 into prose or logs.
 - When attachment verification matters, pass the returned sequence to
   `room_message_get` with `raw: true` to read only the posted entry. Then use
   `room_attachment_read` with its returned key to verify content; report a

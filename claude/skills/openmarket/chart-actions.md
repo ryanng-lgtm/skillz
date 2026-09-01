@@ -14,20 +14,9 @@ The Collab Service Bridge is a long-lived WebSocket from the local `om` daemon t
 
 Commands are grouped by **resource**, not by action verb — same pattern as `kubectl get pods`, `docker container run`, `git remote add`. Picking the right group is the agent's first job; the verbs under each group are small and consistent.
 
+### Guardrails
+
 The chart is the display plane where your work turns visible. When the user asks to SEE anything (price action around an event, a support/resistance level, market structure, a comparison between symbols), express it ON the chart: set the symbol and interval, add the indicator, draw the level or zone, and confirm with `chart_screenshot` when they ask how it looks. Prefer this over ASCII sketches, text tables of candles, or describing what a chart would show. Two checks before acting: `chart_status` for the active workspace (and whether a human is watching), and the verb section the ask names (§"Panes and layout" for a grid) so a grid ask lands on `chart_layout` first.
-
-Quick routing — the common asks, each row a recipe (tool + the decisions to make and say; the loaded tool schema owns argument shapes):
-
-| Ask | Recipe |
-| --- | --- |
-| "show me BTC" / "open a chart" | `chart_create` — scratch, no name; default the market like a price ask (BTC/ETH/SOL → Binance spot, 1h); say "temporary, 48h — say keep to make it permanent". |
-| "add RSI and the 200 EMA" | one `chart_indicator_add` per indicator on the active chart (omit the workspace id); defaults RSI 14, EMA 200 — state them. |
-| "screenshot it" / "how does it look" | `chart_screenshot` on the active chart. |
-| "2x2 with BTC, ETH, SOL, DOGE" | `chart_layout` FIRST (2x2 = mode `4`), then one `chart_symbol` per pane whose target differs; `NO_CHANGE` = done, never re-issue. |
-| "mark 21,350" (a named exact level) | `chart_drawing_add`, HorizontalLine at the named price — the explicit-anchor verb is for user-named levels only. |
-| "draw the fib / trendline for the swing" | `chart_drawing_auto` — anchors computed from candles; read the drawing detail file first. |
-| "plot my headlines / alert fires" | `chart_pins` — its own day workspace by default, no approval; a NAMED workspace or `here` needs the user's explicit yes. |
-| "what's on my chart?" | `chart_refresh` with the workspace id omitted — never answered from `chart_list`. |
 
 **Workspace policy: frictionless, scratch by default.** A target the user NAMED is used as-is (with the consent language first); something already on screen (`here`) is painted, creating nothing. Everything else ad-hoc lands on a SCRATCH canvas: `chart_pins` mints its own fresh-or-same-view day workspace as one, and a bare fresh canvas is `chart_create` with `scratch: true` and no name (48h sliding TTL relay-side, exempt from the plan workspace count, listed only on the dim scratch shelf, zero residue when the user walks away). Never mint a NAMED workspace unless the user named it, and never promote one on your own: `chart_keep` is the user's naming act that makes a scratch permanent IN PLACE, same id, same share link; a follow never promotes anything. When a run reports a scratch mint, disclose the expiry once and name the keep verb once.
 
@@ -54,6 +43,23 @@ NEVER call `indicator add` while trying to remove; if you lack information, use 
 
 Pane targeting on a multichart: `--chart 0` / `--chart 1` guesses misroute — identify the target pane from current state first (on the CLI, `--chart <SYMBOL>` resolves the pane by symbol; agent tools take the numeric `chartIndex` you verified).
 
+Watching the agent drive the chart live (ghost cursor, narration) is the primary feedback loop for chart-actions. Whether the user is watching is REPORTED, not guessed: `chart_status` → `humanPresent` on the active workspace. Theater a viewer misses is NOT replayed — a late joiner only gets the end state — so seat the audience BEFORE mutating, not after.
+
+### Routing
+
+Quick routing — the common asks, each row a recipe (tool + the decisions to make and say; the loaded tool schema owns argument shapes):
+
+| Ask | Recipe |
+| --- | --- |
+| "show me BTC" / "open a chart" | `chart_create` — scratch, no name; default the market like a price ask (BTC/ETH/SOL → Binance spot, 1h); say "temporary, 48h — say keep to make it permanent". |
+| "add RSI and the 200 EMA" | one `chart_indicator_add` per indicator on the active chart (omit the workspace id); defaults RSI 14, EMA 200 — state them. |
+| "screenshot it" / "how does it look" | `chart_screenshot` on the active chart. |
+| "2x2 with BTC, ETH, SOL, DOGE" | `chart_layout` FIRST (2x2 = mode `4`), then one `chart_symbol` per pane whose target differs; `NO_CHANGE` = done, never re-issue. |
+| "mark 21,350" (a named exact level) | `chart_drawing_add`, HorizontalLine at the named price — the explicit-anchor verb is for user-named levels only. |
+| "draw the fib / trendline for the swing" | `chart_drawing_auto` — anchors computed from candles; read the drawing detail file first. |
+| "plot my headlines / alert fires" | `chart_pins` — its own day workspace by default, no approval; a NAMED workspace or `here` needs the user's explicit yes. |
+| "what's on my chart?" | `chart_refresh` with the workspace id omitted — never answered from `chart_list`. |
+
 **Events on charts are their own lane: `chart_pins`.** It plots event sources (news feeds, custom watches, price-alert fires) onto a chart's event lane as a live view; the call shape is §"Pins", and the doctrine (defaults, the one-question rule, filters, depth, workspace consent) lives in `news.md`'s "Plotting events on charts" section, so read that before plotting events. Do not confuse it with `chart_events`, the session-edit stream: that verb READS the human's and peers' recent manual chart edits and plots nothing.
 
 **Drawing tools have their own detail file → read [`chart-actions-tool-drawing.md`](chart-actions-tool-drawing.md).**
@@ -61,8 +67,6 @@ It covers every Super Search tool (lines, shapes/ranges, fibonacci, arrows, mark
 annotations), `chart_drawing_auto` (anchors computed from market data — preferred),
 `chart_drawing_add` (caller-supplied role-tagged anchors), `chart_drawing_schema` (a tool's anchor
 roles), and `chart_drawing_remove`. Read it before drawing, adding, or removing any chart tool.
-
-Watching the agent drive the chart live (ghost cursor, narration) is the primary feedback loop for chart-actions. Whether the user is watching is REPORTED, not guessed: `chart_status` → `humanPresent` on the active workspace. Theater a viewer misses is NOT replayed — a late joiner only gets the end state — so seat the audience BEFORE mutating, not after.
 
 ## Single-binary setup
 
@@ -332,6 +336,8 @@ This is the `chart_view` path — ephemeral viewport change, broadcasts to peers
 
 Add, remove (by `indicatorType` or `everyIndicator`), update, list; RSI/MACD/EMA and every registry native, WRUN ids, single-instance `409 NO_CHANGE`, `VALIDATION`, defaults.
 
+Several indicators = ONE `chart_indicator_remove` call with `ids` on one pane (`om chart indicator remove --id a --id b`): one card lists every member (type, pane), an overlay the daemon reports already gone is an unchanged row, and a member that fails never voids the others.
+
 | Tool (CLI) | Wire action | Requires daemon |
 | --- | --- | --- |
 | `chart_indicator_add` (`om chart indicator add`) | `add_indicator` | yes |
@@ -431,6 +437,8 @@ chart_indicator_add { "chartIndex": 0, "indicatorType": "RSI", "settings": { "pe
 ## Drawings
 
 Trendlines, fibonacci, shapes: default `drawing auto` (computed anchors); `drawing add` only for user-named exact levels; `drawing schema` roles; remove by id.
+
+Several drawings = ONE `chart_drawing_remove` call with `ids` on one pane (`om chart drawing remove --id a --id b`): one card lists every member (tool, anchors, pane) and the yes covers exactly that set; never loop single-id removes for a set.
 
 | Tool (CLI) | Wire action | Requires daemon |
 | --- | --- | --- |
@@ -534,7 +542,7 @@ Honest refusals for freehand sketching, streaming/watch loops, and other owners'
 
 ## Errors
 
-Every failure shape and recovery: `bridge_disabled`, `no_active_workspace`, `request_failed`, `UNAUTHORIZED`, `FORBIDDEN`, `VALIDATION`, `CLIENT_VALIDATION`, `NO_CHANGE`.
+Every failure shape and recovery: server wire codes, the client-minted `CLIENT_VALIDATION`/`TIMEOUT`/`TRANSPORT`, and the untyped local shapes, defined in one place.
 
 ```jsonc
 { "error": "bridge_disabled",
@@ -565,11 +573,15 @@ Recovery rules:
 - `UNAUTHORIZED` → API key bad or revoked. Re-run `om init` and `om service restart`.
 - `FORBIDDEN` → key's user isn't the workspace owner. Use `chart_list` to find one they own.
 - `VALIDATION` on a mutation → server didn't accept the envelope. Surface the detail verbatim; let the user correct.
+- `NOT_FOUND` → the target doesn't exist upstream (workspace / chart / overlay id). Re-read (`chart_refresh` / `chart_list`) and correct the id; never re-issue the same call unchanged.
+- `INTERNAL` → the daemon or gateway failed internally (also what an untyped REST-floor refusal maps to). Surface the detail verbatim; one attempt, no retry loop.
 - `no_active_workspace` → a call omitted the workspace id and no ACTIVE workspace is configured (a fresh install has none until `om init` picks one or `chart_workspace_select` runs). Relay the remedy the error names; never invent an id or silently pick one from `chart_list`.
 - `invalid_workspace_id` → the id wasn't a workspace short id or share-link URL (a friendly name like "btc desk" is not an id — resolve it via `chart_list` first).
 - `workspace_select_failed` → the live repoint failed; the persisted default was rolled back, not clobbered. Relay the remedy hint; do not claim the switch happened.
 - `request_failed` → a direct gateway REST call failed without a typed upstream code (network/HTTP-level). Report it as unreachable; one attempt, no retry loop.
 - `CLIENT_VALIDATION` → a drawing call refused BEFORE any network submit (bad roles/anchor count/direction/`text` on geometry). It returns as a normal result with `ok: false` — read the envelope, not just an error flag. Fix the named field once; never claim drawn.
+- `TRANSPORT` → the bridge socket dropped with the intent in flight — the outcome is UNKNOWN: the change may have applied before the drop. Re-read the chart first (`chart_refresh` — `chart_status` only answers bridge connectivity, not chart content) and retry ONLY if the change is absent from the fresh read — a blind retry double-draws on `chart_drawing_add` (idempotent setters merely degrade to `NO_CHANGE`). If `chart_status` stays `reconnecting`, report the bridge down and stop.
+- `TIMEOUT` → no ack within the bridge deadline — same outcome-unknown rule as `TRANSPORT`: re-read the chart first, retry only if the change is absent.
 - `NO_CHANGE` (`409`) → the requested value already matches (or the overlay is already gone / already present for single-instance types). Informational — the CLI exits 0 and no theater fires on the chart UI: treat as done, never retry, never surface as an error.
 - `chartIndex N out of range (have M charts)` → the pane doesn't exist yet; grow the layout first (`chart_layout`), then set that pane once.
 - `403 TIER_FEATURE_LOCKED` → the indicator type is plan-gated; surface it verbatim, do not retry — the user upgrades or picks a free-tier type.
@@ -643,6 +655,33 @@ The wire contract lives in code, not a standalone doc: envelope shapes in `packa
 
 **Adding a new verb under a resource group:** find the resource's `registerXCommands(collab)` function in `cmd/collab.ts`, add a new `.command("...")` under the group, and post the appropriate `action` / `data` / `intent` shape to `collabRpc("submit", ...)`. The bridge's `validateEnvelope` (`runner/collab/validators.ts`) is the safety net; the server's controller is the authority.
 
+<!-- AUTO: ARGUMENT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
+
+## Argument contract
+
+What each tool here fills in when a field is omitted — the defaults and omit-rules its schema states on top-level fields and one object level down; prose never restates them.
+
+- `chart_events` · `chart_indicator_add` · `chart_indicator_preview` · `chart_indicator_remove` · `chart_indicator_update` · `chart_interval` · `chart_layout` · `chart_open` · `chart_plot_type` · `chart_refresh` · `chart_screenshot` · `chart_symbol` · `chart_sync` · `chart_view`
+  - `workspaceId` — OMIT to act on the user's ACTIVE workspace (the daemon resolves it live); omitting is the default and the correct call for 'my chart' / 'this workspace'.
+- `chart_indicator_add`
+  - `settings` — default {}
+- `chart_indicator_preview`
+  - `params` — default {}
+  - `bars` — default 300
+  - `clear` — default false
+- `chart_keep`
+  - `workspace` — Default: the user's ACTIVE chart workspace (charts.workspace), which is where scratch canvases live.
+- `chart_list`
+  - `mine` — Never the answer to a question about the user's workspaces; omit it for those.
+- `chart_screenshot`
+  - `outPath` — Defaults to ./chart-<shortId>-<epochMs>.png in the current directory.
+- `chart_view`
+  - `cursorTimestamp` — Seek-intent focus within [startTime, endTime]; defaults to the midpoint.
+- `nervous_status`
+  - `limit` — default 20
+
+<!-- AUTO: END ARGUMENT CONTRACT -->
+
 <!-- AUTO: RESULT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
 ## Result contract
@@ -651,26 +690,44 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 
 - `chart_indicator_add`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_indicator_preview`
   - on `NO_CHANGE` — NO_CHANGE on a preview push is not a success: the push was refused and the stored preview was tombstoned at the same revision, so the pane renders nothing. Say the preview did not land, and re-run it to supersede rather than reporting it as already shown.
 - `chart_indicator_remove`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_indicator_update`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_interval`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_keep`
   - discloses `disclosures[]` — Guard notes the keep proceeded under: market notes (the rename-in-place path discloses a pane-vs-pins mismatch or several recorded markets instead of refusing, and both paths disclose venue-spelling differences, stale or unreadable pane reads, and unparsable pin markets), a template note when a clone was seeded from defaults, and a warning when the name matches a workspace id only this machine's ledger still knows. Relay them.
 - `chart_layout`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_plot_type`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_symbol`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_sync`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_view`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 
 <!-- AUTO: END RESULT CONTRACT -->
 
@@ -693,7 +750,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart layout` (action: `chart_layout`) — Change the multi-chart layout / grid.
 - `om chart list` (action: `chart_list`) — List every chart workspace the account owns (REST direct, so it works even when the daemon is down): the same list, names and ids, the user sees in the web app.
 - `om chart open` (action: `chart_open`) — Open a workspace's live chart view (openmarket.xyz/chart/<id>?live=true) in a browser on this machine, and optionally wait for a human viewer to join the session.
-- `om chart plot-type` (action: `chart_plot_type`) — Change a chart pane's plot type (candlestick, line, bar, area, ...).
+- `om chart plot-type` (action: `chart_plot_type`) — Change a chart pane's plot type to one of the 18 renderer enum names.
 - `om chart refresh` (action: `chart_refresh`) — Read the LIVE workspace state by issuing REQUEST_STATE_SYNC over the bridge WS and returning the fresh snapshot.
 - `om chart screenshot` (action: `chart_screenshot`) — Render a PNG snapshot of a workspace by short id or share-link URL.
 - `om chart select` (action: `chart_workspace_select`) — Make a workspace the ACTIVE one: the live bridge repoints to it, it becomes the saved default, and every later chart action with `workspaceId` omitted lands on it (exactly what the TUI `/workspace` command does).

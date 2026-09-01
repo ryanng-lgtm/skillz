@@ -63,6 +63,22 @@ When the public place is already a well-formed feed (RSS, Atom, or a JSON list o
 - The fetcher is deliberately narrow, and the limits route for you: https only, private and link-local hosts refused on every poll and every redirect, no cookies and no auth headers ever, one document per poll capped at 2 MiB. A feed behind a login is not a public source (lane 4 or 5); a page that is not one of the three formats needs lane-2 glue, because the declared poller never scrapes HTML.
 - First open sweeps the feed's current items silently so a fresh watch does not ping on the backlog; history enters on request via `om event-watch backfill`.
 
+## TradingView and other cloud senders: the relay mailbox
+
+TradingView alerts POST from TradingView's servers, so they can never reach a laptop's loopback door. When the watch is live-shared over a relay topic (`om share --live --carrier topic`), skip the tunnel: mint the topic's relay mailbox and hand TradingView the drop URL.
+
+```bash
+om event-watch relay-door <watch>
+```
+
+- The drop URL prints exactly once (only its hash is stored at the relay). Paste it into the alert's Webhook URL box in TradingView. Re-running the verb rotates: the old URL stops accepting mail immediately, and every sender still using it must be re-keyed by hand.
+- Set the alert's Message to the ingest door's JSON body. TradingView placeholders interpolate before sending, so a complete paste is: `{"text": "{{ticker}} crossed {{close}}", "kind": "tradingview", "market": "{{ticker}}"}`. Same wire rules as the local door: `text` required, unknown keys refused, 64KB cap.
+- The relay only HOLDS mail (about 30 messages per minute per mailbox, kept up to 72 hours). Your daemon collects it on the stream drain cadence, judges each message against the watch's goal under the normal budgets, and only then publishes to the topic. A malformed message is skipped and counted, never published and never wedging the queue.
+- Requires the topic share first: an unshared or room-shared watch is refused with the exact share command to run. A relay that does not offer mailbox doors yet answers with a typed hint; the share itself is unaffected.
+- Verification is unchanged: fire a test alert in TradingView, then read the event back (`om event-watch events <watch> --format json`) after the next collect pass and say what the classifier did with it.
+
+Use the mailbox only for senders that cannot reach the daemon. A source on the user's own machine or network still takes lanes 2 through 5: the local door is judged immediately, needs no share, and holds nothing at a third party.
+
 ## The one-paste contract
 
 Hand at most ONE paste, and only when the source sits behind the user's own account (their CI's webhook settings, their mail provider's rule box): places only they can touch. The paste block is complete and final: destination, header, body shape, all filled in. The token appears exactly once, inside that paste block, and is never repeated in a later message (only its hash is stored, so there is nothing to reprint; a lost token is a rotate, not a search). If the plan needs a second paste, the lane is wrong: go back one step and pick again.

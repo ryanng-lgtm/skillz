@@ -12,6 +12,8 @@ allowed-tools:
 
 Four tools: `metric_get` (one symbol, one or many metrics — §"Compute"), `metric_series` (one symbol, ONE metric, per-bar history: §"Series"), `metric_screen` (many symbols, one metric — §"Scan"), `metric_list` (what exists). Metric ids and their params: §"Technical indicators". Failures and skipped rows: §"Errors". Arming what you just read: §"Alerts". Shell surface: §"CLI equivalents".
 
+### Guardrails
+
 **Never answer a price question with `metric_get`.** For "what's BTC at" / "price of SOL" / 24h-change questions call the `markets` tool — `lastPrice` plus a sparkline-ready `prices` array in one call; `metric_get` accepts `price` only so an alert spec can be sanity-checked.
 
 **Never loop `metric_get` across a list of symbols.** One `metric_screen` call replaces N gets; a loop burns the per-turn tool budget before answering. The one exception — a few gets after a screen has already narrowed the field — is in §"Scan".
@@ -20,16 +22,20 @@ Always read values through these tools; never recompute indicator math locally �
 
 Chart-only indicators (CCI, MFI, OBV, VWAP, ADL, ADX, PSAR, Ichimoku) are not computable here — they exist only as chart overlays via `chart_indicator_add`.
 
+Never present one venue's numbers as another's: when the requested venue can't serve a metric, refuse with the venue named, or state the substitution explicitly.
+
 Prediction markets leave this surface entirely: route to the `polymarket_*` tools.
 
-Never present one venue's numbers as another's: when the requested venue can't serve a metric, refuse with the venue named, or state the substitution explicitly.
+Unsure a metric name exists in this build? Probe `metric_list` first; if it's absent, say so and stop — never guess a metric id.
+
+### Routing
 
 Quick routing — the common asks, the call, the defaults to assume, and the offer:
 
 | Ask | Call | What to assume or avoid — disclose it, then offer |
 | --- | --- | --- |
 | "what's BTC at?" / price / 24h change | `markets` | never `metric_get`; offer an alert at a level |
-| "what's RSI on BTC?" | `metric_get`, one query | rsi(14), HOUR; bare coin → Binance spot listing ("BTC on Binance", `BTCUSDT`); offer the alert at 70/30 and the chart |
+| "what's RSI on BTC?" | `metric_get`, one query | rsi(14), HOUR; no venue named → omit `exchange`, the result's `listing_note` names the listing read — say it in words; offer the alert at 70/30 and the chart |
 | "the 200-day SMA on BTC" | `metric_get`, one query | sma with `period` from the ask, DAY; offer the alert at the cross |
 | "MACD and EMA on ETH, 4h" | `metric_get`, several `queries[]` in ONE call | macd 12/26/9 (three ids — §"Technical indicators"), ema(20), FOUR_HOURS |
 | "Bollinger Bands on SOL" | `metric_get`, three `queries[]` | bb_upper/bb_middle/bb_lower (20, 2); offer the chart overlay |
@@ -37,10 +43,9 @@ Quick routing — the common asks, the call, the defaults to assume, and the off
 | "compare RSI across BTC, ETH, SOL" | one `metric_screen`, `universe.kind: symbols` | never a per-symbol `metric_get` loop |
 | "alert me when …" | `alert_create` | a screen is a one-shot snapshot, not a watch |
 
-Reply shape: the first line answers with the value, its defaults in words, and freshness — "BTC RSI(14) on the hourly is 61.2 (Binance, 2 minutes ago)" — then two to four offers tailored to what was read (the alert at the threshold just compared, the chart, the scheduled rerun). Venue and interval names in user text are words — "Binance Futures", "hourly" — never registry ids; raw ids and JSON never reach the user.
+### Reply shape
 
-Unsure a metric name exists in this build? Probe `metric_list` first; if it's absent, say so and stop — never guess a metric id.
-
+The first line answers with the value, its defaults in words, and freshness — "BTC RSI(14) on the hourly is 61.2 (Binance, 2 minutes ago)" — then two to four offers tailored to what was read (the alert at the threshold just compared, the chart, the scheduled rerun). Venue and interval names in user text are words — "Binance Futures", "hourly" — never registry ids; raw ids and JSON never reach the user.
 
 ## Compute
 
@@ -54,8 +59,8 @@ What to send, per field:
 | --- | --- |
 | `queries[].metric` | From the user request (`rsi`). Registry ids only — the probe rule in the intro; the full id list is §"Technical indicators". |
 | `queries[].params` | Optional wherever §"Technical indicators" shows numbers: omit them and the documented values apply (`rsi` 14, `macd` 12/26/9, `bb_*` 20/2), filled before validation and echoed back on the value so you can state what was read. A partial object keeps the keys you sent and fills the rest. Send params when the ask means something other than the textbook setting — "RSI 7", "the 50-day SMA" — verbatim, and don't ask just to confirm a default. Three ids document no value and are rejected with `invalid_query` without one: `volume_sma` (`period`), `rolling_high` / `rolling_low` (`bars`). |
-| `selector.symbol` | Required, venue-raw. The coin comes from the user; a bare coin name resolves to its default listing — BTC/ETH/SOL price-class reads = Binance spot (`BTCUSDT`), funding/OI/basis = Binance perps, US equities = the primary listing via `symbol_resolve`. State the resolved listing in one line ("BTC on Binance"). The `symbols` tool enumerates a coin's listings when the wording doesn't fit the defaults. |
-| `selector.exchange` | Required. From the user when named. Canonical IDs via the `exchanges` tool; "Binance Futures" maps to `BINANCE_FUTURES`, "Bybit" to `BYBIT`. Otherwise apply the venue default for the ask (spot `BINANCE` for price-class reads, `BINANCE_FUTURES` for funding/OI/basis) and disclose it in the reply. A read never blocks on a venue question — ask only when the choice commits real money. |
+| `selector.symbol` | Required. Venue-raw (`BTCUSDT`) when `exchange` is named; a bare coin (`BTC`) is enough only when `exchange` is omitted. With `exchange` omitted the tool resolves the coin's default listing itself — spot for price-class reads, the perpetuals book for funding/OI, a US equity on its primary listing — reads it, and echoes it in `selector` and `listing_note`. State that listing in one line, in words. The `symbols` tool enumerates a coin's listings when the wording doesn't fit. |
+| `selector.exchange` | Optional. From the user when named — canonical IDs via the `exchanges` tool; "Binance Futures" maps to `BINANCE_FUTURES`, "Bybit" to `BYBIT` — and never substituted. Otherwise omit it: the tool chooses the default listing and discloses it; a coin listed only on venues without a default is refused as `venue_unresolved`, naming them — relay them and ask. Only `metric_get` (and `signal_create_metric`) resolve an omitted venue; `metric_series`, `metric_screen` and `alert_create` need it named. A `wrun/…` metric needs it named too — its source book is not known before the package resolves, so the omitted form is refused as `venue_unresolved`. A read never blocks on a venue question otherwise — ask only when the choice commits real money. |
 | `selector.interval` | Defaults to `HOUR`. Map a mentioned timeframe to its canonical token — the interval enum is inline in the tool schema; the `enum` tool lists all. |
 | `selector.quote` | Defaults to `USD`. Override only when the user explicitly asks for a quote currency. |
 
@@ -72,13 +77,13 @@ User: **"Give me the 4h MACD for ETH"** → one `metric_get`, three queries:
     { "metric": "macd_signal", "params": { "fast": 12, "slow": 26, "signal": 9 } },
     { "metric": "macd_histogram", "params": { "fast": 12, "slow": 26, "signal": 9 } }
   ],
-  "selector": { "symbol": "ETHUSDT", "exchange": "BINANCE", "interval": "FOUR_HOURS" }
+  "selector": { "symbol": "ETH", "interval": "FOUR_HOURS" }
 }
 ```
 
-(`quote` omitted — the USD default applies; omit `interval` and the HOUR default applies the same way. No venue was named, so the price-class default — Binance spot — applies and is disclosed; had the user said "on Binance Futures", the selector would carry `BINANCE_FUTURES`.)
+(`quote` omitted — the USD default applies; omit `interval` and the HOUR default applies the same way, and the result carries an `interval_note`. No venue was named, so `exchange` is omitted and the result's `listing_note` says which listing was read — relay it in words; had the user said "on Binance Futures", the selector would carry `BINANCE_FUTURES` and the venue-raw symbol verbatim.)
 
-User: **"Is BTC overbought right now? 1-hour."** → `metric_get` rsi(14) on `BTCUSDT`/`BINANCE`/`HOUR`, then compare the value to 70 (overbought) / 30 (oversold) thresholds in your reply — never report a bare number for an overbought/oversold question.
+User: **"Is BTC overbought right now? 1-hour."** → `metric_get` rsi(14) on `BTC`, `HOUR`, no `exchange` (the listing read comes back in words), then compare the value to 70 (overbought) / 30 (oversold) thresholds in your reply — never report a bare number for an overbought/oversold question.
 
 User: **"What's CVD on BTC?"** (proprietary; may or may not be in this build) → `metric_list` filtered to `cvd` first. If empty, tell the user "cvd isn't registered in this build" and stop. If present, use the params the list reports.
 
@@ -243,6 +248,34 @@ A common pattern: read the metric's current value with `metric_get`, then write 
 
 The other two follow-ups a metric answer earns: the chart (a computed indicator can be shown, not just told — the chart indicator tools overlay RSI/EMA/Bollinger on the symbol's chart) and the standing rerun ("same scan daily at 08:00" routes to the schedule tools, never a re-ask).
 
+<!-- AUTO: ARGUMENT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
+
+## Argument contract
+
+What each tool here fills in when a field is omitted — the defaults and omit-rules its schema states on top-level fields and one object level down; prose never restates them.
+
+- `metric_get`
+  - `selector.exchange` — Omit the field and the coin's default listing is used and disclosed on the result; a named venue is never rewritten.
+- `metric_get` · `metric_series`
+  - `selector.interval` — Candle interval token (default HOUR).
+- `metric_series`
+  - `bars` — default 30 — How many most-recent bars to return (1-500, default 30).
+
+<!-- AUTO: END ARGUMENT CONTRACT -->
+
+<!-- AUTO: RESULT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
+
+## Result contract
+
+What a reply must carry from each result-bearing action here; the per-branch guidance itself rides on the tool result.
+
+- `metric_get`
+  - discloses `listing_note` — Present only when the read chose the venue: no `selector.exchange` was named, so the coin's default listing was resolved and is named here in words with its venue symbol. Absent when the caller named the venue.
+  - discloses `interval_note` — Present only when no `selector.interval` was named: hourly bars were read.
+  - on `venue_unresolved` — No default listing could be chosen: relay the venues the message names and ask which one (when it names none, ask the user which venue; when it says the catalog could not be read, the fix is a retry or `om login`, not a venue) — never pick a venue yourself, never swap the coin for another.
+
+<!-- AUTO: END RESULT CONTRACT -->
+
 ## CLI equivalents
 
 The om command forms of these tools — flag syntax, the two --metric forms, and the command-to-action mapping.
@@ -271,7 +304,7 @@ CLI filters are the compact spellings of the same fields: `--filter lt:30`, `--f
 
 <!-- AUTO: COMMAND REFERENCE — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
-- `om metric get` (action: `metric_get`) — Compute one or more named scalar values over the latest candle window for a (symbol, exchange, interval) tuple.
+- `om metric get` (action: `metric_get`) — Compute one or more named scalar values over the latest candle window for a (symbol, exchange?, interval) tuple — omit `exchange` and the coin's default listing is read and echoed back (a `wrun/…` metric needs the venue named).
 - `om metric list` (action: `metric_list`) — List every available scalar metric — name, source data type, and accepted parameter names.
 - `om metric screen` (action: `metric_screen`) — screen a universe of symbols on a single scalar metric (price, delta_pct, volume, funding_rate, open_interest, RSI, MACD, EMA, ATR, etc.).
 - `om metric series` (action: `metric_series`) — Per-bar HISTORY of one scalar metric over the last N bars for a (symbol, exchange, interval) tuple, as [barOpenSec, value] pairs, oldest first, newest = the still-forming bar.

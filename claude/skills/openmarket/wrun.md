@@ -21,7 +21,7 @@ You can build a custom sandboxed indicator from a plain description ("score BTC 
 
 ### Routing
 
-The loop: §"The authoring loop" · what `metadata` must say: §"Metadata dialect" · or declare in the source: §"Code-first indicator authoring" · a fixed reference market on a secondary input: §"Input pins" · one package for any Polymarket market: §"Bindable odds inputs" · looks: §"Chart placement and styling". Consumer tasks stay in the marketplace skill: install `marketplace.md §"Rules"` · mount on a chart, bind, repoint, list, remove `marketplace.md §"WRUN packages"`.
+The loop: §"The authoring loop" · what `metadata` must say: §"Metadata dialect" · or declare in the source: §"Source-declared indicators (code-first)" · a fixed reference market on a secondary input: §"Input pins" · one package for any Polymarket market: §"Bindable odds inputs" · looks: §"Chart placement and styling". Consumer tasks stay in the marketplace skill: install `marketplace.md §"Rules"` · mount on a chart, bind, repoint, list, remove `marketplace.md §"WRUN packages"`.
 
 | Ask | Call | Disclose |
 | --- | --- | --- |
@@ -79,7 +79,7 @@ Keep inputs to the OM-native sources the SDK exposes (ohlcv, funding, open inter
 
 <!-- AUTO: CODE-FIRST AUTHORING - do not edit by hand; source: docs/indicators (snippet: code-first); regenerate with `bun packages/cli/scripts/gen-indicator-docs.ts` -->
 
-## Code-first indicator authoring
+## Source-declared indicators (code-first)
 Declarations in the source, sheet derived at build: the grammar, the refusals, and the wrun-2 notes; read before editing a workspace whose sheet says `generated_from`.
 
 How this mode enters the agent loop, beside (never instead of) the metadata-first loop above:
@@ -109,15 +109,27 @@ grammar is static and literal-only:
 - `param(name, default, options?)` with options `required`, `min`, `max`,
   `description`.
 - `input(name, source.field, options?)` with options `exchange`, `symbol`,
-  `interval`, `outcome`, `binding`, `tenor`, `side`, `token`, `description`.
+  `interval`, `outcome`, `binding`, `tenor`, `side`, `token`, `missing`
+  (`"carry"`, `"nan"`, or `"zero"`; on the first input `"nan"`/`"zero"`
+  densify the request grid), `description`.
   Sources are bare member references from `./sdk/declare`: `ohlcv`, `trades`,
   `funding`, `oi`, `liquidations`, `implied_volatility`, `skew`,
   `token_supply`, `odds`, `time` (metric composition inputs stay
   metadata-first and are refused by name).
 - `output(name, plot?, panel?, options?)` with plots `line`, `bar`, `area`,
   `histogram`, `candle`, `shape`, `scatter`, `none` (data-only), panels
-  `overlay`, `lower`, and options `description`, `unit`, `color`, `width`,
-  `opacity`, `line_style`, `color_by`, `shape_where`.
+  `overlay`, `lower`, and options `description`, `unit`, `color`, `colors`
+  (the color_by palette, an array of string literals), `width`, `opacity`,
+  `line_style`, `color_by`, `shape_where`, `displacement_bars` (an integer
+  in -500..500; negative literals such as `-26` are fine), `width_by`, and
+  `widths` (the per-bar width ladder, an array of numeric literals;
+  `width_by` and `widths` go together, like `color_by` and `colors`).
+- `range(upper, lower, options?)` declares a sheet-level band between two
+  rendered outputs with options `color`, `colors`, `color_by`,
+  `edge_width`, `edge_line_style`, `smooth` (presentation-plane like
+  `fills`, and ABI-neutral: declaring one never flips the sheet to
+  wrun-2). Ranges never dedupe: repeat the declaration for several bands,
+  the same pair included (the sheet schema imposes no uniqueness).
 
 The wrun-2 vocabulary has declaration forms too, and deriving a sheet that
 uses any of them stamps `abi_version: "wrun-2"` automatically (scalar-only
@@ -130,11 +142,13 @@ declarations keep deriving wrun-1 sheets):
   `exchange` pin together; `description`. Scalar-feed knobs (`interval`,
   `side`, ...) are refused on celled inputs.
 - String slots: `string(name, { max_bytes, description? })`.
-- Renderers: `render.text(name, { y, text })`, `render.label(name, { x, y,
-  text })`, `render.table(name, { rows, cols, cells, position? })`,
-  `render.shape(name, { output, shape, where? })`, `render.stats_row(name,
-  { output, title?, format?, polarity? })`. Numeric references name declared
-  outputs; `text` and table `cells` name declared string slots.
+- Renderers: `render.text(name, { y, text, color?, size? })`,
+  `render.label(name, { x, y, text, color?, size? })`, `render.table(name,
+  { rows, cols, cells, position? })`, `render.shape(name, { output, shape,
+  where? })`, `render.stats_row(name, { output, title?, format?,
+  polarity? })`, `render.bgcolor(name, { where, color?, color_by?,
+  colors? })`. Numeric references name declared outputs; `text` and table
+  `cells` name declared string slots.
 - Drawings: `draw.line(name, { x1, y1, x2, y2, color?, width?,
   line_style? })`, `draw.box(name, { left, top, right, bottom, color? })`,
   `draw.polyline(name, { points, color?, width?, line_style? })` where
@@ -230,11 +244,22 @@ How outputs draw (`plot`, `panel`, `unit` per output) and the declarative stylin
 
 **Chart styling** is declared in metadata, never computed in the module: outputs are numbers, some numbers are decisions, metadata maps decisions to looks. Vocabulary:
 - Static, on any output: `color`/`colors`, `width`, `opacity`, `line_style`.
-- Per-bar coloring: emit the decision as an ordinary output (e.g. regime 0/1) marked `"plot": ""` (data-only, never drawn), then on the styled output set `color_by: "<that output>"` + a `colors` palette (at least 2 entries); each bar's value indexes the palette, clamped to its bounds.
+- Per-bar coloring: emit the decision as an ordinary output (e.g. regime 0/1) marked `"plot": ""` (data-only, never drawn), then on the styled output set `color_by: "<that output>"` + a `colors` palette (at least 2 entries); each bar's floored value indexes the palette; a missing or out-of-range index falls back to entry 0. An output cannot color itself.
 - Gated markers: a `plot: "shape"` output with `shape_where: "<gate output>"` renders only where the gate is nonzero.
 - Shaded bands: metadata-level `fills: [{ "between": ["upper", "lower"], "color": "#94a3b8", "opacity": 0.15 }]`; both sides must be rendered outputs.
 - User style knobs: a param with `style: { "output": "<name>", "property": "color"|"width"|"opacity"|"lineStyle" }` never reaches the module (no `p_` accessor, its slot stays zero-filled), shows in the settings dialog (color knobs take string defaults like "#22c55e"), and redraws without recompute. Param names are lowercase (`line_color`).
 When the user describes looks ("green when rising, red when falling, shade the band"), emit decision outputs from the module and declare the looks here; `om publish` cross-validates every reference and names the broken field on mistakes.
+
+<!-- AUTO: ARGUMENT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
+
+## Argument contract
+
+What each tool here fills in when a field is omitted — the defaults and omit-rules its schema states on top-level fields and one object level down; prose never restates them.
+
+- `wrun_create`
+  - `dir` — Defaults to the package short name.
+
+<!-- AUTO: END ARGUMENT CONTRACT -->
 
 ## CLI equivalents
 The shell forms of the authoring loop — `om wrun create` scaffolds a workspace on disk, `om wrun build --install` compiles and installs it — and the command-to-action mapping.

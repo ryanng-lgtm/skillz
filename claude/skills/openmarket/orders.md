@@ -344,6 +344,8 @@ Do not tail with "want me to place another?" or any follow-up question unless th
 
 Use `om order cancel <oid>` or `om order cancel-cloid <cloid>`. The resting-order lookup searches every dex and routes the cancel to the dex it finds the order on, so an order resting on a HIP-3 market cancels by its id alone, and one unreachable dex does not block a cancel for an order found elsewhere. `--dex <name>` scopes the search to that one dex, `--dex canonical` to the canonical one. `--asset` skips the lookup altogether and routes on the name given, so a dex-qualified `--asset xyz:TSLA` goes to `xyz` on its own. A cloid matches by hex value, so the casing it is typed in does not matter. When a scope the search needed could not be read, the message names it: on `cancel` and `cancel-cloid` the way past it is `--asset`, which reaches the order without the search at all, while `modify` and `batch-modify` reach an order only through the search, so their recovery is retrying once that scope answers. If the id matches an execution receipt, the receipt's venue controls routing. Hyperliquid can cancel by numeric oid or cloid; Polymarket cancels by the stored CLOB order id. If a Polymarket receipt has no CLOB order id because the SDK response was dropped or the pinned SDK did not return one, the CLI will say clientOrderId cancellation is unavailable; ask the user for the CLOB order id from `om polymarket-account orders` and cancel by that id.
 
+Several orders = ONE call, one card: `order_cancel` takes `ids` (order ids as strings) with one `venue` (`om order cancel <oid...>`); the card lists every member (asset, side, size, price), a reduce-only member or one with no local receipt is named on the card and holds it off auto mode, Hyperliquid members go through one signed batch cancel per DEX, Polymarket members loop the single cancel, and a mixed-venue set refuses before any write. `order_twap_cancel` takes `ids` (up to 25, one venue and one asset per call, `om order twap-cancel <id...>`); a TWAP already finished comes back as an unchanged row. Never loop single-id cancels for a set: that raises one card per order.
+
 For a recurring auto-execute alert the user wants to stop submitting, use `om alert pause <id>` or `om alert remove <id>`. That's the alerts skill, not this one. If the user says "cancel my order", clarify whether they mean a resting venue order or the alert that may submit more.
 
 ## Workflow when a user wants to inspect what landed
@@ -430,14 +432,14 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om hyperliquid twap-history` (action: `hyperliquid_twap_history`) — Past TWAP orders on the paired account (active, finished, terminated, or errored).
 
 - `om order batch-modify` (action: `order_batch_modify`) — Modify N resting Hyperliquid orders in one signed action per perp DEX.
-- `om order cancel` (action: `order_cancel`) — Cancel a resting order by order id.
+- `om order cancel` (action: `order_cancel`) — Cancel resting orders by order id: `oid` for one, or `ids` for several in ONE call (one approval card covers the set; never a loop of single calls).
 - `om order cancel-cloid` (action: `order_cancel_cloid`) — Cancel a resting order by execution cloid.
 - `om order modify` (action: `order_modify`) — Change the limit price and/or base-asset size of a resting Hyperliquid order.
 - `om order place` (action: `order_place`) — Submit a Hyperliquid order through the full execution pipeline (cap-check, daily ceiling, vault unlock, signing, receipt, reconciler-replayable cloid).
 - `om order place` (action: `order_place_polymarket`) — Submit a Polymarket CLOB order through the full execution pipeline (cap-check, daily ceiling, vault unlock, signing, receipt, reconciler-replayable cloid).
 - `om order schedule-cancel` (action: `order_schedule_cancel`) — HL dead-man's switch: schedule all open orders to auto-cancel at a future time, or clear an existing schedule.
 - `om order twap` (action: `order_twap`) — Place a native Hyperliquid TWAP order.
-- `om order twap-cancel` (action: `order_twap_cancel`) — Cancel a running TWAP order by its twapId.
+- `om order twap-cancel` (action: `order_twap_cancel`) — Cancel running TWAP orders: `twapId` for one, or `ids` for several on the same asset in ONE call (at most 25; one approval card covers the set, never a loop of single calls).
 
 - `om polymarket-account balance` (action: `polymarket_balance`) — Read the paired Polymarket CLOB account's pUSD balance, collateral allowance posture, total notional resting in open orders, and current position value.
 - `om polymarket-account fills` (action: `polymarket_fills`) — Recent Polymarket CLOB trades for the paired account.

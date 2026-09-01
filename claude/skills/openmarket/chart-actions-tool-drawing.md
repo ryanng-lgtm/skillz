@@ -15,8 +15,17 @@ inspect, and remove chart drawings on a workspace. For bridge health, workspace
 state, chart symbol/interval/layout, and indicators, see `chart-actions.md`.
 
 `drawing add` and `drawing remove` call the daemon but fall back to direct gateway REST
-when it is down (`drawing auto` needs the running daemon; `drawing schema` is local). The
-mutating verbs target a pane via `workspaceId` plus `chartIndex` (chart 0 is the primary pane).
+when it is down (`drawing auto` needs the running daemon; `drawing schema` is local).
+
+Every drawing tool in the chart's Super Search palette is on the wire — lines, shapes/ranges, fibonacci, arrows, markers, positions, and annotations. Use the tool name as it appears in Super Search (e.g. `TrendLine`, `FibonacciRetracement`, `Rectangle`). On the chart, both `auto` and `add` render the same way: a ghost cursor opens **Super Search**, types the tool name, arrows to the tool row, and draws at the anchors.
+
+### Guardrails
+
+The mutating verbs target a pane via `workspaceId` plus `chartIndex` (chart 0 is the primary pane).
+
+**Prefer `chart_drawing_auto`.** It fetches recent candles and computes trader-meaningful anchors (swing highs/lows) itself, so you pick the symbol/interval — not raw coordinates. Reach for `chart_drawing_add` only when the user named exact price/time levels (e.g. "draw a fib from 90k to 100k").
+
+### Routing
 
 | Command | Wire action | Requires daemon |
 | --- | --- | --- |
@@ -25,10 +34,6 @@ mutating verbs target a pane via `workspaceId` plus `chartIndex` (chart 0 is the
 | `chart_drawing_schema` (`om chart drawing schema`) | (local, read-only) | no |
 | `chart_drawing_remove` (`om chart drawing remove`) | `remove_drawing` | falls back to gateway REST when down |
 | `chart_drawing_list` (`om chart drawing list`) | (live session read) | yes |
-
-Every drawing tool in the chart's Super Search palette is on the wire — lines, shapes/ranges, fibonacci, arrows, markers, positions, and annotations. Use the tool name as it appears in Super Search (e.g. `TrendLine`, `FibonacciRetracement`, `Rectangle`). On the chart, both `auto` and `add` render the same way: a ghost cursor opens **Super Search**, types the tool name, arrows to the tool row, and draws at the anchors.
-
-**Prefer `chart_drawing_auto`.** It fetches recent candles and computes trader-meaningful anchors (swing highs/lows) itself, so you pick the symbol/interval — not raw coordinates. Reach for `chart_drawing_add` only when the user named exact price/time levels (e.g. "draw a fib from 90k to 100k").
 
 ## `chart_drawing_auto` — anchors computed from market data (preferred)
 
@@ -92,6 +97,8 @@ Remove by `drawingId` — ids read from a workspace refresh, strict `overlayType
 Read the `drawingId` from `chart_drawing_list` — it lists every observed drawing with the handle this verb needs (a `chart_refresh` snapshot also shows overlay ids with `overlayType: "tool"`).
 
 The server filters strictly on `overlayType === 'tool'` so an indicator sharing the id is preserved. A `VALIDATION` error fires if the id isn't found.
+
+Several drawings = ONE call with `ids` (`om chart drawing remove --id a --id b`): one card lists every member, the drawing list is read once for the whole set, and each member rides its own bridge intent, so a member that fails never voids the others.
 
 Successful JSON output mirrors `chart_indicator_add`:
 
@@ -169,14 +176,43 @@ om chart drawing schema LongPosition --format text
 date -u -j -f '%Y-%m-%d %H:%M:%S' '2026-05-15 00:00:00' +%s
 ```
 
+<!-- AUTO: ARGUMENT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
+
+## Argument contract
+
+What each tool here fills in when a field is omitted — the defaults and omit-rules its schema states on top-level fields and one object level down; prose never restates them.
+
+- `chart_drawing_add` · `chart_drawing_auto` · `chart_drawing_list` · `chart_drawing_remove`
+  - `workspaceId` — OMIT to act on the user's ACTIVE workspace (the daemon resolves it live); omitting is the default and the correct call for 'my chart' / 'this workspace'.
+- `chart_drawing_add` · `chart_drawing_auto`
+  - `chartIndex` — default 0
+  - `metaId` — default "main"
+- `chart_drawing_auto`
+  - `normalizedSymbol` — Supply ONE of the three symbol forms, or omit all to use the chart pane's current market.
+  - `lookback` — default "24h"
+- `chart_drawing_list`
+  - `includeRemoved` — default false
+
+<!-- AUTO: END ARGUMENT CONTRACT -->
+
 <!-- AUTO: RESULT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
 ## Result contract
 
 What a reply must carry from each result-bearing action here; the per-branch guidance itself rides on the tool result.
 
+- `chart_drawing_add`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+- `chart_drawing_auto`
+  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_drawing_remove`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
+  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 
 <!-- AUTO: END RESULT CONTRACT -->
 
@@ -189,7 +225,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart drawing add` (action: `chart_drawing_add`) — Draw ANY chart tool at anchors you already know (the user named exact price/time levels, or you computed them).
 - `om chart drawing auto` (action: `chart_drawing_auto`) — Draw a chart tool (trend/ray/parallel lines, rectangle/ellipse, fibonacci retracement & trend, arrows like Momentum/Flow, markers, price/date ranges, long/short positions, and annotations) with trader-meaningful anchors computed from recent candles (swing highs/lows).
 - `om chart drawing list` (action: `chart_drawing_list`) — List the drawings on the live chart with their `drawingId` (the handle `chart_drawing_remove` needs), tool, anchors, and author (`self`, `peer` with its id, `human`, or `unknown` when this daemon never observed the add) plus the author's stated reason.
-- `om chart drawing remove` (action: `chart_drawing_remove`) — Remove a drawing tool from a chart pane by id.
+- `om chart drawing remove` (action: `chart_drawing_remove`) — Remove drawing tools from a chart pane by id: `drawingId` for one, or `ids` for several on the same pane in ONE call (one approval card covers the set; never a loop of single calls).
 - `om chart drawing schema` (action: `chart_drawing_schema`) — Show a drawing tool's anchor schema: the role names (in wire order), how many anchors it needs, whether the role repeats, and whether it takes author text.
 
 <!-- AUTO: END COMMAND REFERENCE -->

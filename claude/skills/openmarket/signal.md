@@ -12,6 +12,8 @@ allowed-tools:
 
 A signal is a **pure producer** — it never trades, reads no account, and touches no venue; how a view becomes a position (flip thresholds, neutral/reversal policy, capital) is **strategy** configuration, not signal configuration. Load the strategy skill via `skill_read`.
 
+### Guardrails
+
 ⚠️ **A text signal only classifies events accepted AFTER the strategy was last enabled.** There is no backlog pickup on arm: events that landed while the strategy was paused are never classified (cutoff detail: §"`text_long_short` — an LLM over an event-watch").
 
 ⚠️ **Not-ready data is an ABSTAIN, not a flat.** When the verdict depends on data that is not ready, the signal emits conviction **0** — the strategy reads *"I have no view"* and **holds** its current exposure. It never flattens on missing data.
@@ -26,13 +28,15 @@ A signal is a **pure producer** — it never trades, reads no account, and touch
 
 **Author only what was asked.** A signal ask creates a signal and nothing else — never an unrequested strategy, alert, or order (the user consented to one object). Offer the strategy wiring as a next step; do not build it.
 
+### Routing
+
 Routing between the create tools follows the rule's nature, not its vocabulary: market words alone never make a metric signal — a thesis ABOUT a market judged from streamed text is still `text_long_short`; the metric kinds apply only where a deterministic computation decides. Per-kind neutral semantics drive different strategy-side defaults (hold-through-neutral for text, flatten for metric — the strategy skill via `skill_read`). On a Polymarket-pinned strategy the topic pairs with `--long-outcome`: the long/short inversion is encoded in exactly ONE of the two, never both (the axis rule rides the strategy skill's intro).
 
 Quick routing — one recipe per common ask; disclose every default you assume:
 
 | Ask | Recipe |
 | --- | --- |
-| "signal when RSI < 30 on BTC" | `signal_create_metric` `metric_level_rule`: rsi(14) `lt` 30, `HOUR` unless phrased otherwise, `on_true` from the ask (the false side defaults to neutral — say so); exchange from the user's words, never a default. |
+| "signal when RSI < 30 on BTC" | `signal_create_metric` `metric_level_rule`: rsi(14) `lt` 30, `HOUR` unless phrased otherwise, `on_true` from the ask (the false side defaults to neutral — say so); `exchange` only when the user named a venue — omitted, the create stamps the coin's default listing and the result's `listing_note` says which, in words; a named venue is never substituted. |
 | "golden cross" | level rule sma(50) `gt` sma(200), `DAY`, `on_true` 1 (bull) + `on_false` -1 (bear) — two-sided. |
 | "enter above X, exit below Y" / a band | `metric_band_rule`: per-side enter+exit trees; omit an unused side — never fabricate a guard. |
 | "watch <news>, go long/short" | `signal_create_text` over an EXISTING event-watch (none → the event-watches skill via `skill_read`); the topic is the whole LONG/SHORT policy; context defaults on — disclose. |
@@ -72,7 +76,7 @@ A metric condition over one market selector → a direction at **conviction 1.0*
 
 A compound condition abstains only when the missing leg could change the answer: `any(true, not-ready)` fires and `all(false, not-ready)` settles false (the outcome is the same for every value the blind leg could have taken, and the rationale names it inline), while `all(true, not-ready)` and `any(false, not-ready)` genuinely hang on the missing leg and abstain. That is a different thing from an acting neutral (below), which conviction 1.0 makes a deliberate instruction.
 
-- **Selector** — `symbol` + `exchange` + `interval` (+ `quote`).
+- **Selector** — `symbol` + `interval` (+ `quote`), and `exchange` when the user named a venue. Omitted, the create (like `metric_get`, and unlike `alert_create`, `metric_series` or `metric_screen`, which need the venue named) resolves the coin's default listing — spot for a price-class rule, the perpetuals book when an operand reads funding or open interest — stamps venue and venue symbol on the saved spec, and discloses them as `listing_note`; a named venue is never rewritten. A `wrun/…` operand on the shared selector is the exception: name the venue, its source book is not known before the package resolves (omitted → `venue_unresolved`).
 - **Comparison** — `metric`+`period` vs a `threshold` (metric-vs-value: RSI < 30) or vs a second metric (`compare_metric`+`compare_period`, metric-vs-metric: golden cross). `signal_create_metric` also accepts an explicit `condition` tree (`{all:[…]}`, `{any:[…]}`, `{not:{…}}`, arithmetic value expressions) for compound and multi-param-indicator rules the shorthand fields can't express — multi-param indicators (`macd`, `bb_*`, `stoch_*`) go through an explicit `params` object. (The CLI's `--metric` flag accepts a narrower subset: §"CLI equivalents".)
 - **Don't use `eq` against a computed metric.** All the comparison operators (`gt`/`gte`/`lt`/`lte`/`eq`) test the exact computed float with no tolerance, and `eq` in particular is a bare IEEE `===` — so `eq` on a continuously-valued indicator — RSI, SMA, EMA, ATR, a delta, price — effectively **never fires**: a computed float almost never lands on the exact bit-pattern you name. Express "around this level" as a **banded condition** instead — a `gte`/`lte` window (e.g. `rsi gte 49 AND rsi lte 51`), or a `metric_band_rule` with enter/exit thresholds. `eq` is only sound against a genuinely discrete value.
 - **`on_true` / `on_false`** — direction mapping for the condition's truth. **`on_false` defaults to neutral**, which makes the rule *one-sided*: `on_true: 1` (bull) with the default emits only `bull` or `neutral`, **never `bear`**. That is usually what you want ("long *while* oversold, flat otherwise") — but it means the rule can never emit an opposing view, so pairing it with a sizer stance that holds through a neutral produces a strategy that can never exit. `strategy_create` warns; see the strategy skill (`skill_read`). For a two-sided rule (a golden/death cross) set `on_false: -1` (bear) explicitly. And note **a metric rule's neutral IS its exit instruction** — "the condition I entered on is no longer true" — which is why a strategy defaults to `on_neutral: flatten` behind a metric signal, the opposite of the text lane.
@@ -101,8 +105,8 @@ What `create` will refuse you for. Everything else is optional.
 | Kind | Required |
 | --- | --- |
 | `text_long_short` | `event_watch` + `topic` |
-| `metric_level_rule` | the selector's `symbol` + `exchange`, plus `on_true` and **either** a `condition` tree **or** `left` + `op` + `right` (the flat `metric`/`threshold`/`compare_metric` shorthands are edit and CLI forms) |
-| `metric_band_rule` | the selector's `symbol` + `exchange`, plus at least one full side — `long` and/or `short`, each `enter`+`exit` together (omit a side entirely to never trade that direction) |
+| `metric_level_rule` | the selector's `symbol` (`exchange` only when a venue was named), plus `on_true` and **either** a `condition` tree **or** `left` + `op` + `right` (the flat `metric`/`threshold`/`compare_metric` shorthands are edit and CLI forms) |
+| `metric_band_rule` | the selector's `symbol` (`exchange` only when a venue was named), plus at least one full side — `long` and/or `short`, each `enter`+`exit` together (omit a side entirely to never trade that direction) |
 
 The tools are kind-split: `signal_create_text` is always `text_long_short`; `signal_create_metric` requires `kind` (the CLI's `--kind` defaults to `text_long_short`). **`kind` and `slug` are immutable** — `edit` cannot change either; remove and recreate.
 
@@ -111,6 +115,8 @@ The tools are kind-split: `signal_create_text` is always `text_long_short`; `sig
 The lifecycle verbs — list, show, create, edit, pause, resume, remove — with the removal confirm and the identity guard on edits.
 
 `signal_list` enumerates every signal with its kind and enabled state; `signal_show` prints the full resolved spec plus the strategies that reference it. The create tools author one and `signal_edit` tunes it (subject to the identity guard above). `signal_pause` stops evaluating it, `signal_resume` starts again, and `signal_remove` deletes it (refused while a strategy references it, unless `force` is passed — typed `signal_has_consumers`; §"Errors"). The delete is permanent, so it confirms first — the tool call raises an approval card, the terminal form prompts, and `--yes` is the scripted bypass.
+
+Several signals = ONE call: `signal_remove` / `signal_pause` / `signal_resume` take `ids` (id-or-slug, resolved slug-first) beside `id_or_slug` (`om signal remove <id> <id>`, `om signal pause <id> <id>`); one card lists every member (a remove names each member's consuming strategies; two ids that address the same signal refuse as `invalid_input`), ids that do not exist are skipped rows, and a batch pause in auto mode prints one receipt block with one `signal_resume` undo. Never loop single-id calls for a set: that raises one card per signal.
 
 ## Tool-call hygiene
 
@@ -130,16 +136,16 @@ signal_create_text {"event_watch": "fed-watch", "slug": "fed-cut-view",
   "context": {"recent_events": 10}}
 ```
 
-Deterministic RSI level rule, evaluated on bar close (`on_true`/`on_false` are numeric: +1 bull, -1 bear, 0 neutral; the unset false side stays neutral — one-sided):
+Deterministic RSI level rule, evaluated on bar close (`on_true`/`on_false` are numeric: +1 bull, -1 bear, 0 neutral; the unset false side stays neutral — one-sided). No venue was named, so `exchange` is omitted: the create stamps the coin's default listing and the result's `listing_note` says which — relay it in words:
 
 ```json
 signal_create_metric {"kind": "metric_level_rule", "slug": "sig-rsi-oversold",
-  "selector": {"symbol": "BTCUSDT", "exchange": "BINANCE_FUTURES", "interval": "HOUR"},
+  "selector": {"symbol": "BTC", "interval": "HOUR"},
   "left": {"metric": "rsi", "params": {"period": 14}}, "op": "lt", "right": {"value": 30},
   "on_true": 1}
 ```
 
-Short-only hysteresis band (no long side at all — never fabricate one):
+Short-only hysteresis band (no long side at all — never fabricate one); here the user named the venue, so the selector carries it verbatim:
 
 ```json
 signal_create_metric {"kind": "metric_band_rule", "slug": "sig-rsi-short-band",
@@ -187,6 +193,35 @@ Sections above may *name* a code; this glossary defines them. A result-interpret
 
 **Approval card:** `signal_remove` raises the card (the delete is permanent). A declined card is the user's no — never retry it or route around it.
 
+<!-- AUTO: ARGUMENT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
+
+## Argument contract
+
+What each tool here fills in when a field is omitted — the defaults and omit-rules its schema states on top-level fields and one object level down; prose never restates them.
+
+- `signal_create_metric`
+  - `selector.exchange` — Omit the field and the coin's default listing is used and disclosed on the result; a named venue is never rewritten.
+  - `condition` — Metric operands inherit the signal's shared selector by default; an operand MAY carry its own selector to read a DIFFERENT market (cross-market condition).
+  - `on_false` — Direction otherwise (metric_level_rule); default 0 neutral.
+  - `eval` — Evaluation cadence for metric signal kinds: bar (once per bar, default) | tick (every daemon tick, act on direction/regime change).
+  - `long` — Omit the side entirely for a short-only band (never fabricate a can't-fire guard); at least one side is required.
+  - `short` — Omit the side entirely for a long-only band; at least one side is required.
+- `signal_create_metric` · `signal_edit`
+  - `selector.displayName` — Cosmetic only: the fetch is by `symbol`, and an absent label falls back to it.
+- `signal_create_text`
+  - `context` — Absent ⇒ the CREATE DEFAULT applies ({overview:true, recent_events:5}); pass no_context:true to opt out into isolation.
+  - `context.overview` — default true — Feed the event-watch's synthesized overview.md as context (default on).
+  - `context.recent_events` — default 5 — How many recent accepted events to feed as memory (0..20, default 5; 0 = overview only).
+  - `no_context` — Opt out of the default prior-context memory: the classifier judges each event in isolation.
+- `signal_decisions_list`
+  - `limit` — Maximum rows returned (default 50, newest first).
+- `signal_edit`
+  - `context` — Merges onto the current policy (or defaults if off).
+  - `condition` — Metric operands inherit the signal's shared selector — omitted interval/quote on an operand selector default to HOUR/USD
+  - `threshold` — `delta_pct` is percent points (2 means a 2% move, NOT 0.02) — price-class metrics are in the selector's quote currency, USD by default
+
+<!-- AUTO: END ARGUMENT CONTRACT -->
+
 <!-- AUTO: RESULT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
 ## Result contract
@@ -195,7 +230,11 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 
 - `signal_create_metric`
   - discloses `enabled`
+  - discloses `listing_note` — Present only when the create chose the venue: no `selector.exchange` was named, so the coin's default listing was resolved, stamped on the saved spec, and is named here in words with its venue symbol. Absent when the caller named the venue.
+  - discloses `interval_note` — Present only when no `selector.interval` was named: the rule reads hourly bars by default, and this says so in words.
   - discloses `warnings[]` — Advisory notes about the signal just created. SURFACE THESE TO THE USER. Possible notes: an operand reading a perpetuals-only series (funding rate, open interest) on a SPOT venue, which the alert lane refuses outright and this lane saves — it abstains forever until repointed; a cross-market condition naming which operands read a different market series than the shared selector and how they are sampled (bar mode: each at the shared selector's evaluation clock); or a tick-mode selector-bearing condition that will abstain until eval is set to bar or the operand selectors are removed.
+  - on `missing_api_key` — An omitted venue is resolved against the market catalog, which needs the OpenMarket data key: route the user to `om login`, or name `selector.exchange` — a named venue needs no catalog read.
+  - on `venue_unresolved` — No default listing could be chosen: relay the venues the message names and ask which one (when it names none, ask the user which venue; when it says the catalog could not be read, the fix is a retry or `om login`, not a venue) — never pick a venue yourself, never swap the coin for another.
 - `signal_create_text`
   - discloses `enabled`
   - discloses `warnings[]` — Advisory notes about the signal just created. SURFACE THESE TO THE USER. Possible notes: an operand reading a perpetuals-only series (funding rate, open interest) on a SPOT venue, which the alert lane refuses outright and this lane saves — it abstains forever until repointed; a cross-market condition naming which operands read a different market series than the shared selector and how they are sampled (bar mode: each at the shared selector's evaluation clock); or a tick-mode selector-bearing condition that will abstain until eval is set to bar or the operand selectors are removed.
@@ -214,8 +253,8 @@ om signal create --kind text_long_short --event-watch fed-watch \
   --topic "LONG = raises the odds of a cut; SHORT = lowers them; repeats of known news are priced in — NEUTRAL" \
   --context --context-recent-events 10 --slug fed-cut-view
 
-# Deterministic RSI level rule, evaluated on bar close
-om signal create --kind metric_level_rule --symbol BTCUSDT --exchange BINANCE_FUTURES --interval HOUR \
+# Deterministic RSI level rule, evaluated on bar close (no --exchange: the default listing is stamped and disclosed)
+om signal create --kind metric_level_rule --symbol BTC --interval HOUR \
   --metric rsi --period 14 --op lt --threshold 30 --on-true bull --slug sig-rsi-oversold
 
 # Short-only hysteresis band: enter short at RSI>75, cover at RSI<55
@@ -240,9 +279,9 @@ CLI-only limits and spellings: the `--metric` flag accepts only `price`, `delta_
 - `om signal decisions purge` (action: `signal_decisions_purge`) — Permanently invalidate pinned decision-cache verdicts (filter by signal slug, event id, or spec fingerprint; no filter purges the whole cache).
 - `om signal edit` (action: `signal_edit`) — Patch tunable fields of an `om signal` by id or slug.
 - `om signal list` (action: `signal_list`) — List configured `om signal` directional producers (the persisted SignalSpecs).
-- `om signal pause` (action: `signal_pause`) — Disable one `om signal` producer by id or slug (preserves the spec).
-- `om signal remove` (action: `signal_remove`) — Remove one `om signal` producer by id or slug.
-- `om signal resume` (action: `signal_resume`) — Re-enable one paused `om signal` producer by id or slug.
+- `om signal pause` (action: `signal_pause`) — Disable `om signal` producers by id or slug (`id_or_slug` for one, `ids` for several in ONE call; one approval card covers the set).
+- `om signal remove` (action: `signal_remove`) — Remove `om signal` producers by id or slug: `id_or_slug` for one, or `ids` for several in ONE call (one approval card covers the set; never a loop of single calls).
+- `om signal resume` (action: `signal_resume`) — Re-enable paused `om signal` producers by id or slug (`id_or_slug` for one, `ids` for several in ONE call; one approval card covers the set).
 - `om signal show` (action: `signal_show`) — Show one `om signal` producer spec by id or slug, plus the strategies that reference it (its downstream consumers).
 
 <!-- AUTO: END COMMAND REFERENCE -->
