@@ -23,7 +23,7 @@ Event watches are persistent local monitors for non-price event streams. A watch
 - Only pull the journal that is relevant to the user's question. Do not bulk-load every journal into prompt context.
 - An X account is watched keyless through the `x` adapter (`extra.handle`, a 5-minute timeline poll); `om event-watch show` prints its backend coverage, and `Coverage: partial` means silence from it is not evidence of no posts; a `known gap since` note on that line is a window the poller moved past during a flood without reading, which no `om event-watch` verb clears (a backfill that reads it would), so the watch stays incomplete over that window even while its state reads ok. Live X search across X (an xAI credential: SuperGrok / X Premium subscription or API key) stays the escalation beyond one handle's timeline, reached through `web_research`, never by the poller. Create the watch either way; if the result carries `x_search_hint`, relay it once and never nag afterward.
 
-- A watch request names a subject, not a source, and the composer verb owns that shape end to end: `watch_compose` (`om watch <sentence>`) researches the subject's channels, probes and commits the covering set under one group with notify enabled, and orients once in the same reply. Open with the dated read of where the subject stands (what they last said or did, dates kept), then the committed members and delivery state; offer the found-but-unwatched sources as ONE natural sentence the user can answer (could also watch: X, Y; say add them; never auto-commit one, the user confirms and a re-run with `sources` commits it); state every gap plainly. Reach for the individual verbs below only when the user names ONE concrete source or stream ref. "Tell me whenever <subject> posts about <topic>" is the same shape: topic in `intent`, never hand-rolled `event_watch_create`.
+- A watch request names a subject, not a source, and the composer verb owns that shape end to end: `watch_compose` (`om watch <sentence>`) researches the subject's channels, probes and commits the covering set under one group with notify enabled, seeds each new watch with a judged sample of its source's recent items, and orients once in the same reply. Open with the current read (the kept `baseline_items`, dates kept): a first-party section only when verified first-party sources exist, then coverage; name each auto-committed source with its corroboration evidence in one clause; state the filtered count and that saying "show filtered" inspects the held-back items; when `baseline_gap` is set, say plainly that the watches are live but no baseline was stored. Then the committed members and delivery state; offer the found-but-unwatched sources as ONE natural sentence the user can answer (could also watch: X, Y; say add them; an unverified first-party claim stays an offer - the user confirms and a re-run with `sources` commits it); state every gap plainly, and never present the posting sample as a predicted rhythm. Reach for the individual verbs below only when the user names ONE concrete source or stream ref. "Tell me whenever <subject> posts about <topic>" is the same shape: topic in `intent`, never hand-rolled `event_watch_create`.
 
 - A CADENCE BRIEF is not a watch request: "every weekday at 8, tell me only if X said something new" routes to `skill_read("schedules")` and ONE errand with `web_research`, no watches, no composer. The composer answers "watch X for me" (continuous, event-by-event). When composed watches exist only to feed a scheduled digest, pass `notify: false` at compose time so they record silently from birth; never create them noisy and edit them quiet.
 - A request to watch something is an instruction, not a question: run `watch_compose` in the turn it was asked. When an equivalent watch already stands the composer adopts or extends it and says so; never answer a watch request with a status report alone, and never decompose the subject by hand when the composer covers it.
@@ -42,6 +42,8 @@ Event watches are persistent local monitors for non-price event streams. A watch
 List and inspect before acting — `event_watch_list` / `event_watch_show` ahead of any edit, pause, resume, remove, or journal pull.
 
 Call `event_watch_list` for state questions — it answers "what am I watching?" on its own, and an empty list is an answer, not a reason to look elsewhere. In a `system_status` payload the `event_watches.enabled` count is what is still armed to capture, not what is readable, because paused and removed watches keep their journals; check `event_journal_list` before deciding whether a journal is relevant. Reach for `system_status` itself only when the ask is about local setup state beyond the watches.
+
+In the TUI, `/watches` opens the watches panel over these same rows — every watch and composite group with its stored events, coverage and delivery, a field sheet per member, and `p` / `r` / `x` / `s` for pause, resume, remove and share — so name it when the user is already in `om chat` on a terminal. On every other surface the panel does not exist: answer in prose from `event_watch_list` / `event_watch_events`.
 
 Use `om event-watch list --enabled --format json` when the user asks what is currently active. Use `om event-watch show <id-or-slug> --format json` before editing, pausing, resuming, removing, or pulling a journal for a specific watch.
 
@@ -165,7 +167,7 @@ Use `--market <EXCHANGE:SYMBOL>` (repeatable) to tag the watch with related mark
 
 Pause, resume, remove — remove preserves the journal, destroys stored events, backbone, snapshots, shares, and confirms first; alert shadows refuse (`event_watch_alert_managed`).
 
-Every event-watch lifecycle verb below takes `id_or_slug`. Several watches by EXACT id are ONE call: `event_watch_remove` / `event_watch_pause` / `event_watch_resume` take `ids` beside `id_or_slug` and `group` (`om event-watch remove <id> <id>`, `om event-watch pause <id> <id>`); one card lists every member (state, group, `shadow` and `consumers` flags), ids that do not exist are reported as skipped and never dispatched, alert shadows come back as `skipped_unsafe` rows, and a batch resume refuses the whole call over a member with consumers unless the card carried it. Never loop single-id calls for a set: that raises one card per watch.
+Every event-watch lifecycle verb below takes `id_or_slug`. Several watches by EXACT id are ONE call: `event_watch_remove` / `event_watch_pause` / `event_watch_resume` take `ids` beside `id_or_slug` and `group` (`om event-watch remove <id> <id>`, `om event-watch pause <id> <id>`); one card lists every member (state, group, `shadow` and `consumers` flags), and the result is the batch report `{done, unchanged, not_found, failed}`: ids nothing answers for land in `not_found` and are never dispatched, an alert shadow lands in `failed` carrying its `om alert` redirect (`event_watch_alert_managed`), and an unforced remove of a watch with consumers lands in `failed` (`event_watch_has_consumers`) while the rest proceed. No verb here refuses the whole call over one member; a resume whose members feed acting strategies, or whose consumer scan could not finish, instead raises a card that never auto-approves. The `skipped_unsafe` and `skipped_alert_managed` buckets belong to the `group` form. Never loop single-id calls for a set: that raises one card per watch.
 
 - `om event-watch pause <id-or-slug>` disables a watch and keeps its journal.
 - `om event-watch resume <id-or-slug>` re-enables a watch.
@@ -186,6 +188,16 @@ A watch (or alert) shared under a registry address `@scope/name` is a stream: ru
   for after seeing the preview. Never make the first call a live one. Disclose on every live share:
   **lanes are space-scoped** — readable only by members of the author's space. Scope comes from
   `scope` or the `registry_scope` setting (`missing_scope` otherwise).
+- `stream_unshare` (`om unshare <ref>`): stop sharing — closes every open topic the subject stands
+  behind at the relay store (rotated-away topics included; a room lane archives) so followers stop
+  receiving. The journal, local history and published packages are ALL kept, and `om share`
+  re-opens under the next version. Several refs = ONE call with `ids` (`om unshare <ref> <ref>`),
+  one ticket in ask mode listing what each member closes. Works with every sharing flag off:
+  teardown is the safe direction.
+- One gesture: `om share` / `om follow` / `om unshare` cover watches AND alerts. The legacy
+  alert-plane verbs (`alert_share`, `alert_unshare`, `topic_follow`, `topic_unfollow`,
+  `topic_fires`) are DEPRECATED one-release aliases over this merged surface and retire next
+  release; never teach them when the merged verb serves.
 - `stream_follow` (`om follow <address>`): creates a PAUSED accept_all watch fed by the author's
   signed relay postcards (0 LLM calls, execution never); resume it to start folding. `stream_unfollow`
   removes the follow, journal preserved; several follows = ONE call with `ids` (`om unfollow <ref> <ref>`),
@@ -278,8 +290,10 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `name` — Defaults to the watch slug (or a kebab form of the alert label).
   - `version` — Defaults to 0.1.0, or the last shared version with the patch bumped.
   - `history` — Ship the accepted past as history/<member>.jsonl (default true).
+  - `live` — Watches and alerts default to an UNCAPPED relay-store topic whose door is public unless door=knock (a standing live lane keeps its own carrier; schedules use a space channel, members only, cap 100).
   - `door` — Default public.
-  - `carrier` — Default: the stream_lane.default_carrier setting, else room_post.
+  - `carrier` — Default: the stream_lane.default_carrier setting; unset, watches and alerts default to topic and schedules keep room_post.
+  - `retention_seconds` — Live alert shares on the topic carrier only: fire retention at the relay store in seconds, 1h..1y (default 90 days).
 - `watch_compose`
   - `group` — Composite group label for every committed member; defaults to the subject names.
   - `notify` — Whether the created watches ping the channel per live event (default true).
@@ -298,13 +312,13 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om event-journal` — (bespoke; see narrative above)
 - `om event-journal get` (action: `event_journal_get`) — Return one local event journal Markdown file by slug.
 - `om event-journal list` (action: `event_journal_list`) — List local event journals by slug, including the backing watch id/label when a watch spec still exists.
-- `om event-journal search` (action: `event_journal_search`) — Free-text search over the user's WHOLE news/event fire history: accepted stories across all watches and followed feeds (FTS story lines grouped by watch, groups ordered by their top-ranked story, majors first then newest within each; all-time unless `window_hours` narrows it), plus substring matches from the journal Markdown itself (metadata/events/overview), which is what keeps a removed watch's preserved journal and raw-text-only entries reachable.
+- `om event-journal search` (action: `event_journal_search`) — an unattended run and an MCP client get the stored-local halves.
 
 - `om event-watch` — (bespoke; see narrative above)
 - `om event-watch amend` (action: `event_watch_amend`) — Correct an event this watch already streamed over its TOPIC lane.
 - `om event-watch backfill` (action: `event_watch_backfill`) — Run a historical backfill for an existing (live or paused) or newly-created event watch.
 - `om event-watch create` (action: `event_watch_create`) — Create a daemon-owned event watch from a natural-language goal and ONE structured stream reference the user named or a probe verified.
-- `om event-watch edit` (action: `event_watch_edit`) — Update a watch's goal, filters, extra guidance, classifier, notify, overview, related-market tags, or the brief_alert_fires switch.
+- `om event-watch edit` (action: `event_watch_edit`) — Update a watch's goal, filters, extra guidance, classifier, notify, an inbound watch's ingest daily cap, overview, related-market tags, or the brief_alert_fires switch.
 - `om event-watch events` (action: `event_watch_events`) — Query structured SQLite event rows by outcome, time, source, confidence, and notification state.
 - `om event-watch export` (action: `event_watch_export`) — Export one watch's accepted event rows as canonical stream-event lines (JSONL), the shape a shared pack ships as history and `om event push --file` reads back.
 - `om event-watch list` (action: `event_watch_list`) — List configured event watches with their daemon runtime status, optionally only one composite's members (`group: <label>`, exact trimmed case-insensitive match).
@@ -331,6 +345,8 @@ Every `om` command this skill covers, one line each with its action name — che
 
 - `om unfollow` (action: `stream_unfollow`) — Stop following a stream: remove the follow watch (its stored events go with it; the journal is preserved, exactly the event_watch_remove contract) and drop the durable lane cursor so a later re-follow starts clean.
 
-- `om watch` (action: `watch_compose`) — "Watch <subject> for me" as ONE verb: researches where each subject (a person, organization, product, or public issue) publishes and is covered, verifies sources with deterministic probes, creates the grouped event-watch set with notifications enabled, and opens with a dated, sourced read of where the subject stands right now.
+- `om unshare` (action: `stream_unshare`) — Stop sharing a stream: closes EVERY open live-share version and scope the subject stands behind (the current topic and every rotated-away topic at the relay store, or the room lane) so followers stop receiving.
+
+- `om watch` (action: `watch_compose`) — "Watch <subject> for me" as ONE verb: researches where each subject (a person, organization, product, or public issue) publishes and is covered, verifies sources with deterministic probes, creates the grouped event-watch set with notifications enabled, and seeds each new watch with a judged sample of its source's own recent items — the reply's dated 'Current read'.
 
 <!-- AUTO: END COMMAND REFERENCE -->

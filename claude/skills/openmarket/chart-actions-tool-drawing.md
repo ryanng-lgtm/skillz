@@ -225,7 +225,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart drawing add` (action: `chart_drawing_add`) — Draw ANY chart tool at anchors you already know (the user named exact price/time levels, or you computed them).
 - `om chart drawing auto` (action: `chart_drawing_auto`) — Draw a chart tool (trend/ray/parallel lines, rectangle/ellipse, fibonacci retracement & trend, arrows like Momentum/Flow, markers, price/date ranges, long/short positions, and annotations) with trader-meaningful anchors computed from recent candles (swing highs/lows).
 - `om chart drawing list` (action: `chart_drawing_list`) — List the drawings on the live chart with their `drawingId` (the handle `chart_drawing_remove` needs), tool, anchors, and author (`self`, `peer` with its id, `human`, or `unknown` when this daemon never observed the add) plus the author's stated reason.
-- `om chart drawing remove` (action: `chart_drawing_remove`) — Remove drawing tools from a chart pane by id: `drawingId` for one, or `ids` for several on the same pane in ONE call (one approval card covers the set; never a loop of single calls).
+- `om chart drawing remove` (action: `chart_drawing_remove`) — Remove drawing tools from a chart pane by id: `drawingId` for one, or `ids` for several on the same pane in ONE call, never a loop of single calls.
 - `om chart drawing schema` (action: `chart_drawing_schema`) — Show a drawing tool's anchor schema: the role names (in wire order), how many anchors it needs, whether the role repeats, and whether it takes author text.
 
 <!-- AUTO: END COMMAND REFERENCE -->

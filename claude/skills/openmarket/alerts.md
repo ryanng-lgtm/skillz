@@ -312,7 +312,7 @@ Chart (kScript) indicators are alertable on the platform hosted engine, never th
 A CHART indicator (kScript, including marketplace `kscript-indicator` packages) can never be a daemon alert leaf: no kScript engine ships in this binary. It IS alertable on the platform's hosted alerts engine, which watches the chart indicator server-side 24/7, independent of the daemon. Route there the moment the user's ask names a chart indicator or a `@scope/name` kscript package:
 
 - **Arm**: `alert_hosted_create` (CLI `om alert hosted create <script>`), where `<script>` is a platform script id or `@scope/name`. Rule kinds: `script_alert` (the script's own alert() calls, the default when the user just says "alert me on this indicator"), `signal` (a named `alertcondition` in the script), `threshold` (a plotted output vs a value; needs the output index + label).
-- **Manage**: `alert_hosted_list`, `alert_hosted_history`, `alert_hosted_pause` / `alert_hosted_resume`, `alert_hosted_remove` (destructive: confirm first). Several hosted alerts at once are ONE call with `ids` (up to 25 per call; one card lists every member with its status and rule; `om alert hosted pause|resume|rm <id...>`): never loop single-id calls for a set. A platform rate limit stops the remainder as `failed: rate_limited`, never retried; re-run the rest later.
+- **Manage**: `alert_hosted_list`, `alert_hosted_history`, `alert_hosted_pause` / `alert_hosted_resume`, `alert_hosted_remove` (destructive: confirm first). Several hosted alerts at once are ONE call with `ids` (up to 25 per call; `om alert hosted pause|resume|rm <id...>`): never loop single-id calls for a set. Pause and resume follow the writes mode — one ticket in ask mode, one receipt block in auto mode; the remove raises one ticket in every mode, listing every member with its status and rule. A platform rate limit stops the remainder as `failed: rate_limited`, never retried; re-run the rest later.
 - **Delivery is the platform's**: chart toast and email from the verbs here; webhooks are configured in the chart UI's alert settings, never passed through the agent (webhook URLs can embed credentials). Hosted fires do NOT flow through the daemon's channels, and hosted alerts are notification-only, never an `on_fire.execute`.
 - **The split to say out loud**: daemon alerts = price/metrics/WRUN outputs/custom scripts, delivered via `om` channels, executable. Hosted alerts = chart indicators, delivered by the platform, notify-only. Same account, one `om alert hosted list` view of the hosted side.
 - Offer a WRUN port only when the user needs the indicator's VALUE locally (screens, signals, backtests, auto-execution), not as a workaround for alerting, which hosted alerts already cover.
@@ -851,7 +851,7 @@ Three paths, mirroring remove:
 
 - **Path A — explicit id**: *"pause alert 2"* → `alert_pause` `{ "id": "2" }`, report once.
 - **Path B — ambiguous description**: *"pause my BTC alert"* with multiple BTC alerts → `alert_list` with the implied filters, disambiguate via the structured-question tool, then execute.
-- **Path C — everything**: *"pause everything"* → **always** confirm first via structured question (`Yes, pause all N alerts` / `Cancel`). On confirm, call `alert_pause` ONCE with `ids: [...]` (one ticket in ask mode, one receipt block in auto mode; a shell user has `om alert pause <id...>` or `--every-alert`). Report the count. `alert_resume` with `ids` refuses the whole call (`batch_arming_member`) when a member is a script alert or carries an execute block: resume those one at a time so each arming card stands alone.
+- **Path C — everything**: *"pause everything"* → **always** confirm first via structured question (`Yes, pause all N alerts` / `Cancel`). On confirm, call `alert_pause` ONCE with `ids: [...]` (one ticket in ask mode, one receipt block in auto mode; a shell user has `om alert pause <id...>` or `--every-alert`). Report the count. `alert_resume` with `ids` refuses the whole call (`batch_arming_member`) on either of two counts, each named separately in the error: a member that would ARM (a script alert, or one carrying an execute block) — resume those one at a time so each arming card stands alone — and a member this build cannot READ, which no batch can prove toothless: that spec is repaired or removed first, and naming an arming alert instead sends the user after the wrong file.
 
 There is no notion of "resume only the alerts I just paused" — resuming everything resumes every alert in the directory.
 
@@ -1090,7 +1090,18 @@ channels or `on_fire.execute`. Author-side stats are the author's own activity; 
 receipts are relay-stamped and `relay_age` is publisher-claimed — label them that way, never as
 verified reality.
 
-`alert_unshare` (`om alert unshare <id...>`) closes every open topic an alert was shared under; several alerts = ONE call with `ids`, one card listing every member with its topic state (no receipt: the safe-direction stop, `alert_share` re-opens).
+`stream_unshare` (`om unshare <alert-ref>`) is the one teardown gesture: it closes every open
+topic the alert was shared under (followers stop receiving; the journal, local history and
+published packages are all kept); several refs = ONE call with `ids`, one ticket in ask mode
+listing what each member closes and a straight dispatch in auto mode (no receipt either way:
+the safe-direction stop, `om share` re-opens).
+
+ONE gesture for sharing: `om share` / `om follow` / `om unshare` for watches and alerts alike.
+The legacy verbs (`alert_share`, `alert_unshare`, `topic_follow`, `topic_unfollow`,
+`topic_fires`) are DEPRECATED one-release aliases over that merged surface and retire next
+release; only a `door: "private"` alert_share still rides the legacy handler (the merged share
+offers public|knock until the private rung ships). Never teach or reach for a legacy verb when
+the merged one serves.
 
 ## Charts and catalysts
 
@@ -1105,7 +1116,7 @@ Every alert's fires mirror into the event store, so they chart like any news fee
 The chat-output failure modes: infrastructure warnings, second-guessing thresholds, explain-then-ask, chained follow-ups, leaked schema vocabulary, and the enum humanization table.
 
 - **Do not surface infrastructure concerns.** `TELEGRAM_BOT_TOKEN`, `OM_API_KEY` — these are operator responsibilities, configured before you arrived. Do not warn the user about them. If they're missing, the runner errors out clearly *when invoked*; that's the right place to surface it, not before.
-- **Do not second-guess the user's threshold.** If they say "more than 95k," produce `op: gt, value: 95000`. Do not ask "did you mean `lt`?", do not note "BTC is already above that," do not suggest a different value. The user knows what they wrote.
+- **Do not second-guess the user's threshold.** If they say "more than 95k," produce `op: gt, value: 95000` — transcribe the level literally, and never suggest a different value. Direction is the one thing you may question: when the stated value sits far from the current reading (or the condition is already true as written), surface the current value and confirm the direction in one structured question before arming, as the Polymarket create flow's sanity-check step does.
 - **Do not present the command shape before discovery completes.** Showing an `exchange: BINANCE_FUTURES` preview with the value baked in *before* calling `exchanges` / `markets` teaches the user the wrong mental model and biases them toward whatever exchange you guessed.
 - **Do not explain a command and then ask permission to run it.** This is the most common failure mode. Concretely:
 
@@ -1225,7 +1236,7 @@ EOF
 
 The runner validates, generates the `id`, and writes atomically. On success it prints `{ "ok": true, "id": "...", "path": "..." }` with `--format json`. For compound alerts, this is the only path — `om alert import` accepts the full condition tree.
 
-Several alerts in one go: `om alert import` accepts a JSON array (up to 50 specs), and `alert_create` / `alert_import` take `specs: [...]` beside the flat single-spec form. One card lists every member (label, condition, delivery) and the yes covers exactly that set; in auto mode the batch prints one receipt block (`+ created N alerts`, one undo call). A member that would arm (a script condition, an `on_fire.execute` block, an `event` leaf needing followed-fires consent) or that collides on an explicit id refuses the WHOLE call before any write (`batch_arming_member` / `alert_id_taken`, naming the members): arming alerts are created one at a time so each arming card stands alone.
+Several alerts in one go: `om alert import` accepts a JSON array (up to 50 specs), and `alert_create` / `alert_import` take `specs: [...]` beside the flat single-spec form. In ask mode one ticket lists every member with its condition, over one line for how each member's delivery resolves, and the yes covers exactly that set; in auto mode the batch prints one receipt block (`+ created N alerts`, one undo call). A member that would arm (a script condition, an `on_fire.execute` block, an `event` leaf needing followed-fires consent) or that collides on an explicit id refuses the WHOLE call before any write (`batch_arming_member` / `alert_id_taken`, naming the members): arming alerts are created one at a time so each arming card stands alone.
 
 ### From flags (shell shortcut — single-leaf alerts only)
 
@@ -1329,7 +1340,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 What a reply must carry from each result-bearing action here; the per-branch guidance itself rides on the tool result.
 
 - `alert_create`
-  - discloses `routing_note` — Where the alert's fires post, in one sentence, with the command that moves it.
+  - discloses `routing_note` — Where the alert's fires post, in one sentence, with the command that moves it. · Where this set's fires post, in one sentence, with the command that moves them. A channel-less home writes every member as a deliberate mute, so the sentence names `om setup` and the edit that routes one.
   - discloses `condition_text` — The condition the daemon accepted, rendered the way every human surface renders it (`om alert list`, the fire card): metric, operator, threshold, venue and market per leg, compounds joined by AND / OR / NOT, and a script condition as `script: <path>`. A Polymarket leg reads as the venue's own question wherever the selector carries a `displayName` — the create resolves one, so the id's hex spelling is the fallback, not the norm.
   - discloses `readings[]` — Where every metric leg of the accepted condition stands right now — the value in the units the alert compares, and the signed distance to the threshold. This is the arming sentence's material; a leg that could not be read carries `unavailable` with the reason instead of a value, and never blocks the create.
   - discloses `cooldown_note` — How often the armed alert may speak, in one quotable sentence.
@@ -1386,7 +1397,7 @@ What a reply must carry from each result-bearing action here; the per-branch gui
   - on `hosted_alert_refused` — The platform decides entitlement and script visibility: relay its reason as given; do not recast it as a local failure or retry by another route.
   - on `not_logged_in` — The platform rejected the stored key (signed out, revoked or expired): say so and point at `om login` or auth_relogin; nothing on the platform changed.
 - `alert_import`
-  - discloses `routing_note` — Where the alert's fires post, in one sentence, with the command that moves it.
+  - discloses `routing_note` — Where the alert's fires post, in one sentence, with the command that moves it. · Where this set's fires post, in one sentence, with the command that moves them. A channel-less home writes every member as a deliberate mute, so the sentence names `om setup` and the edit that routes one.
   - discloses `venue_note` — Present when the spec's `on_fire.execute` names a venue with no paired account. The alert is written and stays written; each fire records a blocked order and no trade reaches the venue until it is paired, with `om setup <venue>` (or `/setup` in om chat). The note's own wording says which side of `enabled` the alert is on — armed, or waiting to be enabled before any of this happens. Absent on an alert with no execute block, and on one whose execute venue already has an account.
   - discloses `saturation_notice` — Advisory when active script alerts exceed the concurrent script pool.
   - discloses `trust_notice` — The unsandboxed-execution notice, present on a script-condition alert until a human has acknowledged it at an interactive CLI. Relay it to the operator.
@@ -1416,23 +1427,23 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om alert hosted create` (action: `alert_hosted_create`) — Arm an alert on a chart indicator (kScript) on the platform's hosted alerts engine.
 - `om alert hosted history` (action: `alert_hosted_history`) — Fired events from this account's hosted (chart indicator) alerts, newest first.
 - `om alert hosted list` (action: `alert_hosted_list`) — List this account's hosted (chart indicator) alerts with their engine status.
-- `om alert hosted pause` (action: `alert_hosted_pause`) — Pause hosted (chart indicator) alerts: `id` for one, or `ids` for several in ONE call (one approval card covers the set; never a loop of single calls).
-- `om alert hosted resume` (action: `alert_hosted_resume`) — Re-arm paused hosted (chart indicator) alerts on the platform engine: `id` for one, or `ids` for several in ONE call (one approval card covers the set).
-- `om alert hosted rm` (action: `alert_hosted_remove`) — Delete hosted (chart indicator) alerts from the platform engine: `id` for one, or `ids` for several in ONE call (one approval card covers the set; never a loop of single calls).
+- `om alert hosted pause` (action: `alert_hosted_pause`) — Pause hosted (chart indicator) alerts: `id` for one, or `ids` for several in ONE call (one ticket in ask mode, one receipt block in auto; never a loop of single calls).
+- `om alert hosted resume` (action: `alert_hosted_resume`) — Re-arm paused hosted (chart indicator) alerts on the platform engine: `id` for one, or `ids` for several in ONE call (one ticket in ask mode, one receipt block in auto).
+- `om alert hosted rm` (action: `alert_hosted_remove`) — Delete hosted (chart indicator) alerts from the platform engine: `id` for one, or `ids` for several in ONE call (one ticket covers the set, in every mode; never a loop of single calls).
 - `om alert import` (action: `alert_import`) — Create alerts from complete spec objects, typically parsed from a JSON file or another tool's output: one flat spec, or `specs` (1..50 in ONE call; an arming member refuses the whole call).
 - `om alert list` (action: `alert_list`) — List configured alerts, optionally filtered.
 - `om alert pause` (action: `alert_pause`) — Pause alerts by id (`id` for one, `ids` for several in ONE call; one approval card covers the set), or every alert installed from a package (`package: @scope/name[@version]`).
 - `om alert remove` (action: `alert_remove`) — Permanently remove alerts by id: `id` for one, or `ids` for several in ONE call (one approval card covers the set; never a loop of single calls).
 - `om alert resume` (action: `alert_resume`) — Resume paused alerts by id (`id` for one, `ids` for several in ONE call; one approval card covers the set), or arm every alert installed from a package (`package: @scope/name[@version]`; pack alerts install paused).
 - `om alert schema` (action: `alert_schema`) — Return the AlertSpec input schema as JSON Schema (draft 2020-12), suitable for LLM tool-use input_schema.
-- `om alert share` (action: `alert_share`) — Share one of your alerts as a followable topic: enrolls this home's scope signing key, creates the topic at the store, publishes the alert's recipe as an alert-recipe-pack under your scope with the signed proof, and reports the saga state.
+- `om alert share` (action: `alert_share`) — DEPRECATED, retiring next release: use `om share <alert-id>` (stream_share), the one share gesture.
 - `om alert show` — Show one alert by id, whichever kind it is: a metric alert's spec and state, or an event watch (routed by id/slug)
-- `om alert state clear` (action: `alert_state_clear`) — Wipe a custom-script alert's persistent memory: `id` for one, or `ids` for several in ONE call (one approval card covers the set).
+- `om alert state clear` (action: `alert_state_clear`) — Wipe a custom-script alert's persistent memory: `id` for one, or `ids` for several in ONE call (one ticket covers the set, in every mode).
 - `om alert state show` (action: `alert_state_show`) — Return the JSON state blob a custom-script alert last persisted via next_state.
 - `om alert test fire` (action: `alert_test_fire`) — Send a sample fire message to the alert's own routed destinations (its `channels[]`) — the same places a real fire would go, and nowhere else.
-- `om alert unshare` (action: `alert_unshare`) — Stop sharing alerts: `id` for one, or `ids` for several in ONE call (one approval card covers the set).
+- `om alert unshare` (action: `alert_unshare`) — DEPRECATED, retiring next release: use `om unshare <alert-id>` (stream_unshare), the one teardown gesture.
 - `om alert watch` — (bespoke; see narrative above)
 
-- `om fires` (action: `topic_fires`) — Read the verified fires stored for a followed alert topic, newest first.
+- `om fires` (action: `topic_fires`) — DEPRECATED, retiring next release: the follower watch's journal owns this history (om event-watch events / event_journal_get).
 
 <!-- AUTO: END COMMAND REFERENCE -->

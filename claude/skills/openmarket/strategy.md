@@ -52,7 +52,7 @@ The strategy/alert/order boundary: a standing signal-driven position is this ski
 
 What a strategy needs before it runs, and how to route the user to each missing piece; come here when a create or resume names a gap.
 
-A missing feed, LLM key, data API key, wallet or daemon service surfaces as a typed error; confirm it with `system_status` before claiming the gap — never pre-flight unconditionally. The agent can author the specs but **cannot** set secrets or start the daemon — surface what is missing and tell the user the exact command to run:
+A missing feed, LLM key, data API key, wallet or daemon service surfaces as a typed error; confirm it with `system_status` before claiming the gap. The agent can author the specs but **cannot** set secrets or start the daemon — surface what is missing and tell the user the exact command to run:
 
 | Prerequisite | Needed for | If missing, the user runs |
 | --- | --- | --- |
@@ -100,7 +100,7 @@ The rungs — observe, paper, dry_run, live — what each needs and does; strate
 
 Strategies are **daemon-native**. You author durable specs (a signal and a strategy — and, for an event-driven signal, an event-watch), arm them, and the running daemon evaluates every enabled strategy each tick. There is no foreground run command — execution happens only inside `om run` / `om service`. The rungs: `observe` (walletless, never trades), `paper` (walletless simulated account — a persistent book the fills mutate), `dry_run` (reads the real wallet, simulates), `live` (routes through the venue's capped execution path).
 
-**Pairing a wallet is the user's step, and only `dry_run` and `live` need one.** The agent authors specs only — it never sets secrets, never pairs a wallet, never starts the daemon; those steps capture credentials, which are the user's to hold. When the feed, signal credentials, wallet, or daemon are missing for the mode the user asked for, route them to the exact `om setup` / `om config` / `om service install` command; call `system_status` when you are about to claim something is or is not configured — not unconditionally.
+**Pairing a wallet is the user's step, and only `dry_run` and `live` need one.** The agent authors specs only — it never sets secrets, never pairs a wallet, never starts the daemon; those steps capture credentials, which are the user's to hold. When the feed, signal credentials, wallet, or daemon are missing for the mode the user asked for, route them to the exact `om setup` / `om config` / `om service install` command; call `system_status` when you are about to claim something is or is not configured.
 
 | Mode | Wallet | Behavior |
 | --- | --- | --- |
