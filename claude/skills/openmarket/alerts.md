@@ -346,7 +346,7 @@ Alerts may include an `on_fire.execute` block. Its presence is the user's author
 
 When authoring an alert with `on_fire.execute`, if the user has not provided `brackets.stop_loss_px`, ask via the structured-question tool: "Add a stop-loss?" with a recommended yes option. Do not silently add a stop. The executor does not reconcile against pre-existing positions or pending orders; `reduce_only` is the user's tool for close-only intent, and repeated fires can stack exposure unless capped.
 
-**Executing on a stream's fires is an explicit opt-in.** An execute block on an alert whose condition carries an `event` leaf is refused unless `on_fire.allow_followed_fires: true` sits beside it (§"The `event` condition leaf" carries the rule and the risk line). The pairing means an order placed on another daemon's claim: only author it when the user asked for exactly that and heard the risk, and let the approval card's followed-fires line be the consent. From a terminal the same consent is `--allow-followed-fires` on `om alert import` / `om alert edit`, which prints the risk and asks.
+**Executing on a stream's fires is an explicit opt-in.** An execute block on an alert whose condition carries an `event` leaf is refused unless `on_fire.allow_followed_fires: true` sits beside it (§"Condition tree" carries the rule and the risk line under its `event` leaf sub-heading). The pairing means an order placed on another daemon's claim: only author it when the user asked for exactly that and heard the risk, and let the approval card's followed-fires line be the consent. From a terminal the same consent is `--allow-followed-fires` on `om alert import` / `om alert edit`, which prints the risk and asks.
 
 ## Create an alert
 
@@ -799,47 +799,11 @@ Ranking by volume IS the choice: a theme names no single question, so the liquid
 
 **Membership is editable, so joining or leaving is never a reason to delete and recreate.** The user's own `om alert edit <id> --group "US-Iran escalation"` moves an existing alert into a watch and `--clear-group` takes it out (there is no alert-edit tool on this surface — hand them the command); both preserve fire history, and the label rides through a condition edit unchanged, so re-pointing a threshold never quietly drops a leg out of the set. `event_watch_edit {id_or_slug, group}` does the same for a watch — including a feed's — and `group: null` there leaves the composite. Leaving is per leg: the legs that stay keep the watch and its name.
 
-## Remove an alert
+## Lifecycle: pause, resume, remove
 
-Deleting alerts one at a time, several at once (`ids`, one card lists every member), or all at once: alert_remove cards (permanent); report once.
+alert_pause / alert_resume keep fire history, alert_remove deletes it; three paths each, everything-at-once confirms first, pack resume skips arming members as skipped_unsafe.
 
-Three paths depending on how the user phrases it. Pick one — do not narrate the others.
-
-### Path A: user specifies the id directly
-
-> *"Remove alert 2"* → just call `alert_remove` `{ "id": "2" }`.
->
-> Report: *"Removed alert 2."*
->
-> The delete is permanent, so it confirms first — the tool call raises an approval card, the terminal form prompts, and `--yes` is the scripted bypass. `alert_remove` permanently deletes the spec and its recorded fire history; a re-created alert starts with a new id and an empty history, and does not inherit the old one's destinations (restate them). To keep the history, pause instead (§"Pause and resume").
-
-### Path B: user describes the alert ambiguously
-
-> *"Delete my BTC alert"* — when the user has multiple BTC alerts:
->
-> 1. Call `alert_list` **with whatever filters the user implied** — *"my BTC alert"* → `symbols: ["BTCUSDT"]`; *"my disabled alert"* → `enabled: false`; *"my RSI alert"* → `metrics: ["rsi"]`. Filtering server-side is preferred over fetching all and filtering in chat.
-> 2. If anything remains ambiguous after filtering (e.g. label / threshold), narrow further in agent context.
-> 3. If exactly one matches → confirm the spec once via structured question (`Yes, remove it` / `Cancel`), then execute.
-> 4. If multiple match and the user wants one → use the structured-question tool to pick which `id`, then execute. If they want all of them → one `alert_remove` with `ids: [...]`; the card lists every member.
-> 5. If none match → tell the user honestly and offer to show the list.
-
-### Path C: user wants to delete everything
-
-> *"Remove all my alerts"* or *"clear all alerts"*:
->
-> 1. **Always confirm first** via structured question: `Yes, remove all N alerts` / `Cancel`. This is destructive and easy to misinterpret. The count should be in the option text so the user sees what's being deleted.
-> 2. On confirm, call `alert_remove` ONCE with `ids: [...]` from the list: one card lists every member (id, label, delivery, state) and the yes covers exactly that set. Never loop single-id calls for a batch: that raises one card per alert. A shell user has `om alert remove <id...>` or `om alert remove --every-alert`.
->
-> 3. Report the count: *"Removed 3 alerts."*
-
-### Behaviors to follow
-
-- Always confirm a remove-everything via structured question before executing. No exceptions.
-- For single-alert removal, you can skip confirmation when the user *specified the id directly* (Path A). Confirmation is only required when there was ambiguity that the LLM resolved (Path B) or it's destructive en-masse (Path C).
-- Do not pre-list the alerts in chat before removing. The user already knows their alerts (they made them); a confirmation prompt with the matched id is enough context.
-- Report exactly what was removed in one line. Don't tail with "want me to create a new one?" or similar follow-ups.
-
-## Pause and resume
+### Pause and resume
 
 alert_pause / alert_resume preserve fire history; the three paths, pause-everything confirms first, and pack resume skipping scripts and execute blocks as skipped_unsafe.
 
@@ -856,6 +820,46 @@ Three paths, mirroring remove:
 There is no notion of "resume only the alerts I just paused" — resuming everything resumes every alert in the directory.
 
 **Pause and resume are deliberately asymmetric on a recipe pack.** `alert_pause` with `package: "@scope/name[@version]"` takes every descendant of one install. `alert_resume` with `package` skips the descendants that would arm something the user has not re-read: a script condition (the daemon runs script bodies unsandboxed) or an `on_fire.execute` block (arming would auto-place orders). Each one lands in the result's `skipped_unsafe` with its reason (the terminal form prints `SKIPPED <id> (<label>): <reason> — resume it individually after review` and **exits nonzero** when anything was skipped or failed, so a half-armed pack never reads as success in a script). Tell the user which alerts stayed paused and that resuming one by id is the way to arm it after reading it.
+
+### Remove an alert
+
+Deleting alerts one at a time, several at once (`ids`, one card lists every member), or all at once: alert_remove cards (permanent); report once.
+
+Three paths depending on how the user phrases it. Pick one — do not narrate the others.
+
+#### Path A: user specifies the id directly
+
+> *"Remove alert 2"* → just call `alert_remove` `{ "id": "2" }`.
+>
+> Report: *"Removed alert 2."*
+>
+> The delete is permanent, so it confirms first — the tool call raises an approval card, the terminal form prompts, and `--yes` is the scripted bypass. `alert_remove` permanently deletes the spec and its recorded fire history; a re-created alert starts with a new id and an empty history, and does not inherit the old one's destinations (restate them). To keep the history, pause instead (Pause and resume, above).
+
+#### Path B: user describes the alert ambiguously
+
+> *"Delete my BTC alert"* — when the user has multiple BTC alerts:
+>
+> 1. Call `alert_list` **with whatever filters the user implied** — *"my BTC alert"* → `symbols: ["BTCUSDT"]`; *"my disabled alert"* → `enabled: false`; *"my RSI alert"* → `metrics: ["rsi"]`. Filtering server-side is preferred over fetching all and filtering in chat.
+> 2. If anything remains ambiguous after filtering (e.g. label / threshold), narrow further in agent context.
+> 3. If exactly one matches → confirm the spec once via structured question (`Yes, remove it` / `Cancel`), then execute.
+> 4. If multiple match and the user wants one → use the structured-question tool to pick which `id`, then execute. If they want all of them → one `alert_remove` with `ids: [...]`; the card lists every member.
+> 5. If none match → tell the user honestly and offer to show the list.
+
+#### Path C: user wants to delete everything
+
+> *"Remove all my alerts"* or *"clear all alerts"*:
+>
+> 1. **Always confirm first** via structured question: `Yes, remove all N alerts` / `Cancel`. This is destructive and easy to misinterpret. The count should be in the option text so the user sees what's being deleted.
+> 2. On confirm, call `alert_remove` ONCE with `ids: [...]` from the list: one card lists every member (id, label, delivery, state) and the yes covers exactly that set. Never loop single-id calls for a batch: that raises one card per alert. A shell user has `om alert remove <id...>` or `om alert remove --every-alert`.
+>
+> 3. Report the count: *"Removed 3 alerts."*
+
+#### Behaviors to follow
+
+- Always confirm a remove-everything via structured question before executing. No exceptions.
+- For single-alert removal, you can skip confirmation when the user *specified the id directly* (Path A). Confirmation is only required when there was ambiguity that the LLM resolved (Path B) or it's destructive en-masse (Path C).
+- Do not pre-list the alerts in chat before removing. The user already knows their alerts (they made them); a confirmation prompt with the matched id is enough context.
+- Report exactly what was removed in one line. Don't tail with "want me to create a new one?" or similar follow-ups.
 
 ## Edit an alert
 
@@ -903,7 +907,7 @@ Editing an alert: which fields re-arm it (symbol, exchange, metric, interval, pa
    - *Keep the suggested label* (the regenerated one)
    - *Keep the original label* (the pre-edit value)
    - *Write a custom label* (free-form follow-up)
-6. **Hand over.** On `Yes`, give the user the exact command: the flag form for a single-leaf change (`om alert edit 2 --symbol ETHUSDT --value 4500`), or `om alert edit <id> --condition-file -` with the full updated JSON spec written out for them to paste on stdin when the alert is compound or compare. Include the (possibly user-modified) suggested label in the spec's `label` field — the CLI preserves whatever value is sent. Tell them once what to expect, mirroring the command's `rearmed` output: *"That re-arms alert 2 — ETHUSDT > 4500; fire history clears."* (or *"…, fire history preserved."* when nothing data-identity changed).
+6. **Hand over.** On `Yes`, give the user the exact command: the flag form for a single-leaf change (`om alert edit 2 --symbol ETHUSDT --value 4500`), or `om alert edit <id> --condition-file -` with the full updated JSON spec written out for them to paste on stdin when the alert is compound or compare. Include the (possibly user-modified) suggested label in the spec's `label` field — the CLI preserves whatever value is sent. Tell them once what to expect, mirroring the command's `rearmed` output: *"That re-arms alert 2 — ETHUSDT > 4500; fire history clears."* (or *"…, fire history preserved."* when nothing data-identity changed). On a shared alert the command also prints a `Shared:` line (what saving does to followers: a new signed revision with the next fire, or a paused relay until a re-share); relay it verbatim (§"Share a watch or alert as a stream").
 
 **Flag-based editing** works only when the alert's existing condition is a single `MetricLeaf`. For compound or compare alerts, use `--condition-file` — the CLI errors clearly if a leaf-only flag is applied to a tree. `om alert import` is a create, not a replace: an import naming an id an alert already holds is refused, so changing an existing alert goes through `edit` whichever mode you use.
 
@@ -1078,30 +1082,72 @@ An alert that fails 3 consecutive evaluation passes is marked broken, and the ru
 
 **A quota refusal (HTTP 429) is an ACCOUNT condition, never a broken alert.** A rate-limited read does not count toward any alert's failure run and writes no per-alert error row: the alerts whose reads were refused did not evaluate at all, which is a fact about the key, not about the spec. The daemon posts one warning per episode naming the account and `om usage`, the list surface carries an account line above the per-alert disclosures while the last pass saw the account throttled, and runner status carries the same observation as `data_account`. When a user asks why an alert has gone quiet and the account line is present, answer with the quota, not with the alert — `usage` is the surface, and the episode clears itself once ten minutes pass with no refusal. Auth failures (401 / 403) are different and still accumulate the per-alert run.
 
-## Sharing an alert as a stream
+## Share a watch or alert as a stream
 
 `stream_share` publishes an alert's recipe and signed fires under `@scope/name`; followers install paused and never inherit channels or execution.
 
-`stream_share` (`om share <alert-ref>`) packages the alert's recipe plus signed fire history
-under `@scope/name`; dry-run by default, `live: true` mints the relay lane on the alert's shadow
-watch so followers fold new fires live. Disclose on every live share: lanes are space-scoped
-(readable only by the author's space members). Installed alert packs land PAUSED and never carry
-channels or `on_fire.execute`. Author-side stats are the author's own activity; follower-side
-receipts are relay-stamped and `relay_age` is publisher-claimed — label them that way, never as
-verified reality.
+`stream_share` (`om share <alert-ref> --live [--carrier topic] [--door knock]`) packages the
+alert's recipe plus its signed fire history under `@scope/name`; dry-run by default, `live: true`
+mints the relay lane on the alert's shadow watch so followers fold new fires live. Preview first
+(a `dry_run: true` call, relay the card), then the live call the user asked for after seeing it.
+Installed alert packs land PAUSED and never carry channels or `on_fire.execute`. The card's
+honesty line in recipe mode: "Followers receive fires signed by your key. The packaged recipe is
+immutable and inspectable; OpenMarket does not prove you evaluated it." Author-side stats are
+the author's own activity; follower-side receipts are relay-stamped and `relay_age` is
+publisher-claimed: label them that way, never as verified reality.
+
+- **Doors** (`door`, topic carrier only): `public` (anyone subscribes; the author sees counts,
+  never who) or `knock` (each follower asks, the publisher decides, and the admitted accounts are
+  listed to the author). `stream_knocks` (`om knocks [ref]`) lists who is knocking;
+  `stream_knock_resolve` (`om knocks approve|deny|revoke <ref> <user>`) is the decision.
+  Approve answers "Approved: <account> can now complete the follow."; "<account> is now
+  following <label>" arrives only once the audience poll observes the join.
+- **Fires-only** (`share_mode: "fires_only"`; `om share <ref> --live --fires-only
+  --display-name <text> --description <text>`): the pack ships the manifest plus the signed
+  fire history and NO recipe member, so it can be followed but never installed or forked
+  (`alert_pack_fires_only`). Card line: "The recipe is hidden. Followers verify who signed each
+  fire, not the condition you ran. Fire titles, bodies and values are visible." The digest is
+  the author-signed revision ID: an assertion signed by the author, never a verified recipe.
+  `display_name` and `description` never carry the topic id.
+- **Edits announce.** A share minted after the store update (projection `recipe_projection_v2`,
+  the default) never pauses on an edit: the NEXT signed fire carries the new revision and
+  followers are told then; if it never fires again, no notice is sent; the changed fields are
+  not shipped. A share minted before it (`recipe_projection_v1`, the card said "the store update
+  for live edits is pending") pins the recipe: the edit pauses relay until an explicit re-share
+  (`om share <ref> --live --carrier topic`), which mints a new version and tells followers to
+  re-follow. `om alert edit` prints the matching `Shared:` line (`share_note` in JSON); relay it
+  verbatim. A `store_pending` pause means the store does not yet accept the edited recipe:
+  fires queue (50 per share, oldest dropped and counted) until it does or the alert is re-shared.
+- **The sharing pane** in `/alerts`: `s` on an alert opens it (door, share mode, relay state
+  as live | paused: <cause> | closed, active followers with joins and leaves, "N accounts
+  knocking", the receipts line "N active subscriptions acknowledged through fire #S as of <t>
+  (cursors are best-effort)", never "reached N/M"); `k` the roster (knocks, plus subscribers
+  where the door discloses them) with `p` approve / `d` deny and a `y/n` line; `Enter` re-share
+  (a dry-run consent); `x` unshare behind a default-no confirm; `r` re-read; `Esc` back. First
+  paint is local state; a public door shows counts only.
+- **Notifications** default on: knocks as they arrive, follower joins and leaves as one weekly
+  digest (Sunday 09:00 local, "since the previous digest"), milestones at 10/50/100/500 active
+  followers once each, receipts off, revision notices on. The `/setup` panel's SHARING
+  NOTIFICATIONS rows or `om config set sharing.notify.<knocks|followers|milestones|receipts|changes>
+  <on|digest|off>` change them; `off` is a mute (held rows dropped, pending rows cancelled,
+  nothing replays). "Mute knock notifications for alert 3" is the sharing pane's `m` key (no
+  per-alert verb): it lists knocks, followers, milestones and receipts with their effective mode,
+  `Enter` cycles the selected policy (the step into `off` mutes it for that alert only and asks
+  `y/n` first, since a mute drops held and pending notices for good) and `c` returns it to the
+  global key; point the user there. Unmuting replays nothing, but knocks still waiting at the
+  store surface again (the poll re-observes them).
 
 `stream_unshare` (`om unshare <alert-ref>`) is the one teardown gesture: it closes every open
-topic the alert was shared under (followers stop receiving; the journal, local history and
-published packages are all kept); several refs = ONE call with `ids`, one ticket in ask mode
-listing what each member closes and a straight dispatch in auto mode (no receipt either way:
-the safe-direction stop, `om share` re-opens).
+topic the alert was shared under (followers get one closed notice and stop receiving; the
+journal, local history and published packages are all kept); several refs = ONE call with
+`ids`, one ticket in ask mode listing what each member closes and a straight dispatch in auto
+mode (no receipt either way: the safe-direction stop, `om share` re-opens).
 
-ONE gesture for sharing: `om share` / `om follow` / `om unshare` for watches and alerts alike.
-The legacy verbs (`alert_share`, `alert_unshare`, `topic_follow`, `topic_unfollow`,
-`topic_fires`) are DEPRECATED one-release aliases over that merged surface and retire next
-release; only a `door: "private"` alert_share still rides the legacy handler (the merged share
-offers public|knock until the private rung ships). Never teach or reach for a legacy verb when
-the merged one serves.
+ONE gesture for sharing: `om share` / `om follow` / `om unshare` / `om knocks` for watches and
+alerts alike. The legacy verbs (`alert_share`, `alert_unshare`, `topic_follow`,
+`topic_unfollow`, `topic_fires`) are DEPRECATED one-release aliases over that merged surface
+and retire next release; only a `door: "private"` alert_share still rides the legacy handler.
+Never teach or reach for a legacy verb when the merged one serves.
 
 ## Charts and catalysts
 

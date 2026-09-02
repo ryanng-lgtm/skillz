@@ -116,6 +116,8 @@ The lifecycle verbs — list, show, create, edit, pause, resume, remove — with
 
 `signal_list` enumerates every signal with its kind and enabled state; `signal_show` prints the full resolved spec plus the strategies that reference it. The create tools author one and `signal_edit` tunes it (subject to the identity guard above). `signal_pause` stops evaluating it, `signal_resume` starts again, and `signal_remove` deletes it (refused while a strategy references it, unless `force` is passed — typed `signal_has_consumers`; §"Errors"). The delete is permanent, so it confirms first — the tool call raises an approval card, the terminal form prompts, and `--yes` is the scripted bypass.
 
+A thesis a strategy's exit wake wants rewritten arrives as a PROPOSAL, not an edit. `signal_propose_thesis` is the agent-only write half of the loop: it records the rewrite against the signal and changes nothing a strategy evaluates, which is why it is an everyday write rather than a card. The operator answers it — `om signal proposals` lists what is waiting (`--all` includes the applied and dismissed), `om signal apply-proposal <id>` runs the edit behind a confirmation (`--yes` scripts it), and `om signal dismiss-proposal <id>` discards it and leaves the signal reading as it does. A strategy set to `--wake-mode autonomous` skips the queue: its woken turn applies the rewrite to its own signal directly.
+
 Several signals = ONE call: `signal_remove` / `signal_pause` / `signal_resume` take `ids` (id-or-slug, resolved slug-first) beside `id_or_slug` (`om signal remove <id> <id>`, `om signal pause <id> <id>`); one card lists every member (a remove names each member's consuming strategies; two ids that address the same signal refuse as `invalid_input`), ids that do not exist are skipped rows, and a batch pause in auto mode prints one receipt block with one `signal_resume` undo. Never loop single-id calls for a set: that raises one card per signal.
 
 ## Tool-call hygiene
@@ -267,19 +269,22 @@ om signal create --kind metric_band_rule --symbol ETHUSDT --exchange BINANCE_FUT
 om signal edit fed-cut-view --context-recent-events 10 --force
 ```
 
-CLI-only limits and spellings: the `--metric` flag accepts only `price`, `delta_pct`, `delta_abs`, `volume`, `funding_rate`, `open_interest`, `rsi`, `sma`, `ema`, `atr` (plus installed `wrun/...` ids) — `macd`, `bb_*` and `stoch_*` are rejected from the CLI and go through the action's `params` object. There is no `--condition` JSON flag on create, so a cross-market or compound LEVEL rule is action-only (the `signal_edit` action's `condition` field can replace one later — also action-only); the band kind's `--long-enter`/`--long-exit`/`--short-enter`/`--short-exit` JSON flags accept operand selectors directly. Context flags: `--context`, `--context-recent-events <0..20>`, `--no-context-overview`, `--no-context`, `--clear-context` (edit). `--force` is the `force` field; `--yes` scripts the removal confirm.
+CLI-only limits and spellings: the `--metric` flag accepts only `price`, `delta_pct`, `delta_abs`, `volume`, `funding_rate`, `open_interest`, `rsi`, `sma`, `ema`, `atr` (plus installed `wrun/...` ids) — `macd`, `bb_*` and `stoch_*` are rejected from the CLI and go through the action's `params` object. There is no `--condition` JSON flag on create, so a cross-market or compound LEVEL rule is action-only (the `signal_edit` action's `condition` field can replace one later — also action-only); the band kind's `--long-enter`/`--long-exit`/`--short-enter`/`--short-exit` JSON flags accept operand selectors directly. Context flags: `--context`, `--context-recent-events <0..20>`, `--no-context-overview`, `--no-context`, `--clear-context` (edit). `--force` is the `force` field; `--yes` scripts the removal confirm. The proposal verbs are shell-only: `om signal proposals` (`--all`), `om signal apply-proposal <id>` (`--yes` scripts its confirm) and `om signal dismiss-proposal <id>`.
 
 <!-- AUTO: COMMAND REFERENCE — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
 - `om signal` — (bespoke; see narrative above)
+- `om signal apply-proposal` — (bespoke; see narrative above)
 - `om signal create` (action: `signal_create_text`) — Create a text_long_short signal: an LLM classifier over an event-watch's occurrences
 - `om signal create` (action: `signal_create_metric`) — Create a deterministic metric rule signal (metric_level_rule or metric_band_rule)
 - `om signal decisions` — (bespoke; see narrative above)
 - `om signal decisions list` (action: `signal_decisions_list`) — Inspect the durable text_long_short decision cache: the pinned classifier verdicts, newest first.
 - `om signal decisions purge` (action: `signal_decisions_purge`) — Permanently invalidate pinned decision-cache verdicts (filter by signal slug, event id, or spec fingerprint; no filter purges the whole cache).
+- `om signal dismiss-proposal` — (bespoke; see narrative above)
 - `om signal edit` (action: `signal_edit`) — Patch tunable fields of an `om signal` by id or slug.
 - `om signal list` (action: `signal_list`) — List configured `om signal` directional producers (the persisted SignalSpecs).
 - `om signal pause` (action: `signal_pause`) — Disable `om signal` producers by id or slug (`id_or_slug` for one, `ids` for several in ONE call; one approval card covers the set).
+- `om signal proposals` — (bespoke; see narrative above)
 - `om signal remove` (action: `signal_remove`) — Remove `om signal` producers by id or slug: `id_or_slug` for one, or `ids` for several in ONE call (one approval card covers the set; never a loop of single calls).
 - `om signal resume` (action: `signal_resume`) — Re-enable paused `om signal` producers by id or slug (`id_or_slug` for one, `ids` for several in ONE call; one approval card covers the set).
 - `om signal show` (action: `signal_show`) — Show one `om signal` producer spec by id or slug, plus the strategies that reference it (its downstream consumers).

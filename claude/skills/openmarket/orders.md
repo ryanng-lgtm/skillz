@@ -483,7 +483,10 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `order_type` — default "market"
   - `caps.max_fires` — default 1
 - `order_place`
+  - `slippage` — Omit for the venue default (0.05).
   - `reduce_only` — default false
+- `order_place_polymarket`
+  - `worst_price` — Omit for an unbounded market order (any price the book offers).
 - `order_schedule_cancel`
   - `clear` — default false
 - `order_twap` · `order_twap_cancel`

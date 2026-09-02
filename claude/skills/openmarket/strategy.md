@@ -80,6 +80,8 @@ A strategy (`strategy_create`) binds a **referenced** signal + an **optional pin
 
 **Unpinned = research-only, and it is the DEFAULT.** A strategy created without a market is a research object: backtestable against any data asset the plan serves (including series with no execution venue at all, e.g. US equities), listable, editable — and never evaluated by the daemon. The lifecycle is: create unpinned → backtest freely → when the user wants it to RUN, pin a market (`strategy_edit` with `market`; pin-once) → arm. Any explicit run-mode on an unpinned strategy fails typed (`strategy_unpinned`) with that exact recovery in the hint (§"Errors").
 
+**A managed exit can wake the agent.** `wake` on `strategy_create` / `strategy_edit` (`--wake-on-exit`) runs one agent turn once a stop-loss, time-stop, signal close, external close or flip has closed the position; the turn reads the thesis, the strategy's own trading record and its own notes, and answers with a thesis rewrite, a pause, or holding the view. `wake.mode: "propose"` (the default) RECORDS the rewrite — `om signal proposals` lists what is waiting, `om signal apply-proposal <id>` runs the edit behind a confirmation, and `watching_overview` names anything unanswered. `wake.mode: "autonomous"` is standing authority for the woken turn to apply the rewrite to that strategy's own signal, so setting it from chat raises an approval card and over MCP costs an armed window; `clear_wake` removes the block. A strategy's notes live under `<home>/memory/strategy/<id>/`, read with `om memory list --strategy <id>` and reachable from a chat turn through `memory_search`.
+
 ## Wiring each signal kind
 
 Per-kind wiring: topic and context for text_long_short, conditions and eval cadence for metric_level_rule, per-side regimes for metric_band_rule, cross-market operands.
@@ -238,7 +240,7 @@ A `text_long_short` signal reads an event-watch; metric signals read market metr
 
 ### 3. Create the signal
 
-Author it per the signal skill — `skill_read signal`, §"Quick recipes" carries a worked tool call per kind (text over an event-watch; a level rule; a hysteresis band; the identity-guarded edit). Decisions to make here: two-sided rules set `on_false` explicitly (a golden cross's death side); prompt change-driven entries use `eval: tick` with a `cooldown` (entries only — exits stay exempt); multi-param indicators (`macd`, `bb_*`, `stoch_*`) and compound conditions go through an explicit `params` object or `condition` tree. Discover metrics and their params with `metric_list`.
+Author it per the signal skill — `skill_read signal`, signal.md §"Quick recipes" carries a worked tool call per kind (text over an event-watch; a level rule; a hysteresis band; the identity-guarded edit). Decisions to make here: two-sided rules set `on_false` explicitly (a golden cross's death side); prompt change-driven entries use `eval: tick` with a `cooldown` (entries only — exits stay exempt); multi-param indicators (`macd`, `bb_*`, `stoch_*`) and compound conditions go through an explicit `params` object or `condition` tree. Discover metrics and their params with `metric_list`.
 
 ### 4. Create the strategy
 
@@ -332,6 +334,9 @@ Reading what a strategy decided: `strategy_list`, `logs_tail` (service-only), an
 - `strategy_list` — which strategies exist, enabled state, and run_mode.
 - `logs_tail` — the daemon's per-tick `[strategy] …` lines plus a one-line decision summary (view, sized order) per evaluated strategy. This is the primary window into what a strategy decided; it requires the daemon running as a service.
 - `event_watch_events` — what an event-driven signal last saw.
+- `strategy_show` with `live: true` — the venue position beside the exit distances, plus `market_clock` on a Polymarket pin: the CLI renders a `resolves in` countdown row while the market still trades and a `market` row once it has settled.
+- `strategy_history` (`om strategy history`) — the durable event timeline. A row a cached classifier verdict commanded carries `decision_source` (`hit`, `computed`, `coalesced`) in `--format json` and renders as `verdict <source>` in the text table; a row no cached verdict stands behind says nothing about a cache.
+- `om memory list --strategy <id>` — the notes an exit-wake turn wrote for that strategy, kept in its own partition rather than the shared store.
 
 ## Backtesting a strategy
 
@@ -341,7 +346,7 @@ Backtests are the research skill's job: `skill_read research` documents `backtes
 
 - **An unsaved idea backtests via `backtest_spec` with an inline `candidate`** ({strategy, signal?} in the authoring shapes of `strategy_create` and the signal create tools); nothing is persisted, and a winning candidate is creatable verbatim — except a `constant` signal, which is replay-only (the kind is retired from the create surface; re-author it as a metric/text kind to trade the idea).
 - **A registry strategy template is not an inline candidate.** `package_try` — the marketplace funnel's default — backtests the tuned template candidate and mints its install token; `backtest_spec` is only for manual replay knobs on it.
-- **Authoring the candidate's signal spec?** The per-kind condition shapes and worked JSON examples are in `skill_read("signal", section = the kind name)` and its §"Quick recipes" (one worked call per kind).
+- **Authoring the candidate's signal spec?** The per-kind condition shapes and worked JSON examples are in `skill_read("signal", section = the kind name)` and its signal.md §"Quick recipes" (one worked call per kind).
 
 ## Behaviors to follow
 
@@ -421,6 +426,10 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `sizer.leverage` — Strategy leverage for perp venues (Hyperliquid), a number 1..100; omitted = 1x unleveraged.
   - `exit.track_target` — default true — When true (default), a FRESH acting evaluation re-sizes a held position toward its current target, so exposure tracks the view's conviction
   - `entry_freshness` — Omit for the defaults.
+  - `slippage` — A named side states `ticks`, `frac`, or both; omit a side, or the whole block, for the defaults.
+  - `wake` — Omit for no wake.
+  - `wake.on_exit` — default false
+  - `wake.mode` — default "propose"
   - `daemon.mode` — OMIT for the default — paper when a market is pinned, observe when unpinned — and tell the user which mode the strategy landed in; the result's warnings echo a defaulted mode.
   - `notify` — OMIT the field for default-on: create resolves the marked-default or sole configured channel
 - `strategy_create` · `strategy_edit` · `strategy_resume`
@@ -432,6 +441,8 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `entry_drift_frac` — Entry-freshness gate (event-driven text_long_short signals only): new drift bound as a fraction of the stamped reference price (default 0.05, floored at one Polymarket tick).
   - `entry_max_age_secs` — Entry-freshness gate: new cap on how old the arming event may be at any entry attempt, integer SECONDS (default 600).
   - `clear_entry_freshness` — Remove both entry-freshness overrides so the gate falls back to its defaults.
+  - `slippage` — Defaults: entry 2 ticks or 2%, exit 3 ticks or 5%.
+  - `clear_slippage` — Remove the slippage overrides so orders fall back to the default bounds.
 - `strategy_history`
   - `limit` — default 50
 - `strategy_paper_reset`
@@ -501,13 +512,15 @@ om strategy pause my-strategy
 om strategy edit  my-strategy --min-confidence 0.6
 om strategy edit  my-strategy --clear-tp             # --clear-sl / --clear-time-stop likewise
 om strategy edit  my-strategy --apply-to-position --tp 0.1 --sl 0.05   # held position, confirmed
+om strategy edit  my-strategy --tp-price 0.72 --entry-slippage 3t   # absolute level (Polymarket) + a wider entry bound
+om strategy edit  my-strategy --wake-on-exit --wake-mode propose    # record a thesis rewrite when an exit closes the position
 om strategy show  my-strategy
 om strategy remove my-strategy                       # prompts; --yes to script; --force cancels HL children
 om signal pause my-signal ; om signal resume my-signal
 om signal edit my-signal --period 28 ; om signal remove my-signal
 ```
 
-Flag↔field spellings (edit-side names; on `strategy_create` they nest — `daemon.mode`, `sizer.min_confidence`, `exit.bracket.tp`/`sl`, `exit.time_stop.max_hold_secs`, `daemon.paper.starting_cash`/`fee_bps`): `--run-mode` = `run_mode` (the CLI also accepts `dry-run`), `--min-confidence` = `min_confidence`, `--tp`/`--sl`/`--time-stop` = `tp`/`sl`/`time_stop_secs`, `--clear-tp`-family = `clear_tp`/`clear_sl`/`clear_time_stop`, `--apply-to-position` = `apply_to_position`, `--allow-same-market`/`--allow-unverified-cohort`/`--allow-existing-position` = the consent fields, `--paper-cash`/`--paper-fee-bps` = the paper fields, `--yes`/`-y` scripts a confirm, `--force` = `force`. The CLI `create` always pins — `--condition-id` + `--long-outcome` (`--venue` defaults to polymarket), `--venue hyperliquid --coin`, or `--venue market_data --exchange <ID> --symbol <SYM>`; an unpinned research strategy is tool-only (`strategy_create` without `market`), `om strategy edit` has no market flags (pin later with `strategy_edit` `market`), and tool callers state `market.venue` explicitly.
+Flag↔field spellings (edit-side names; on `strategy_create` they nest — `daemon.mode`, `sizer.min_confidence`, `exit.bracket.tp`/`sl`, `exit.time_stop.max_hold_secs`, `daemon.paper.starting_cash`/`fee_bps`): `--run-mode` = `run_mode` (the CLI also accepts `dry-run`), `--min-confidence` = `min_confidence`, `--tp`/`--sl`/`--time-stop` = `tp`/`sl`/`time_stop_secs`, `--clear-tp`-family = `clear_tp`/`clear_sl`/`clear_time_stop`, `--apply-to-position` = `apply_to_position`, `--allow-same-market`/`--allow-unverified-cohort`/`--allow-existing-position` = the consent fields, `--paper-cash`/`--paper-fee-bps` = the paper fields, `--tp-price`/`--sl-price` = `tp_price`/`sl_price` (an absolute venue price in (0,1) of the token the position HOLDS, Polymarket only; it sits beside the fraction form and whichever the price reaches first fires), `--clear-tp-price`/`--clear-sl-price` = `clear_tp_price`/`clear_sl_price` (independent of `clear_tp`/`clear_sl`), `--entry-slippage`/`--exit-slippage` = `slippage.entry`/`slippage.exit` (each takes `ticks` and `frac` — `3t`, `2%`, or both — and the wider binds; defaults entry 2t/2%, exit 3t/5%, and on Hyperliquid only `frac` binds), `--clear-slippage` = `clear_slippage`, `--wake-on-exit`/`--no-wake-on-exit` = `wake.on_exit`, `--wake-mode propose|autonomous` = `wake.mode`, `--clear-wake` = `clear_wake`, `--yes`/`-y` scripts a confirm, `--force` = `force`. The CLI `create` always pins — `--condition-id` + `--long-outcome` (`--venue` defaults to polymarket), `--venue hyperliquid --coin`, or `--venue market_data --exchange <ID> --symbol <SYM>`; an unpinned research strategy is tool-only (`strategy_create` without `market`), `om strategy edit` has no market flags (pin later with `strategy_edit` `market`), and tool callers state `market.venue` explicitly.
 
 <!-- AUTO: COMMAND REFERENCE — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
