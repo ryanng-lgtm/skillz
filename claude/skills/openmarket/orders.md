@@ -481,7 +481,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `dex` — Omit it to search the canonical DEX and every HIP-3 DEX; the replacement order is signed against the DEX the original rests on.
 - `order_place` · `order_place_polymarket`
   - `order_type` — default "market"
-  - `caps.max_fires` — default 1
+  - `caps.max_fires` — default 1 — Omit for one execution (a manual order fires once anyway); RAISE it on a recurring execute alert, or 'recurring' fires once and blocks.
 - `order_place`
   - `slippage` — Omit for the venue default (0.05).
   - `reduce_only` — default false
