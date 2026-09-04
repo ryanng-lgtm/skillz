@@ -1146,10 +1146,10 @@ journal, local history and published packages are all kept); several refs = ONE 
 mode (no receipt either way: the safe-direction stop, `om share` re-opens).
 
 ONE gesture for sharing: `om share` / `om follow` / `om unshare` / `om knocks` for watches and
-alerts alike. The legacy verbs (`alert_share`, `alert_unshare`, `topic_follow`,
-`topic_unfollow`, `topic_fires`) are DEPRECATED one-release aliases over that merged surface
-and retire next release; only a `door: "private"` alert_share still rides the legacy handler.
-Never teach or reach for a legacy verb when the merged one serves.
+alerts alike, doors public|knock|private included (`--door private`: no account follows on its
+own; the publisher grants access at the store). The legacy alert-plane verbs are RETIRED
+tombstones that redirect to the merged surface; `topic_fires` remains the shelf reader. Never
+teach or reach for a retired verb: the merged one serves everything they did.
 
 ## Charts and catalysts
 
@@ -1369,10 +1369,6 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `symbols` — default []
   - `exchanges` — default []
   - `metrics` — default []
-- `alert_share`
-  - `name` — Package short name; defaults to a slug of the alert id.
-  - `version` — Package version (semver); defaults to 0.1.0.
-  - `retention_seconds` — Fire retention at the store in seconds, 1h..1y (default 90 days).
 - `alert_stats`
   - `id` — Scope to one alert id; omit for the whole fleet.
   - `window_days` — Stats window in days: 7 (default) or 30.
@@ -1484,12 +1480,10 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om alert remove` (action: `alert_remove`) — Permanently remove alerts by id: `id` for one, or `ids` for several in ONE call (one approval card covers the set; never a loop of single calls).
 - `om alert resume` (action: `alert_resume`) — Resume paused alerts by id (`id` for one, `ids` for several in ONE call; one approval card covers the set), or arm every alert installed from a package (`package: @scope/name[@version]`; pack alerts install paused).
 - `om alert schema` (action: `alert_schema`) — Return the AlertSpec input schema as JSON Schema (draft 2020-12), suitable for LLM tool-use input_schema.
-- `om alert share` (action: `alert_share`) — DEPRECATED, retiring next release: use `om share <alert-id>` (stream_share), the one share gesture.
 - `om alert show` — Show one alert by id, whichever kind it is: a metric alert's spec and state, or an event watch (routed by id/slug)
 - `om alert state clear` (action: `alert_state_clear`) — Wipe a custom-script alert's persistent memory: `id` for one, or `ids` for several in ONE call (one ticket covers the set, in every mode).
 - `om alert state show` (action: `alert_state_show`) — Return the JSON state blob a custom-script alert last persisted via next_state.
 - `om alert test fire` (action: `alert_test_fire`) — Send a sample fire message to the alert's own routed destinations (its `channels[]`) — the same places a real fire would go, and nowhere else.
-- `om alert unshare` (action: `alert_unshare`) — DEPRECATED, retiring next release: use `om unshare <alert-id>` (stream_unshare), the one teardown gesture.
 - `om alert watch` — (bespoke; see narrative above)
 
 - `om fires` (action: `topic_fires`) — DEPRECATED, retiring next release: the follower watch's journal owns this history (om event-watch events / event_journal_get).

@@ -23,9 +23,10 @@ Event watches are persistent local monitors for non-price event streams. A watch
 - Only pull the journal that is relevant to the user's question. Do not bulk-load every journal into prompt context.
 - An X account is watched keyless through the `x` adapter (`extra.handle`, a 5-minute timeline poll); `om event-watch show` prints its backend coverage, and `Coverage: partial` means silence from it is not evidence of no posts; a `known gap since` note on that line is a window the poller moved past during a flood without reading, which no `om event-watch` verb clears (a backfill that reads it would), so the watch stays incomplete over that window even while its state reads ok. Live X search across X (an xAI credential: SuperGrok / X Premium subscription or API key) stays the escalation beyond one handle's timeline, reached through `web_research`, never by the poller. Create the watch either way; if the result carries `x_search_hint`, relay it once and never nag afterward.
 
-- A watch request names a subject, not a source, and the composer verb owns that shape end to end: `watch_compose` (`om watch <sentence>`) researches the subject's channels, probes and commits the covering set under one group with notify enabled, seeds each new watch with a judged sample of its recent items, and returns the current read the surface prints under the result (§"Watch a subject"). Reach for the individual verbs below only when the user names ONE concrete source or stream ref. "Tell me whenever <subject> posts about <topic>" is the same shape: topic in `intent`, never hand-rolled `event_watch_create`.
+- A watch request names a subject, not a source, and the composer verb owns that shape end to end: `watch_compose` (`om watch <sentence>`) researches the subject's channels, probes and commits the covering set under one group with notify enabled, seeds each new watch with a judged sample of its recent items, and returns the current read the reply narrates day by day, one line per entry with its link (§"Watch a subject"). Reach for the individual verbs below only when the user names ONE concrete source or stream ref. "Tell me whenever <subject> posts about <topic>" is the same shape: topic in `intent`, never hand-rolled `event_watch_create`.
 
 - A CADENCE BRIEF is not a watch request: "every weekday at 8, tell me only if X said something new" routes to `skill_read("schedules")` and ONE errand with `web_research`, no watches, no composer. The composer answers "watch X for me" (continuous, event-by-event). When composed watches exist only to feed a scheduled digest, pass `notify: false` at compose time so they record silently from birth; never create them noisy and edit them quiet.
+- A standing SEARCH leg (web, X on xAI, YouTube via web search) is a paid model request on the user's own AI account at its cadence, and it exists only through the composer's structured `search` block or `event_watch_search_add`, approved on a card that states the calls (never currency); it is never implied by "watch X" (the reply OFFERS it: relay `search_offer` verbatim), never created through `event_watch_create`, and never available over MCP (§"Watch a subject").
 - A request to watch something is an instruction, not a question: run `watch_compose` in the turn it was asked. When an equivalent watch already stands the composer adopts or extends it and says so; never answer a watch request with a status report alone, and never decompose the subject by hand when the composer covers it.
 
 ### Routing
@@ -49,18 +50,20 @@ Use `om event-watch list --enabled --format json` when the user asks what is cur
 
 ## Watch a subject
 
-A subject-shaped ask ("watch X for me", "tell me whenever X posts about Y") is ONE `watch_compose` call (the watch composer) in the turn asked; the surface prints `current_read`.
+A subject-shaped ask ("watch X for me", "tell me whenever X posts about Y") is ONE `watch_compose` call in the turn asked; its `read` IS the reply, a day-by-day journal.
 
-One call does the whole job: research proposes where the subject publishes and is covered (their own feed or site, their X account, plus a locally minted news-search net); every candidate is fetched live; a candidate commits without a card when its probe carries the subject's name, labeled `first_party` (verified: a feed whose fetched domain IS the subject's name, an account that domain's own page links, an X handle independent coverage names) or `first_party_claimed` (the research claim plus a name-consistent probe, nothing more: say "claimed first-party", never "verified"); the last items of each committed source, plus one searched coverage digest (the two weeks' most substantive coverage with real article addresses), are judged by one sealed call acting as the editor of a two-week digest (substantive content only, one gist sentence per kept item); the keepers are seeded as the watch's opening history before the watch goes live; live polling starts after what was already read.
+One call does the whole job: research proposes where the subject publishes and is covered (their own feed or site, their X account, plus a locally minted news-search net); every candidate is fetched live; a candidate commits without a card when its probe carries the subject's name, labeled `first_party` (verified: a feed whose fetched domain IS the subject's name, an account that domain's own page links, an X handle independent coverage names) or `first_party_claimed` (the research claim plus a name-consistent probe, nothing more: say "claimed", never "verified"); the last items of each committed source, plus one searched coverage digest (the two weeks' most substantive coverage with real article addresses), are judged by one sealed call acting as the editor of a two-week digest (substantive content only, one gist sentence per kept item); the keepers are seeded as the watch's opening history before the watch goes live; live polling starts after what was already read. Every created watch is named after its source (the X handle, a feed's channel title, "News coverage" for the minted net), and `read.sources` carries the same names. The read holds the last `read.window_days` days: a source with nothing kept inside the window keeps `items: []` and its `latest`, the date of its newest kept item, so the reply says when it last spoke instead of narrating stale items as news. A coverage row always names its `publisher`, and an aggregator link is decoded to the article's own address when it can be (else `url` is null and the journal keeps the link).
 
-Reply shape, in this order:
+The read IS the reply, in three parts, written in markdown:
 
-1. The `current_read` block is printed under the tool result by the surface on every channel, dates and links intact: never repeat its lines. Open with ONE sentence that reads it (how many items were kept, the newest first-party item). When it reports a baseline gap, the watches are live with no opening history stored; say so plainly.
-2. Each committed source in one clause (a verified first-party one with its `corroboration` evidence), then the delivery state from `notifications`.
-3. ONE offer sentence for found-but-unwatched sources ("could also watch his X account and YouTube; say add them"). A discovered source whose probe carries the subject's name is already committed (verified or claimed); only a claim the probe cannot connect to the name is offered here.
-4. Every entry of `gaps` plainly, and the `posting` sample as what was observed, never as an expected rhythm.
+1. One opening sentence in om's own voice: the subject is now watched for the intent, and the sentence introduces the two weeks the journal covers. No item counts in it, no link, no day line. A `gaps` entry is told plainly in its own sentence right under it.
+2. The journal, newest day first. A bold day line per day that has entries, `**<Mon D>**` (three-letter month and day; `**<Mon D, YYYY>**` when the year is not the current one). Under it one line per entry, newest first: the source as an inline-code tag, two spaces, then ONE sentence; the item's `url` sits on one to three words of that sentence, the key noun phrase (`[<phrase>](url)`), never the whole sentence; no semicolon chains, no second sentence. An own source's tag is its `read.sources[].label`; a coverage entry's tag is its `publisher`, never the coverage source's name; a claimed source's first entry carries the word claimed in plain text after the tag. A blank line between days, none between entries.
+3. One italic footer line, `_..._`, its parts joined by " · ": each quiet source (a `read.sources[]` entry with `items: []`) as "<tag>: nothing since <Mon D>" from its `latest`; then "<n> filtered"; then "<m> more in the journal" when `read.more` is above zero; then "say show filtered". Nothing else in it: no Sources list, no delivery or ping sentence, no could-also-watch offer (`suggestions` stay in the result for when the user asks), no `posting` sample counts (answer from `posting` only when asked how often a source posts, as the sample observed, never a rhythm to expect). When `read.gap` is set, the italic line says instead that the watches are live with no opening history stored.
+4. Never a count in place of the entries, never JSON, never headers other than the bold day lines, never bullets.
 
-Follow-ups stay in the conversation: "add them" re-runs `watch_compose` with the offered locators in `sources` (same subject, intent and `group`); "show filtered" answers from this response's `filtered_items` (reasons are response-only, the store keeps none); "what has it caught?" is `event_watch_events` with the group (§"Read journals"). Re-running the sentence over standing watches adopts them and returns no new read; re-running after a remove re-attaches the preserved journal and seeds a fresh opening read beside the old entries.
+Standing search legs are the one paid addition, and only ever an explicit opt-in. `search: { engines: ["web","x","youtube"], cadence_sec }` on a structured call (subjects + intent, never a free-text `request`) adds one leg per engine per subject: the exact query is minted locally from the subject and intent (never model-authored), the engine, cadence, the current provider/model and its lane, and the hosted-search cap are frozen on a mandatory approval card in calls (1 model request per scheduled attempt, up to 2 hosted-search calls; the probe 1 request and 1 call; the per-day and 31-day ceilings; legs totaled), and the probe runs only after the yes. An X leg needs an xAI credential (the card refuses it typed elsewhere); YouTube is web search scoped to youtube.com and is always named "YouTube search (via web search)". A plain call never adds a leg: when the configured model can run one, the result carries `search_offer` ("I can also run a daily web sweep and an X search on your xAI account; say add them"), the one sentence to close the reply with, verbatim. "Add them" then re-runs `watch_compose` with the `search` block (same subject, intent and `group`), or `event_watch_search_add` adds legs to a standing group; "run the web sweep hourly" is a NEW leg on the re-approved cadence through the same verb (a search leg's engine, query, cadence and sealed authority are its identity, so `event_watch_edit` never touches them). A committed leg lands in `committed` as kind `hosted-search` with its `search` facts (engine, exact query, cadence, provider/model, findings sampled); its findings are a stranger's pages re-typed by a search model, judged under the watch's classifier budget like any other item, and a date the search model reports is a claim shown as "reported", never the item's clock. `/watches` shows a leg's sheet: the engine on its sealed model, the question, the cadence with `next` from the durable due, the calls (1 request per run, the cap, this month's attempts from the run ledger), and `f` runs one attended search now with no timing floor.
+
+Follow-ups stay in the conversation: "what else could I watch?" answers from this response's `suggestions` (a discovered source whose probe carries the subject's name is already committed, verified or claimed, so only a claim the probe cannot connect to the name is left to name), and "add them" re-runs `watch_compose` with those locators in `sources` (same subject, intent and `group`); "show filtered" answers from this response's `filtered_items` (reasons are response-only, the store keeps none); the whole journal is `read.journal_command` when the user asks for it; "what has it caught?" is `event_watch_events` with the group (§"Read journals"). Re-running the sentence over standing watches adopts them and returns no new read; re-running after a remove re-attaches the preserved journal and seeds a fresh opening read beside the old entries.
 
 ## Create a watch
 
@@ -77,6 +80,8 @@ Never hand-build a stream ref to watch a news feed. `om news follow` / `om news 
 Creating a vendor-fed watch requires a concrete source stream from a registered listener adapter. Ask for the missing source detail if the user has not supplied it; do not invent adapter credentials or stream identifiers. Current production adapters include `openmarket` market streams, `synoptic` news/social streams, the `attention` / `attention-briefs` news feeds, the keyless `feed` poller, and the keyless `x` account timelines (`extra.handle`; the runtime row's `collection_state` reports the backend's coverage every poll).
 
 A `feed` watch polls one public URL with no credential: an RSS 2.0 / RSS 1.0 / Atom feed (a Google News search RSS, a YouTube channel feed, a podcast feed), a JSON Feed, or an EDGAR per-CIK submissions JSON (`https://data.sec.gov/submissions/CIK##########.json`). Its stream ref is exactly `{"adapter":"feed","channel":"items","extra":{"url":"<normalized http(s) URL>"}}`: creation requires the normalized spelling (lowercase scheme and host, no default port, no userinfo, no fragment) and the refusal quotes the spelling to use. The first poll sweeps the feed's current entries silently (`swept=<n>`, nothing fires), and every entry that appears afterwards is an event; entries the feed drops while the daemon is down are gone for good, and `event_watch_backfill` answers `backfill_unsupported` for this adapter. Feed text is a stranger's writing, so the classifier and overview prompts frame it as untrusted data and the notification quotes the source text inside a fence. Polls run every five minutes by default (`OM_FEED_POLL_INTERVAL_MS`, 60s floor); a URL on `127.0.0.0/8` is refused unless the test-rig switch `OM_FEED_ALLOW_LOOPBACK=1` is set.
+
+A `search` source (`search://findings?engine=&q=&every=&auth=`) is never created here: its query is minted and its authority sealed only by the composer's `search` block or `event_watch_search_add` (§"Watch a subject"), and `event_watch_create` refuses the shape on every surface, as MCP does before any handler.
 
 A watch whose events the user pushes themselves takes no stream ref: `om event-watch create --inbound` opens a door at `POST /ingest/v1/<watch-id>` (also reachable as `om event push`), bounded by `--ingest-daily-cap <n>` (default 2000 accepted pushes per UTC day; a typed 429 above it). The door starts closed — no token hash, a uniform 401 on every request — until `om event-watch rotate-token <id>` mints the token on a stdio surface, which prints it once.
 
@@ -217,10 +222,10 @@ A watch (or alert) shared under a registry address `@scope/name` is a stream: ru
   re-opens under the next version. Several refs = ONE call with `ids` (`om unshare <ref> <ref>`),
   one ticket in ask mode listing what each member closes. Works with every sharing flag off:
   teardown is the safe direction.
-- One gesture: `om share` / `om follow` / `om unshare` cover watches AND alerts. The legacy
-  alert-plane verbs (`alert_share`, `alert_unshare`, `topic_follow`, `topic_unfollow`,
-  `topic_fires`) are DEPRECATED one-release aliases over this merged surface and retire next
-  release; never teach them when the merged verb serves.
+- One gesture: `om share` / `om follow` / `om unshare` cover watches AND alerts (an alert
+  topic's door may be public, knock, or private). The legacy alert-plane verbs are RETIRED
+  tombstones that redirect to this merged surface; `topic_fires` remains the shelf reader.
+  Never teach a retired verb: the merged one serves everything they did.
 - `stream_follow` (`om follow <address>`): creates a PAUSED accept_all watch fed by the author's
   signed relay postcards (0 LLM calls, execution never); resume it to start folding. `stream_unfollow`
   removes the follow, journal preserved; several follows = ONE call with `ids` (`om unfollow <ref> <ref>`),
@@ -304,10 +309,23 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `limit` — Defaults to 50, capped at 500.
 - `event_watch_export`
   - `limit` — Defaults to 1000, capped at 5000 (one page is always a valid history file on its own); reach older rows with `before`.
+- `event_watch_page_add`
+  - `intent` — What to watch the page for, in the user's words (default: "anything new posted here"); the judge applies it per item.
+  - `group` — The watch group the new watch joins (the composite label); absent leaves it standing alone.
+  - `cadence_sec` — Seconds between checks (default 900; any number from 60, the source-politeness floor).
+  - `daily_cap` — Model reads permitted per UTC day (default 20; 0 = fetch and diff only with every change shown as a pending read).
+  - `notify` — Whether the watch pings the channel per new item (default true).
 - `event_watch_reclassify`
   - `limit` — Maximum error rows to re-judge in this call (default 50, max 200).
 - `event_watch_remove`
   - `members` — The approval surfaces write this after the human saw the roster; omit it to act on the group's membership at dispatch time.
+- `event_watch_search_add`
+  - `intent` — What to watch the subject for, in the user's words (default: "anything noteworthy they say or do").
+  - `notify` — Whether the created legs ping the channel per finding (default true).
+- `event_watch_search_add` · `watch_compose`
+  - `search.cadence_sec` — Seconds between scheduled attempts (default 86400, daily; any number from 60, the poll loop's floor).
+  - `search.max_calls` — Hosted-search calls permitted inside each model request, where the lane's wire enforces a cap (default 2 per scheduled attempt, 1 for the probe).
+  - `search.window_days` — Days each run accepts findings from (default 7, never narrower than the cadence plus slack; dedupe absorbs the overlap).
 - `event_watch_stats`
   - `window_days` — Stats window in days (default 7).
 - `event_watch_synthesize`
@@ -324,7 +342,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `name` — Defaults to the watch slug (or a kebab form of the alert label).
   - `version` — Defaults to 0.1.0, or the last shared version with the patch bumped.
   - `history` — Ship the accepted past as history/<member>.jsonl (default true).
-  - `live` — Watches and alerts default to an UNCAPPED relay-store topic whose door is public unless door=knock (a standing live lane keeps its own carrier; schedules use a space channel, members only, cap 100).
+  - `live` — Watches and alerts default to an UNCAPPED relay-store topic whose door is public unless door says otherwise (a standing live lane keeps its own carrier; schedules use a space channel, members only, cap 100).
   - `door` — Default public.
   - `carrier` — Default: the stream_lane.default_carrier setting; unset, watches and alerts default to topic and schedules keep room_post.
   - `retention_seconds` — Live alert shares on the topic carrier only: fire retention at the relay store in seconds, 1h..1y (default 90 days).
@@ -359,17 +377,19 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om event-watch events` (action: `event_watch_events`) — Query structured SQLite event rows by outcome, time, source, confidence, and notification state.
 - `om event-watch export` (action: `event_watch_export`) — Export one watch's accepted event rows as canonical stream-event lines (JSONL), the shape a shared pack ships as history and `om event push --file` reads back.
 - `om event-watch list` (action: `event_watch_list`) — List configured event watches with their daemon runtime status, optionally only one composite's members (`group: <label>`, exact trimmed case-insensitive match).
+- `om event-watch page-add` (action: `event_watch_page_add`) — : Watch a URL (a page, a document, a JSON endpoint, or a feed) for new items.
 - `om event-watch pause` (action: `event_watch_pause`) — Disable one event watch by id or slug, several by exact id in ONE call (`ids`), or every watch in a composite (`group: <label>`); consuming strategies are NOT auto-paused, and journals are preserved.
 - `om event-watch reclassify` (action: `event_watch_reclassify`) — Re-run the classifier over event rows this watch already stored with outcome `error` (a failed classification, e.g. a missing or expired LLM credential), using each row's retained raw text and source context.
 - `om event-watch relay-door` (action: `event_watch_relay_door`) — Mint or rotate the relay mailbox for a watch that is live-shared over a relay topic, and print the drop URL exactly once.
 - `om event-watch remove` (action: `event_watch_remove`) — Remove one event watch by id or slug, several by exact id in ONE call (`ids`), or a whole composite (`group: <label>`); consuming strategies auto-pause and each member's journal is preserved.
 - `om event-watch resume` (action: `event_watch_resume`) — Re-enable one paused event watch by id or slug, several by exact id in ONE call (`ids`), or a whole composite (`group: <label>`); event flow returns and consuming strategies need no re-arm.
 - `om event-watch rotate-token` (action: `event_watch_rotate_token`) — Mint a fresh ingest token for an inbound event watch and invalidate the old one immediately (rotation IS revocation: only the token's sha256 is stored, so the previous token stops authorizing the instant the new hash lands).
+- `om event-watch search-add` (action: `event_watch_search_add`) — Add standing hosted-search legs (web, X, YouTube via web) to a watch group, each a paid model request on the user's own AI account at its cadence.
 - `om event-watch show` (action: `event_watch_show`) — Show one event watch (spec, runtime status) by id or slug, or a composite's whole card (`group: <label>`), plus the signals and strategies that depend on it (the blast radius of a pause or remove).
 - `om event-watch stats` (action: `event_watch_stats`) — Stream receipts for one event watch, computed on read from the local ledgers: window activity by arrival lane (live/relay/catchup/imported/backfill), and, for a followed stream, relay-stamp receipts (postcards by transport, relay_age labeled publisher-claimed, future-timestamp flags, heartbeat-sampled uptime) plus the author-side lane block for a live-shared one.
 - `om event-watch synthesize` (action: `event_watch_synthesize`) — Refresh one event watch's overview.md from its accepted event history.
 
-- `om follow` (action: `stream_follow`) — Follow a live-shared stream: create a PAUSED event watch fed by the author's fires over their relay lane.
+- `om follow` (action: `stream_follow`) — Follow a live-shared stream (an event watch's live events, or an alert-recipe-pack's live ALERT fires): create a PAUSED event watch fed by the author's fires over their relay lane.
 
 - `om fork` — (bespoke; see narrative above)
 
@@ -384,6 +404,6 @@ Every `om` command this skill covers, one line each with its action name — che
 
 - `om unshare` (action: `stream_unshare`) — Stop sharing a stream: closes EVERY open live-share version and scope the subject stands behind (the current topic and every rotated-away topic at the relay store, or the room lane) so followers stop receiving.
 
-- `om watch` (action: `watch_compose`) — "Watch <subject> for me" as ONE verb: researches where each subject (a person, organization, product, or public issue) publishes and is covered, verifies sources with deterministic probes, creates the grouped event-watch set with notifications enabled, and seeds each new watch with a judged sample of its source's own recent items — the reply's dated 'Current read', returned as `current_read` and printed under the result by the surface itself (never repeat its lines; open with one sentence reading it).
+- `om watch` (action: `watch_compose`) — "Watch <subject> for me" as ONE verb: researches where each subject (a person, organization, product, or public issue) publishes and is covered, verifies sources with deterministic probes, creates the grouped event-watch set with notifications enabled, and seeds each new watch with a judged sample of its source's own recent items, returned per source as `read`: the reply is a day-by-day journal of it, one line per entry with its link, never a count in place of the entries.
 
 <!-- AUTO: END COMMAND REFERENCE -->
