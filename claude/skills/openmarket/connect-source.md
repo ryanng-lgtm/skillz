@@ -35,7 +35,7 @@ One inbound watch is the destination for every lane. Create it first, with the g
 om event-watch create --inbound --goal "Fire on real CI failures on main. Do not fire on flaky reruns, scheduled jobs, or branch builds"
 ```
 
-- `--inbound` means there is no vendor stream: the watch IS the endpoint. The create prints the door once: the `/ingest/v1/<watch>` endpoint plus a bearer token, shown exactly once (only its hash is stored). Losing or leaking the token has one answer, `om event-watch rotate-token <watch>`, and rotation is revocation.
+- `--inbound` means there is no vendor stream: the watch IS the endpoint. The create prints the door once: the `/ingest/v1/<watch>` endpoint plus a bearer token, shown exactly once (only its hash is stored). Losing or leaking the token has one answer, `om watch rotate-token <watch>`, and rotation is revocation.
 - The default classifier (`llm_every_event`) judges every push against the goal under the watch's normal daily budgets, so a chatty source still yields a clean journal. `--classifier-mode accept_all` journals everything and is the user's explicit opt-out, same doctrine as `news.md`.
 - Delivery, channels, muting, and noise tuning are ordinary watch mechanics (`event-watches.md`); the feed also appears in `om news list --provider inbound` like any other feed.
 
@@ -61,11 +61,11 @@ When the public place is already a well-formed feed (RSS, Atom, or a JSON list o
 - `format` is one of `rss`, `atom`, `json`; `every_sec` is the cadence, an integer from 60 to 86400. When the feed's field names are nonstandard, add a field map: `title_key`, `time_key`, `id_key`, `body_key`, `items_key` (element names for RSS and Atom, dot paths into the document for JSON, for example `items_key: "data.rows"`).
 - No script exists and none travels: a shared or installed pack that carries this source is run by the SAME fixed fetcher on every installer's daemon, which is why the consent card says it "fetches from your machine". Pass `occurred_at`-style timestamps through `time_key` so items land in source-time order; items older than the live window (six hours, or twice the cadence if longer) journal quietly as catch-up instead of pinging.
 - The fetcher is deliberately narrow, and the limits route for you: https only, private and link-local hosts refused on every poll and every redirect, no cookies and no auth headers ever, one document per poll capped at 2 MiB. A feed behind a login is not a public source (lane 4 or 5); a page that is not one of the three formats needs lane-2 glue, because the declared poller never scrapes HTML.
-- First open sweeps the feed's current items silently so a fresh watch does not ping on the backlog; history enters on request via `om event-watch backfill`.
+- First open sweeps the feed's current items silently so a fresh watch does not ping on the backlog; history enters on request via `om watch backfill`.
 
 ## TradingView and other cloud senders: the relay mailbox
 
-TradingView alerts POST from TradingView's servers, so they can never reach a laptop's loopback door. When the watch is live-shared over a relay topic (`om share --live --carrier topic`), skip the tunnel: mint the topic's relay mailbox and hand TradingView the drop URL.
+TradingView alerts POST from TradingView's servers, so they can never reach a laptop's loopback door. When the watch is live-shared over a relay topic (`om watch share --live --carrier topic`), skip the tunnel: mint the topic's relay mailbox and hand TradingView the drop URL.
 
 ```bash
 om event-watch relay-door <watch>
@@ -75,7 +75,7 @@ om event-watch relay-door <watch>
 - Set the alert's Message to the ingest door's JSON body. TradingView placeholders interpolate before sending, so a complete paste is: `{"text": "{{ticker}} crossed {{close}}", "kind": "tradingview", "market": "{{ticker}}"}`. Same wire rules as the local door: `text` required, unknown keys refused, 64KB cap.
 - The relay only HOLDS mail (about 30 messages per minute per mailbox, kept up to 72 hours). Your daemon collects it on the stream drain cadence, judges each message against the watch's goal under the normal budgets, and only then publishes to the topic. A malformed message is skipped and counted, never published and never wedging the queue.
 - Requires the topic share first: an unshared or room-shared watch is refused with the exact share command to run. A relay that does not offer mailbox doors yet answers with a typed hint; the share itself is unaffected.
-- Verification is unchanged: fire a test alert in TradingView, then read the event back (`om event-watch events <watch> --format json`) after the next collect pass and say what the classifier did with it.
+- Verification is unchanged: fire a test alert in TradingView, then read the event back (`om watch events <watch> --format json`) after the next collect pass and say what the classifier did with it.
 
 Use the mailbox only for senders that cannot reach the daemon. A source on the user's own machine or network still takes lanes 2 through 5: the local door is judged immediately, needs no share, and holds nothing at a third party.
 
@@ -85,11 +85,11 @@ Hand at most ONE paste, and only when the source sits behind the user's own acco
 
 ## Verified means the first event arrived
 
-The word "configured" is banned as an endpoint. Nothing here is done because it is set up; it is done when the first real event arrived and classified as intended, and completion is reported as exactly that: "first event arrived, classified irrelevant, as intended." Wait for the first natural event when the cadence makes that reasonable; otherwise send a test push yourself (`om event push <watch> --text "test: ..."`), read it back (`om event-watch events <watch> --format json`), and say what the classifier did with it. A test event the goal rejects as `irrelevant` is the filter PASSING, not the pipe failing; say it that way.
+The word "configured" is banned as an endpoint. Nothing here is done because it is set up; it is done when the first real event arrived and classified as intended, and completion is reported as exactly that: "first event arrived, classified irrelevant, as intended." Wait for the first natural event when the cadence makes that reasonable; otherwise send a test push yourself (`om event push <watch> --text "test: ..."`), read it back (`om watch events <watch> --format json`), and say what the classifier did with it. A test event the goal rejects as `irrelevant` is the filter PASSING, not the pipe failing; say it that way.
 
 ## Failure modes, named out loud
 
 - **The source cannot reach the daemon port.** The door lives on the daemon's HTTP bind, loopback by default: a CI webhook aimed at a laptop's localhost will simply never arrive. A remote sender needs a reachable door: the always-on VPS install, an SSH tunnel (`ssh -L`), or a TLS-terminating proxy in front of the daemon. Never a bare non-loopback bind: that sends the bearer token in cleartext.
-- **No event within the expected cadence.** Recheck the glue, not the watch: is the poller actually running, did the rule match anything, what status did the sender log? 401 is the token (rotate and re-key the sender), 409 is a paused watch (`om event-watch resume`), 422 is a missing or oversized `text`.
+- **No event within the expected cadence.** Recheck the glue, not the watch: is the poller actually running, did the rule match anything, what status did the sender log? 401 is the token (rotate and re-key the sender), 409 is a paused watch (`om watch resume`), 422 is a missing or oversized `text`.
 - **The daily ingest cap.** Accepted pushes are bounded per watch per UTC day (default 2000, `--ingest-daily-cap`); past it the door answers 429 with `retry_at`. A source that hits it needs the cap raised or the glue made choosier; duplicates never spend the cap.
 - **Daemon down.** `om status`, then `om service start` (or `om service install` if none exists): fires only flow while the daemon runs, and saying so beats letting the user wait on pings that cannot arrive.

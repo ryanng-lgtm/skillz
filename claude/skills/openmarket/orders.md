@@ -385,7 +385,7 @@ Use `om order cancel <oid>` or `om order cancel-cloid <cloid>`. The resting-orde
 
 Several orders = ONE call, one card: `order_cancel` takes `ids` (order ids as strings) with one `venue` (`om order cancel <oid...>`); the card lists every member (asset, side, size, price), a reduce-only member or one with no local receipt is named on the card and holds it off auto mode, Hyperliquid members go through one signed batch cancel per DEX, Polymarket members loop the single cancel, and a mixed-venue set refuses before any write. `order_twap_cancel` takes `ids` (up to 25, one venue and one asset per call, `om order twap-cancel <id...>`); a TWAP already finished comes back as an unchanged row. Never loop single-id cancels for a set: that raises one card per order.
 
-For a recurring auto-execute alert the user wants to stop submitting, use `om alert pause <id>` or `om alert remove <id>`. That's the alerts skill, not this one. If the user says "cancel my order", clarify whether they mean a resting venue order or the alert that may submit more.
+For a recurring auto-execute alert the user wants to stop submitting, use `om watch pause <id>` or `om watch remove <id>`. That's the alerts skill, not this one. If the user says "cancel my order", clarify whether they mean a resting venue order or the alert that may submit more.
 
 ## Inspect receipts
 
@@ -507,7 +507,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 
 Every `om` command this skill covers, one line each with its action name — check exact verbs and spellings here.
 
-- `om execute history` (action: `execute_history`) — Read the execution receipts triggered by a specific alert, newest-first.
+- `om execute history` (action: `execute_history`) — Read the execution receipts a watch's execute action placed, newest-first.
 - `om execute list` (action: `execute_list`) — List execution receipts ordered newest-first.
 - `om execute summary` (action: `execute_summary`) — Aggregate execution receipt counts by status, plus total notional.
 

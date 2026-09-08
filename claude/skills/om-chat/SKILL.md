@@ -67,12 +67,28 @@ names, never more rooms than it needs.
 
 - `room_history` pages a room; `room_message_search` searches one room;
   `rooms_search_messages` fans out across every granted room.
-- Results arrive as compact `[seq] @handle: text` lines, not JSON. A
+- History and search results are previews in `[seq] @handle: text` lines. A
   re-read of a window you already saw collapses to an "already shown"
   marker; do not re-fetch to "double check" text you have.
-- Pass `raw: true` on any call only when you truly need the full JSON
-  (reactions, attachments metadata).
+- Follow a message link with `room_message_get` using its room and seq.
+  Exact reads preserve the message text and attachment keys without clipping.
+- Pass the boolean `raw: true` when you need JSON metadata. It changes
+  formatting; it does not bypass access checks or file page limits.
 - Cite messages as `om://msg/<room>/<seq>` so claims trace to sources.
+
+## Reading files
+
+Use `room_attachment_read` with the message's attachment key. Text files
+return bounded pages. Continue with the returned `nextOffset` and
+`contentSha256` as `expectedContentSha256`, preserving the other arguments.
+Offsets count UTF-16 code units; use the returned value rather than counting
+characters yourself. The file is complete only when `nextOffset` is null.
+On `attachment_changed`, restart from offset 0; never combine versions.
+
+An oversized download returns metadata and, when supported, `retryMaxBytes`.
+The download ceiling is 10 MiB. Images return bounded image blocks; other
+binary formats return metadata. Report unread content as unread.
+Never write back a preview or an incomplete file as the original document.
 
 ## Watching a room
 

@@ -299,7 +299,7 @@ om metric screen --metric NAME[:k=v,k=v] [--params k=v,k=v]
                  [--format json|text]
 ```
 
-`om metric get` takes two equivalent, mutually exclusive forms: a single bare `--metric` with `--params` (the shape `om alert create` mirrors), or the repeatable compact `--metric name:k=v,k=v` colon form for several metrics. `--params` is only legal with a single bare `--metric` (no colon); for multi-metric, use the colon form. `om metric series` takes the same two forms but exactly one metric, and its text mode renders the series as a sparkline.
+`om metric get` takes two equivalent, mutually exclusive forms: a single bare `--metric` with `--params` (the shape `om watch create` mirrors), or the repeatable compact `--metric name:k=v,k=v` colon form for several metrics. `--params` is only legal with a single bare `--metric` (no colon); for multi-metric, use the colon form. `om metric series` takes the same two forms but exactly one metric, and its text mode renders the series as a sparkline.
 
 CLI filters are the compact spellings of the same fields: `--filter lt:30`, `--filter between:30..70`, `--top-n 25 --by VOLUME_24H`. JSON output (`--format json`) is byte-identical to the tool results shown above. The command-to-action mapping:
 

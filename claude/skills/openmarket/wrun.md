@@ -17,7 +17,7 @@ You can build a custom sandboxed indicator from a plain description ("score BTC 
 - Consent rule for the whole loop: a draft the user named in this conversation flows end to end (author, build, local install, preview) with receipts instead of asks; the approval gates live where trust changes hands, installing REGISTRY packages and PUBLISHING.
 - `@local` is reserved — author under the user's own scope before publishing (§"The authoring loop").
 - WRUN source reads params, inputs, and outputs ONLY through the generated accessors (`p_<param>()`, `in_<input>()`, `out_<output>(value)` then `emitRow()`): a raw positional literal such as `getFloat(0)` or `setOutput(0, ...)` is a BUILD ERROR in scaffold builds (§"The authoring loop"). In WRUN metadata a feed pin is `symbol` AND `exchange` together (the schema refuses a lone half) and an `interval` pin is legal: a coarser source aligns as-of its candle close (§"Input pins").
-- Publishing is the user's call and the marketplace's gate: `package_publish` with `dry_run=true` first (uploads nothing, raises no card), then the real publish only on the user's explicit go — the approval card on chat surfaces, `yes=true` over MCP (`marketplace.md §"Publishing and yanking"`).
+- Publishing is the user's call and the marketplace's gate: `package_publish` with `dry_run=true` first (uploads nothing, raises no card), then the real publish only on the user's explicit go — the approval card on chat surfaces, `yes=true` over MCP (`marketplace.md §"Publishing and discontinuing"`).
 
 ### Routing
 
@@ -87,11 +87,11 @@ How this mode enters the agent loop, beside (never instead of) the metadata-firs
 - Scaffold code-first with `template: "sma-codefirst"` on `wrun_author` (or `om wrun create @scope/name --template sma-codefirst`): a complete SMA in 14 non-blank source lines, sheet derived, same build and preview loop as any draft. For the wrun-2 surface (a celled volume-profile input, a string slot, a text renderer) scaffold `template: "vp-buy-share-codefirst"` instead and edit that shape.
 - On a code-first workspace, `wrun_author`'s `metadata` argument is REFUSED with `wrun_metadata_generated`, and `wrun_source_set` is refused with `wrun_source_set_generated`: the sheet is derived state, so pass updated `source` with edited declarations instead, and the build re-derives sheet + accessors together.
 - `abi_version: "wrun-2"` is additive (scalar wrun-2 packages compute bit-identically to wrun-1). Celled inputs (`cellType: "array"` + required `max_cells`, counted in source tuples) read the celled source classes and FETCH LIVE for `volume_profile` ([low, high, buy, sell] cells) and `book` ([price, size, side] cells; `block_size` required, `om block-sizes` lists the venue's); `trade_volume_by_size` is declared but refused by name (`wrun_cells_unavailable`). Backtests and screens refuse whole celled packages by name (`wrun_celled_metric_unsupported`); alerts, `metric_get`/`metric_series`, and chart previews are the supported consumers.
-- wrun-2 sheets may also declare `string_slots` (byte-capped per-bar text written in `finalize()` via generated `str_<slot>` senders; slots are never metrics), `renderers` (`text`, `label`, `table`, `shape`, `stats_row`), and `drawings` (`line`, `box`, `polyline`, `label`; coordinates from named outputs, x in epoch seconds). Modules read celled blocks through generated `in_<input>_cells()` / `in_<input>_read(ptr)` accessors; raw `wrun_arg_len` / `wrun_arg_bytes` / `wrun_output_str` literals are a scaffold build error like any positional access.
+- wrun-2 sheets may also declare `string_slots` (byte-capped per-bar text written in `finalize()` via generated `str_<slot>` senders; slots are never metrics), `renderers` (`text`, `label`, `table`, `shape`, `stats_row`), `drawings` (`line`, `box`, `polyline`, `label`; coordinates from named outputs, x in epoch seconds), and per-bar `boxes` / `segments` (`box(...)` / `segment(...)` over declared outputs with bar offsets and an optional `when` gate; sheet-only, ABI-neutral). Modules read celled blocks through generated `in_<input>_cells()` / `in_<input>_read(ptr)` accessors; raw `wrun_arg_len` / `wrun_arg_bytes` / `wrun_output_str` literals are a scaffold build error like any positional access.
 
 Instead of hand-writing `wrun/metadata.json`, declare params, inputs, and
-outputs as typed top-level statements of `src/indicator.ts`, imported from
-`./sdk/declare`:
+outputs as typed top-level statements of `src/indicator.ts`, imported
+from `./sdk/declare`:
 
 ```typescript
 import { input, line, lower, ohlcv, output, overlay, param } from "./sdk/declare";
@@ -102,18 +102,20 @@ input("btc_close", ohlcv.close, { symbol: "BTCUSDT", exchange: "BINANCE_FUTURES"
 output("value", line, lower, { unit: "score" });
 ```
 
-The build derives the sheet from these declarations and generates the
-accessors from the SAME in-memory object, so the two can never disagree. The
-grammar is static and literal-only:
+The build extracts the declarations statically (the code never runs at
+build time), derives the sheet, and generates the accessors from the
+same in-memory object, so the two cannot disagree. The grammar is static
+and literal-only:
 
 - `param(name, default, options?)` with options `required`, `min`, `max`,
   `description`.
 - `input(name, source.field, options?)` with options `exchange`, `symbol`,
-  `interval`, `outcome`, `binding`, `tenor`, `side`, `token`, `missing`
-  (`"carry"`, `"nan"`, or `"zero"`; on the first input `"nan"`/`"zero"`
-  densify the request grid), `description`.
-  Sources are bare member references from `./sdk/declare`: `ohlcv`, `trades`,
-  `funding`, `oi`, `liquidations`, `implied_volatility`, `skew`,
+  `interval` (`MINUTE`, `FIVE_MINUTES`, `FIFTEEN_MINUTES`,
+  `THIRTY_MINUTES`, `HOUR`, `FOUR_HOURS`, `DAY`, `WEEK`), `outcome`,
+  `binding`, `tenor`, `side`, `token`, `missing` (`"carry"`, `"nan"`, or
+  `"zero"`; on the first input `"nan"`/`"zero"` densify the request
+  grid), `description`. Sources are bare member references: `ohlcv`,
+  `trades`, `funding`, `oi`, `liquidations`, `implied_volatility`, `skew`,
   `token_supply`, `odds`, `time` (metric composition inputs stay
   metadata-first and are refused by name).
 - `output(name, plot?, panel?, options?)` with plots `line`, `bar`, `area`,
@@ -124,24 +126,42 @@ grammar is static and literal-only:
   in -500..500; negative literals such as `-26` are fine), `width_by`, and
   `widths` (the per-bar width ladder, an array of numeric literals;
   `width_by` and `widths` go together, like `color_by` and `colors`).
+  `output(...)` returns a handle; bind it with a top-level `const` when a
+  `box` or `segment` needs to name it.
 - `range(upper, lower, options?)` declares a sheet-level band between two
   rendered outputs with options `color`, `colors`, `color_by`,
   `edge_width`, `edge_line_style`, `smooth` (presentation-plane like
   `fills`, and ABI-neutral: declaring one never flips the sheet to
-  wrun-2). Ranges never dedupe: repeat the declaration for several bands,
-  the same pair included (the sheet schema imposes no uniqueness).
+  `"wrun-2"`). Ranges never dedupe: repeat the declaration for several
+  bands, the same pair included (the sheet schema imposes no uniqueness).
+- `box(name, options)` and `segment(name, options)` declare per-bar
+  shapes over output HANDLES (Drawing objects). Box
+  options: `top`, `bottom` (handles, required), `from`, `to` (bar
+  offsets: integer literals in -500..500 or handles, default 0), `when`
+  (a gate handle), `panel` (`"overlay"` or `"lower"`), `color`,
+  `borderColor`, `opacity`, `borderWidth`. Segment options: `yFrom`,
+  `yTo` (handles, required), `from`, `to`, `when`, `panel`, `color`,
+  `width`, `lineStyle`. The derived sheet records output NAMES under the
+  snake_case fields (`x_from`, `x_to`, `border_color`, `border_width`,
+  `y_from`, `y_to`, `line_style`). ABI-neutral like `range`. A handle
+  that binds no `output(...)` declaration, a string literal where a
+  handle goes, a non-integer offset literal, or a `panel` outside the two
+  names is a named build error.
 
-The wrun-2 vocabulary has declaration forms too, and deriving a sheet that
-uses any of them stamps `abi_version: "wrun-2"` automatically (scalar-only
-declarations keep deriving wrun-1 sheets):
+The second runtime contract's vocabulary has declaration forms too, and
+deriving a sheet that uses any of them stamps `abi_version: "wrun-2"`
+automatically (scalar-only declarations keep the first contract):
 
 - Celled inputs: `input(name, <class>.cells, options)` with classes
-  `volume_profile`, `book`, `trade_volume_by_size` referenced as
-  `volume_profile.cells` etc. `max_cells` is REQUIRED; `block_size`
-  (required on `book`) and `max_depth` are the book fetch facets; `symbol` +
-  `exchange` pin together; `description`. Scalar-feed knobs (`interval`,
-  `side`, ...) are refused on celled inputs.
-- String slots: `string(name, { max_bytes, description? })`.
+  `volume_profile`, `book`, `trade_volume_by_size`. `max_cells` is
+  REQUIRED; `block_size` (required on `book`) and `max_depth` are the
+  book fetch facets; `symbol` + `exchange` pin together; `description`.
+  Scalar-feed knobs (`interval`, `side`, ...) are refused on celled
+  inputs.
+- String slots: `string(name, { max_bytes, description? })`. The
+  declaration is named `string`, which shadows the type name in a file
+  that imports it; `import { string as slot }` keeps the type
+  (String functions).
 - Renderers: `render.text(name, { y, text, color?, size? })`,
   `render.label(name, { x, y, text, color?, size? })`, `render.table(name,
   { rows, cols, cells, position? })`, `render.shape(name, { output, shape,
@@ -164,28 +184,23 @@ Rules the extractor enforces, each as a named build error:
 - Indexes follow declaration order: the first `input(...)` is slot 0 (the
   primary input), and reordering declarations reorders slots while the
   generated accessors keep your source name-attached.
+- Box and segment coordinates are output handles bound by a top-level
+  `const` (`let`, `var`, and `export const` bind too; a handle may be
+  bound below the shape that uses it); the sheet records the output's
+  name, never the handle.
 
 The derived sheet records `generated_from: "declarations"` plus a
-`source_digest` (sha256 of the source), serializes canonically (an unchanged
-source rewrites nothing), and is DERIVED state from then on: `om wrun source
-set` refuses with `wrun_source_set_generated` and the agent's metadata
-argument refuses with `wrun_metadata_generated`, both pointing at the
-declaration to edit instead. A sheet claiming generated provenance over a
-declaration-free source blocks the build naming both ways out (restore the
-declarations, or delete `generated_from` and `source_digest` to hand-edit
-again). A workspace with no declarations stays metadata-first: byte-identical
-behavior to a hand-written sheet, and the supported mode for languages
-without an extractor (Rust, Zig, pre-built wasm).
-
-The `sma-codefirst` template is the worked example: scaffold it and read the
-source it returns; the whole user file is 14 non-blank lines with zero
-hand-written sheet. The `vp-buy-share-codefirst` template is the wrun-2
-worked example (a celled volume-profile input, a string slot, and a text
-renderer in 20 non-blank lines), and the generated accessors for the wrun-2
-forms are `in_<input>_cells()` / `in_<input>_read(ptr)` /
-`in_<input>_capacity` for celled inputs and the `src/gen/strings.ts` line
-builder (`sb_clear` / `sb_text` / `sb_int` / `sb_f64`) with per-slot
-`str_<slot>(s)` / `str_<slot>_sb()` senders for string slots.
+`source_digest` (sha256 of the source), serializes canonically (an
+unchanged source rewrites nothing), and is DERIVED state from then on:
+`om wrun source set` refuses with `wrun_source_set_generated` and the
+agent's metadata argument refuses with `wrun_metadata_generated`, both
+pointing at the declaration to edit instead. A sheet claiming generated
+provenance over a declaration-free source blocks the build naming both
+ways out (restore the declarations, or delete `generated_from` and
+`source_digest` to hand-edit again). A workspace with no declarations
+stays metadata-first: byte-identical behavior to a hand-written sheet,
+and the supported mode for languages without an extractor (Rust, Zig, a
+pre-built module).
 
 <!-- AUTO: END CODE-FIRST AUTHORING -->
 
@@ -248,7 +263,7 @@ How outputs draw (`plot`, `panel`, `unit` per output) and the declarative stylin
 - Gated markers: a `plot: "shape"` output with `shape_where: "<gate output>"` renders only where the gate is nonzero.
 - Shaded bands: metadata-level `fills: [{ "between": ["upper", "lower"], "color": "#94a3b8", "opacity": 0.15 }]`; both sides must be rendered outputs.
 - User style knobs: a param with `style: { "output": "<name>", "property": "color"|"width"|"opacity"|"lineStyle" }` never reaches the module (no `p_` accessor, its slot stays zero-filled), shows in the settings dialog (color knobs take string defaults like "#22c55e"), and redraws without recompute. Param names are lowercase (`line_color`).
-When the user describes looks ("green when rising, red when falling, shade the band"), emit decision outputs from the module and declare the looks here; `om publish` cross-validates every reference and names the broken field on mistakes.
+When the user describes looks ("green when rising, red when falling, shade the band"), emit decision outputs from the module and declare the looks here; `om watch publish` cross-validates every reference and names the broken field on mistakes.
 
 <!-- AUTO: ARGUMENT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
