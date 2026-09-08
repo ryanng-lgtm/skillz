@@ -25,10 +25,10 @@ Quick routing — one recipe per common ask; the result discloses every default,
 
 | Ask | Recipe |
 | --- | --- |
-| "paper trade the golden cross on BTC" | the signal first, then `strategy_create` pinned as a `market_data` market to the listing the signal create stamped (its `listing_note` / selector give `exchange` + `symbol`), `enabled: true` because the ask says trade — it lands ARMED in paper; read the spec back in one block, say how to pause, offer `backtest_run`. |
+| "paper trade the golden cross on BTC" | the signal first, then `strategy_create` pinned as a `market_data` market to the listing the signal create stamped (its `listing_note` / selector give `exchange` + `symbol`), `enabled: true` because the ask says trade — it lands ARMED in paper; one outcome line plus the `Defaults:` row, say how to pause; no closing offer. |
 | "a strategy on Hyperliquid BTC / this Polymarket market" | `strategy_create` with the market pinned (`coin`, or `condition_id` + `long_outcome`); a pinned create defaults to paper — the result says so — and lands disabled: only an ask TO trade / run it arms. |
 | "paper trade a pair with no venue market" (any exchange+symbol the metrics plane serves) | `strategy_create` pinned `{venue: "market_data", exchange, symbol}` — observe/paper only, never `dry_run`/`live`; going live = recreate pinned to a real venue. |
-| "how is my strategy doing?" | `strategy_show` by slug; unnamed → `strategy_list` first (there is no most-recent default). Reply from the result: P&L (paper or realized), trades, "waiting for: …" in words, state, the one offer. |
+| "how is my strategy doing?" | `strategy_show` by slug; unnamed → `strategy_list` first (there is no most-recent default). Reply from the result: P&L (paper or realized), trades, "waiting for: …" in words, state; no closing offer. |
 | "stop it" / "pause it" | `strategy_pause` — never remove, never the signal; the result's `held_position` note is relayed verbatim. |
 | "go live" / "arm it" | only on an explicit yes: confirm the wallet, `strategy_edit` run_mode (escalating into live or dry_run DISARMS), then `strategy_resume` — a capital confirmation. |
 | "never short" / one-sided | sizer mode `single_sided` — the only mode that never takes the other side (`close_only` blocks a one-step flip, not a reversal: §"Sizer modes and policies"). |
@@ -232,7 +232,7 @@ Every strategy order is a marketable taker order — Polymarket FAK (fill-and-ki
 
 ## Workflow when a user wants a strategy
 
-The create path end to end: discovery, event-watch, signal, strategy with derive-disclose defaults, the backtest offer, daemon check, verify, ask-before-arm.
+The create path end to end: discovery, event-watch, signal, strategy with derive-disclose defaults, daemon check, verify, ask-before-arm.
 
 ### 1. Discovery
 
@@ -250,18 +250,18 @@ Author it per the signal skill — `skill_read signal`, signal.md §"Quick recip
 
 It is **created disabled by default** (nothing trades until you arm it) — the one exception is a paper ask that says trade / run / arm, which may pass `enabled: true` and land armed in paper.
 
-**Derive, disclose, override — do NOT interrogate the user.** Create immediately with the defaults for everything the user did not specify, then read the resolved spec back in ONE compact block so they can correct anything. Never ask upfront questions about sizing, capital, venue, or indicator parameters; the only decisions that warrant a question are (a) real money — arming `dry_run`/`live`, wallet-sourced capital — (b) a genuinely unresolvable market reference, and (c) the user's own explicit asks conflicting (below). The defaults:
+**Derive, disclose, override — do NOT interrogate the user.** Create immediately with the defaults for everything the user did not specify, then read the defaults back in ONE `Defaults:` row so they can correct anything. Never ask upfront questions about sizing, capital, venue, or indicator parameters; the only decisions that warrant a question are (a) real money — arming `dry_run`/`live`, wallet-sourced capital — (b) a genuinely unresolvable market reference, and (c) the user's own explicit asks conflicting (below). The defaults:
 
 | Knob | Default when unspecified |
 | --- | --- |
 | `market` | **OMIT — unpinned research strategy.** Pin at create only when the user names a trading venue/market or asks for the paper simulation itself (`market_data`); a bot / "trade it for me" ask naming no venue stays unpinned (the venue is proposed at arm time); on such an ask the pair the signal's rule reads is the SIGNAL's series, not a market pin — it becomes a `market_data` pin only when the paper simulation IS the ask (the recipe table above). |
 | `sizer` | OMIT — resolves to conviction mode, conviction scale, fixed $10,000 (the backtest's own defaults, so backtests describe the real strategy). `single_sided` only on explicit "never short"-style language. |
-| exit | OMIT — no kind stamps a managed exit (a metric rule's neutral/reversal IS the exit). A text/news strategy left without one gets the no-autonomous-exit note: relay it and offer a managed exit (`strategy_edit` `tp`/`sl`/`time_stop_secs`). Ratio asks ("r/r > 2") translate agent-side: `tp = k × sl`, plain fractions — no ratio field. |
+| exit | OMIT — no kind stamps a managed exit (a metric rule's neutral/reversal IS the exit). A text/news strategy left without one gets the no-autonomous-exit note: one row naming the fix (`strategy_edit` `tp`/`sl`/`time_stop_secs`), never an offer. Ratio asks ("r/r > 2") translate agent-side: `tp = k × sl`, plain fractions — no ratio field. |
 | indicator params | The user's phrase supplies levels ("RSI under 30"); periods default to textbook values (RSI 14, MA cross 50/200, MACD 12/26/9, Bollinger 20/2). |
 | cadence | From phrasing ("hourly"); else HOUR. |
 | run-mode / enabled | `paper` when a market is pinned, `observe` when unpinned; disabled — never pass them unprompted; a defaulted `paper` mode is echoed in `warnings[]`. |
 
-Every default the action resolves is echoed in the result's `warnings[]` — surface them verbatim; they are the disclosure. The readback is the override surface: the user corrects, you `strategy_edit`.
+Every default the action resolves is echoed in the result's `warnings[]`: one `Defaults:` row names them in a few words, and every other warning is one short labelled row; they are the disclosure. The readback is the override surface: the user corrects, you `strategy_edit`.
 
 **Defaults fill only what the user left unspecified — what they stated is never yours to change.** When the user's explicit asks conflict (a paper starting balance on an explicit `observe` mode), attempt the call as asked and relay the typed refusal, or ask which side wins BEFORE creating — never substitute run mode, size, or venue so the call succeeds; a substitution disclosed only after the create still counts as one.
 
@@ -280,7 +280,7 @@ strategy_create {"signal": "my-signal", "slug": "my-strategy",
 
 Note no `flip_threshold` is passed: 0.7 is already the default, and passing one *requires* an explicit `on_reversal: flip` (it would otherwise silently override a text signal's close-only default). Only pass it when the user actually wants conviction-gated flips.
 
-**After the create lands, offer a quick backtest before arming.** One call: `backtest_run` with the new strategy's slug (the one-shot verb derives window, interval, costs, and time basis from what is stored, and returns the result against a buy-and-hold benchmark). It is the cheapest way for the user to eyeball whether the idea roughly behaves before any mode change; offer, do not auto-run.
+**The backtest is the user's next ask, never a closing offer on the create.** One call when they ask: `backtest_run` with the new strategy's slug (the one-shot verb derives window, interval, costs, and time basis from what is stored, and returns the result against a buy-and-hold benchmark), the cheapest way to eyeball whether the idea roughly behaves before any mode change; never auto-run it.
 
 **Replaying against another venue's series is gated.** A Polymarket market's series never pairs with a non-Polymarket strategy, and a Polymarket strategy replays only against its own condition's series (`asset_market_mismatch`); wrapping the same signal in an unpinned candidate to dodge the gate is not a replay of the strategy. Before any replay ask that names a venue or market different from the strategy's, read `skill_read("research", section = "Replaying a saved strategy")` — it carries the identity and price-axis rules and the flags per signal kind.
 
@@ -416,7 +416,7 @@ Sections above may *name* a code; this glossary defines them. Rows marked † ar
 
 **Misc:** `invalid_strategy_history_cursor` (cursors are opaque — reuse `next_cursor` verbatim or drop `before`) · `invalid_options` (digest schedule needs `when`).
 
-**Result-side disclosures (not errors — relay them):** `warnings[]` on create/edit/resume is the disclosure surface — surface it verbatim (defaulted sizer and policies, no-autonomous-exit, venue-leverage-below-strategy, cohort and consent journal notes, the Polymarket axis notes, the forced-downgrade retirement warning). `held_position` (+ its `note`) on pause — verbatim; a non-null `held_position_error` means the disclosure read FAILED and must never be rendered as "nothing at risk". On `strategy_show`: `last_error`, `last_skip_reason` ("why is it not trading"), `last_issue_note` (an operand fault while still acting), and the bracket-coverage fields. `strategy_list` carries a per-row `warning`.
+**Result-side disclosures (not errors — relay them):** `warnings[]` on create/edit/resume is the disclosure surface: one short labelled row per warning, facts kept and sentences dropped (defaulted sizer and policies, no-autonomous-exit, venue-leverage-below-strategy, cohort and consent journal notes, the Polymarket axis notes, the forced-downgrade retirement warning). `held_position` (+ its `note`) on pause — verbatim; a non-null `held_position_error` means the disclosure read FAILED and must never be rendered as "nothing at risk". On `strategy_show`: `last_error`, `last_skip_reason` ("why is it not trading"), `last_issue_note` (an operand fault while still acting), and the bracket-coverage fields. `strategy_list` carries a per-row `warning`.
 
 **Approval cards:** `strategy_remove` and `strategy_paper_reset` raise cards; `strategy_create`/`strategy_edit`/`strategy_resume` card on the args-gated shapes (an enabled `live` or `dry_run` create, a `live` or `dry_run` resume, an edit that touches a live spec's exposure — leverage, capital, `apply_to_position`, `force` — or forms a same-market cohort, and the consent flags — the card IS the consent on chat surfaces). A bare escalation into `live`/`dry_run` lands disarmed and does not card on its own; the resume that arms it does. A declined card is the user's no — never retry it or route around it.
 

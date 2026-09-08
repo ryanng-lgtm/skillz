@@ -30,22 +30,22 @@ Unsure a metric name exists in this build? Probe `metric_list` first; if it's ab
 
 ### Routing
 
-Quick routing — the common asks, the call, the defaults to assume, and the offer:
+Quick routing — the common asks, the call, the defaults to assume, and the one follow-up at most:
 
-| Ask | Call | What to assume or avoid — disclose it, then offer |
+| Ask | Call | What to assume or avoid — disclose it, then stop (one follow-up at most) |
 | --- | --- | --- |
-| "what's BTC at?" / price / 24h change | `markets` | never `metric_get`; offer an alert at a level |
-| "what's RSI on BTC?" | `metric_get`, one query | rsi(14), HOUR; no venue named → omit `exchange`, the result's `listing_note` names the listing read — say it in words; offer the alert at 70/30 and the chart |
-| "the 200-day SMA on BTC" | `metric_get`, one query | sma with `period` from the ask, DAY; offer the alert at the cross |
+| "what's BTC at?" / price / 24h change | `markets` | never `metric_get`; the one follow-up is an alert at a level |
+| "what's RSI on BTC?" | `metric_get`, one query | rsi(14), HOUR; no venue named → omit `exchange`, the result's `listing_note` names the listing read — say it in words; the one follow-up is the alert at 70/30 |
+| "the 200-day SMA on BTC" | `metric_get`, one query | sma with `period` from the ask, DAY; the one follow-up is the alert at the cross |
 | "MACD and EMA on ETH, 4h" | `metric_get`, several `queries[]` in ONE call | macd 12/26/9 (three ids — §"Technical indicators"), ema(20), FOUR_HOURS |
-| "Bollinger Bands on SOL" | `metric_get`, three `queries[]` | bb_upper/bb_middle/bb_lower (20, 2); offer the chart overlay |
-| "find oversold perps" / vague scan | `metric_screen` | top 25 by VOLUME_24H, rsi(14) lt:30; disclose the scanned scope, don't ask first; offer the alert and a scheduled rerun |
+| "Bollinger Bands on SOL" | `metric_get`, three `queries[]` | bb_upper/bb_middle/bb_lower (20, 2); the one follow-up is the chart overlay |
+| "find oversold perps" / vague scan | `metric_screen` | top 25 by VOLUME_24H, rsi(14) lt:30; the scope goes in the answer line, don't ask first; the one follow-up is the alert |
 | "compare RSI across BTC, ETH, SOL" | one `metric_screen`, `universe.kind: symbols` | never a per-symbol `metric_get` loop |
 | "alert me when …" | `alert_create` | a screen is a one-shot snapshot, not a watch |
 
 ### Reply shape
 
-The first line answers with the value, its defaults in words, and freshness — "BTC RSI(14) on the hourly is 61.2 (Binance, 2 minutes ago)" — then two to four offers tailored to what was read (the alert at the threshold just compared, the chart, the scheduled rerun). Venue and interval names in user text are words — "Binance Futures", "hourly" — never registry ids; raw ids and JSON never reach the user.
+The first line answers with the value, its defaults in words, and freshness — "BTC RSI(14) on the hourly is 61.2 (Binance, 2 minutes ago)" — then at most one follow-up tailored to what was read (the alert at the threshold just compared), never a menu. Venue and interval names in user text are words — "Binance Futures", "hourly" — never registry ids; raw ids and JSON never reach the user.
 
 ## Compute
 
@@ -183,7 +183,7 @@ Result shape (compact — every field name verbatim):
   skipped: [ { symbol, reason } ] }
 ```
 
-Always state the scanned scope in your reply, in words — translate `universe.description`, never paste it: *"Scanned top 25 by 24h volume on Binance Futures (4h RSI). Four are oversold: SOL (27.1), TRX (28.3), ..."* Freshness is per row here — `data_age_seconds`, said as relative time, `0` on a bar still forming — because a thin market's bar lags a liquid one's in the same scan.
+The scanned scope goes into the answer line, in words — translate `universe.description`, never paste it: *"Top 25 Binance perps by 24h volume, 4h RSI: four oversold, SOL (27.1), TRX (28.3), ..."* Freshness is per row here — `data_age_seconds`, said as relative time, `0` on a bar still forming — because a thin market's bar lags a liquid one's in the same scan.
 
 When `scanned.matched` is 0, never reply a bare "none found": the same call carries `nearest`, the closest value that missed the filter among the symbols scanned, so report it — "none under 30 right now; closest SOL at 34" — and offer the alert at the threshold instead. A second scan buys nothing. `nearest` is absent only when every symbol landed in `skipped`, which is a scan failure to report as one.
 
@@ -193,7 +193,7 @@ Per-symbol misses land in `skipped` with a `reason` (e.g. `budget_exceeded`), an
 
 For "find oversold majors", "scan for X", "you find out", "just pick", or "you decide":
 
-1. **Default and disclose — don't ask, don't re-ask. Default to** top 25 by `VOLUME_24H` on the most relevant exchange. Disclose what you scanned in the reply, and offer to change the ranking (price change / OI change / marketcap) or switch to a specific symbol list.
+1. **Default and disclose — don't ask, don't re-ask. Default to** top 25 by `VOLUME_24H` on the most relevant exchange. Name the scope in the answer line; no offer to change the ranking (price change / OI change / marketcap) or the symbol list, the user's next message does that.
 2. **Honor whatever size the user gives.** `n: 500` is fine; API budget is the user's concern.
 
 ### Drilldown pattern (compound conditions)
@@ -241,7 +241,7 @@ Per-symbol skip reasons on a screen (non-fatal — the row moves to `skipped`, t
 
 ## Alerts
 
-alert_create shares this registry and validators — read the live value before arming, take the spec from skill_read("alerts"), and offer the chart and scheduled-rerun follow-ups.
+alert_create shares this registry and validators — read the live value before arming, take the spec from skill_read("alerts"); no chained follow-ups.
 
 `metric_get` uses **the same metric registry, the same parameter validators, and the same data-fetch path** the alert engine uses. If you can compute it here, you can alert on it via `alert_create` with the same metric name and the same params shape — `skill_read("alerts")` carries the spec. If a metric doesn't show up in `metric_list`, it can't be used in an alert either.
 

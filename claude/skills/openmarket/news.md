@@ -49,7 +49,7 @@ An X API token (developer.x.com; pay-per-use, X bills each post read) is stored 
 
 A home that holds a Grok credential reaches live X whatever the chat model: for a question that plainly targets X (an @handle, an x.com link, tweets, posts on X), or when `web_research` is called with `sources: ["x"]`, the call moves to Grok by itself and says so (`x_search: "on_home_grok_credential"`). A question that only implies X (sentiment "on X", chatter) stays on the chat model unless you pass `sources: ["x"]`; the result then says `x_search: "skipped_not_x_targeted"`.
 
-- When a task plainly targets X (an @handle, x.com links, "tweets") and no xAI credential is connected, a created watch may carry a one-time `x_search_hint`: relay it verbatim, then never raise it again.
+- When a task plainly targets X (an @handle, x.com links, "tweets") and no xAI credential is connected, a created watch may carry a one-time `x_search_hint`: relay it once as its own row, then never raise it again.
 - Never block or delay a task on the missing credential; what exists still runs.
 
 ## Providers and ids
@@ -180,13 +180,11 @@ A Stream sold per target delivers nothing until targets are set on it — `om ne
 
 ## After any acquisition, verify the pair
 
-Every acquisition auto-attaches a per-feed watch — relay feed + watch + delivery + daemon in one message; `news_attach` repairs `eventWatchLinked: false` / `feed_unwatched`.
+Every acquisition auto-attaches a per-feed watch; reply "Following <label>; fires land in <channel>"; `news_attach` repairs `eventWatchLinked: false` / `feed_unwatched`.
 
-`create`, `follow`, `add`, and `fork` auto-attach a per-feed event-watch. The action result reports the attach outcome. Always relay the full picture in one message:
+`create`, `follow`, `add`, and `fork` auto-attach a per-feed event-watch, and the action result reports the attach outcome. The reply is one line: "Following <label>; fires land in <channel>". Ids stay in the result until the user needs one; the daemon is named only when it is down (`om status`), with the fix, because a stored watch with no daemon fires nothing.
 
-- the feed (vendor, id, label) and the attached watch id;
-- whether fires reach a channel. A notify-enabled watch with NO channel is NOT off: fires still show as inline cards in an open `om chat` session; a channel only adds pings for when chat is closed. Frame a channel-less home as "add a channel for closed-session pings" (`/setup` in a terminal `om chat` runs the guided connect inline; `om setup telegram` is the terminal verb) — never as "notifications are off". Only an explicit opt-out is truly off. A watch card-only under `notify_unavailable: "no_default"` takes a `routing_choices` answer through `event_watch_edit`, or a channel named at acquisition; `om setup default` never reaches it. Slack wakes need a verified owner member id: `om setup slack` prompts for it (`--user-id` alone does not persist it); without it, reactive chat works but wakes stay off;
-- whether the daemon is running (`om status`), because a stored watch with no daemon fires nothing.
+A notify-enabled watch with NO channel is NOT off: fires still show as inline cards in an open `om chat` session; a channel only adds pings for when chat is closed. Say "chat cards only; add a channel for closed-session pings" (`/setup` in a terminal `om chat` runs the guided connect inline; `om setup telegram` is the terminal verb), never "notifications are off". Only an explicit opt-out is truly off. A watch card-only under `notify_unavailable: "no_default"` takes a `routing_choices` answer through `event_watch_edit`, or a channel named at acquisition; `om setup default` never reaches it. Slack wakes need a verified owner member id: `om setup slack` prompts for it (`--user-id` alone does not persist it); without it, reactive chat works but wakes stay off.
 
 If the attach reports the stream as already covered by an existing watch, say which one. Covered is not the same as firing: when the covering watch is paused, resume it yourself with `event_watch_resume` (which raises a card, like every watch-lifecycle verb this skill reaches; over the plain CLI, `om event-watch resume <id>`) — do not hand the user a command for a tool you hold. Every feed has its own watch — a vendor-wide watch (no per-feed id) cannot be created, and a legacy one never counts as a feed's watch. If an attach reports `broad_watch_id`, that legacy watch also consumes the feed, so its events now arrive twice: tell the user what it is, and offer to clear it with `event_watch_remove` (removing a watch is destructive, so ask first: the call raises an approval card, and `om event-watch remove <id>` is the terminal equivalent, confirming there). To notify on everything from a vendor, don't reach for a vendor-wide watch — set `om config set news.auto_watch.classifier.<vendor> accept_all` so each feed's own watch accepts every event.
 
@@ -206,7 +204,7 @@ Auto-attach behavior is user-configurable (`om config set news.auto_watch off`, 
 
 Similar pings around one story are expected — map the phrase: "stop pinging" = `news_mute`, "too noisy" = cooldown, "wrong stuff" = tighten, "kill it" = carded removal.
 
-Differently-worded posts about the same development each fire separately; vendors collapse only near-identical wording within a short window. Several similar pings around one hot story is expected behavior, not a bug. When the user complains, diagnose first (`om event-watch events <id> --format json` shows the near-identical titles), explain the behavior, then offer remedies in this order:
+Differently-worded posts about the same development each fire separately; vendors collapse only near-identical wording within a short window. Several similar pings around one hot story is expected behavior, not a bug. When the user complains, diagnose first (`om event-watch events <id> --format json` shows the near-identical titles), explain the behavior in one line, then name the one remedy that fits, the first that applies in this order:
 
 1. **Notification cooldown** (keeps the journal complete, quiets the phone): `om event-watch edit <id> --notify-min-interval-sec 1800`. Major updates bypass the cooldown by design, so genuinely big developments still ping immediately.
 2. **Confidence floor**: `om event-watch edit <id> --notify-min-confidence 0.8`.
@@ -238,7 +236,7 @@ A watch can carry market tags (`related_markets`, normalized `EXCHANGE:SYMBOL`).
 Doctrine:
 
 - When the user creates a news watch *because of* a market conversation (an alert they just made, a chart they are discussing), tag it: `event_watch_create` with `related_markets`, or `om event-watch edit <id> --market BINANCE:BTCUSDT` for an existing watch (repeat `--market` per ref; `--clear-markets` removes them). Auto-attached news watches are not tagged automatically, because only the conversation knows which market motivated them.
-- When the user creates a price alert on a market and no news watch covers it, offer the pairing once ("want to know *why* it moves? I can watch the news on BTC too"), not naggingly.
+- A news watch paired to a price alert is the user's next ask; never a closing offer on the alert.
 - Tags are plain metadata: they never affect what the watch matches or fires on, only what price-alert notifications can borrow from it.
 
 ## Backtest before arming anything
