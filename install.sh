@@ -142,6 +142,37 @@ else
   echo "Plans vault: $PLANS_VAULT not present — skipped."
 fi
 
+# ---- Codex plugins ---------------------------------------------------------
+#
+# Third-party Codex plugins are not vendored here; Codex snapshots the Git
+# marketplace itself and records both entries in config.toml, which stays
+# per-machine. This step re-creates them on a fresh box. Idempotent.
+#
+# Entry format: <plugin>@<marketplace>=<git url>
+CODEX_PLUGINS="
+caveman@caveman-repo=https://github.com/yibie/caveman-codex
+"
+if command -v codex >/dev/null 2>&1; then
+  echo
+  echo "Codex plugins:"
+  installed="$(codex plugin list 2>/dev/null || true)"
+  markets="$(codex plugin marketplace list 2>/dev/null || true)"
+  for entry in $CODEX_PLUGINS; do
+    plugin="${entry%%=*}"; url="${entry#*=}"; market="${plugin#*@}"
+    if ! printf '%s\n' "$markets" | grep -q "^$market[[:space:]]"; then
+      codex plugin marketplace add "$url" >/dev/null && echo "  added marketplace $market"
+    fi
+    if printf '%s\n' "$installed" | grep -q "^$plugin[[:space:]]*installed"; then
+      echo "  $plugin already installed"
+    else
+      codex plugin add "$plugin" >/dev/null && echo "  installed $plugin"
+    fi
+  done
+else
+  echo
+  echo "Codex plugins: codex not on PATH — skipped."
+fi
+
 # ---- Auto-sync hook --------------------------------------------------------
 if [ "$INSTALL_HOOK" = 1 ]; then
   echo

@@ -79,6 +79,16 @@ these are Codex-specific:
 | `mr-markdown` | `$mr-markdown` | Codex port of the `/mr-markdown` command: condensed MR description for the current branch in one copyable code block. |
 | `graphify` | `$graphify` | The Codex build of graphify. Genuinely differs from the Claude one, so it's stored separately rather than symlinked. |
 
+#### Codex plugins
+
+Third-party Codex plugins live in Codex's own marketplace cache, not in this
+repo. `install.sh` registers each marketplace and installs the plugin; Codex
+records both in `config.toml` (per machine, not tracked here).
+
+| Plugin | Source | Trigger | What it does |
+| --- | --- | --- | --- |
+| `caveman@caveman-repo` | [yibie/caveman-codex](https://github.com/yibie/caveman-codex) | `$caveman [lite\|full\|ultra]` | Codex port of the caveman plugin used on the Claude side — terse internal reasoning, same rules. Its bundled `compress` skill ships as symlinks the plugin copy drops, so only `$caveman` works. Upgrade with `codex plugin marketplace upgrade`. |
+
 ### Commands (`claude/commands/` → `~/.claude/commands/`)
 
 | Command | What it does |

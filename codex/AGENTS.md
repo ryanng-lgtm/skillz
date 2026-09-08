@@ -4,7 +4,7 @@ Same rules as my Claude Code setup (`claude/CLAUDE.md` in the skillz repo), phra
 
 ## Caveman mode — internal only
 
-Codex has no caveman plugin, so apply the convention directly. Compress **internal work only** to save tokens — drop articles, filler, pleasantries, and hedging; fragments are fine; keep every technical term exact:
+The `caveman` plugin is installed (`caveman@caveman-repo`, skill `$caveman`; read its SKILL.md once per session for the compression rules — levels `lite|full|ultra`, default `full`). Nothing activates it automatically in Codex, so treat it as always on for **internal work only** to save tokens:
 
 - Reasoning / planning notes
 - Skill execution (audits, plans, debugging steps, checklists)
