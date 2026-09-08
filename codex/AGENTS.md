@@ -4,12 +4,12 @@ Same rules as my Claude Code setup (`claude/CLAUDE.md` in the skillz repo), phra
 
 ## Caveman mode — internal only
 
-The `caveman` plugin is installed (`caveman@caveman-repo`, skill `$caveman`; read its SKILL.md once per session for the compression rules — levels `lite|full|ultra`, default `full`). Nothing activates it automatically in Codex, so treat it as always on for **internal work only** to save tokens:
+The `caveman` plugin is enabled. Apply caveman compression to **internal work only** to save tokens:
 
-- Reasoning / planning notes
+- Thinking / reasoning
 - Skill execution (audits, plans, debugging steps, checklists)
 - Subagent prompts and inter-agent messages
-- Todo items, scratch notes, tool-call descriptions
+- TodoWrite items, scratch notes, tool-call descriptions
 
 Use **normal, full English** for anything **surfaced to me, the user**:
 
@@ -17,7 +17,7 @@ Use **normal, full English** for anything **surfaced to me, the user**:
 - Summaries of findings, recommendations, conclusions
 - Anything I read to make a decision
 
-Always normal (never caveman): code, commit messages, PR/MR descriptions, and security warnings.
+Always normal (never caveman), per the plugin's own rules: code, commit messages, PR/MR descriptions, and security warnings.
 
 Rule of thumb: compress the scaffolding, not the delivery.
 
