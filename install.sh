@@ -15,6 +15,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 WORK_SKILLS="${WORK_SKILLS_DIR:-$HOME/repos/llm/skills}"
+PLANS_VAULT="${PLANS_VAULT_DIR:-$HOME/Library/Mobile Documents/com~apple~CloudDocs/Obsidian/Claude Plans}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 FORCE=0
@@ -114,6 +115,31 @@ if [ -d "$WORK_SKILLS" ]; then
   echo "  $linked linked, $adopted adopted, $skipped skipped"
 else
   echo "Work skills: $WORK_SKILLS not present on this machine — skipped."
+fi
+
+# ---- Plans vault -----------------------------------------------------------
+#
+# Both agents write plan files through <home>/plans, which points at the same
+# iCloud-synced Obsidian folder so Claude and Codex plans land side by side.
+# A real directory already at <home>/plans is left alone and reported.
+if [ -d "$PLANS_VAULT" ]; then
+  echo
+  echo "Plans vault:"
+  for home in "$CLAUDE_HOME" "$CODEX_HOME"; do
+    dest="$home/plans"
+    if [ -L "$dest" ]; then
+      [ "$(readlink "$dest")" = "$PLANS_VAULT" ] || ln -sfn "$PLANS_VAULT" "$dest"
+      echo "  $dest → vault"
+    elif [ -e "$dest" ]; then
+      echo "  SKIP $dest — real directory exists. Move its contents into the vault, remove it, and re-run."
+    else
+      ln -sfn "$PLANS_VAULT" "$dest"
+      echo "  $dest → vault"
+    fi
+  done
+else
+  echo
+  echo "Plans vault: $PLANS_VAULT not present — skipped."
 fi
 
 # ---- Auto-sync hook --------------------------------------------------------

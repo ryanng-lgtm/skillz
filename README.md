@@ -32,9 +32,16 @@ codex/
   skills/        skills                     → ~/.codex/skills/<name>
 ```
 
-`codex/skills/om-chat` and `codex/skills/openmarket` are relative symlinks into
-`claude/skills/`. Those two are identical across both agents, so they're stored
-once; `graphify` genuinely differs between them and is stored twice.
+`install.sh` also points `~/.claude/plans` and `~/.codex/plans` at the same
+iCloud-synced Obsidian folder (`Obsidian/Claude Plans`), so plan files from
+either agent land in one vault. Override the folder with `PLANS_VAULT_DIR`.
+
+Most of `codex/skills/` is relative symlinks into `claude/skills/`: a skill that
+works the same under both agents is stored once. `graphify` genuinely differs
+between them and is stored twice; `commit` and `mr-markdown` are Codex skill
+ports of the Claude slash commands. `codex/AGENTS.md` carries the same rules as
+`claude/CLAUDE.md` in Codex terms (`$skill` triggers, no plan-mode pinning) —
+change one, change the other.
 
 ## Skills
 
@@ -62,10 +69,15 @@ commits, not edited by hand, and aren't listed.
 
 ### Codex (`codex/skills/` → `~/.codex/skills/`)
 
+Every skill in the Claude table above is linked here too and invoked as
+`$name` (Codex's skill mention syntax), e.g. `$demuddy path/to/plan.md`. Only
+these are Codex-specific:
+
 | Skill | Trigger | What it does |
 | --- | --- | --- |
-| `commit` | `/commit` | Commits the currently staged changes only — concise message from the existing index, never stages anything extra. |
-| `graphify` | `/graphify` | The Codex build of graphify. Genuinely differs from the Claude one, so it's stored separately rather than symlinked. |
+| `commit` | `$commit` | Commits the currently staged changes only — concise message from the existing index, never stages anything extra. |
+| `mr-markdown` | `$mr-markdown` | Codex port of the `/mr-markdown` command: condensed MR description for the current branch in one copyable code block. |
+| `graphify` | `$graphify` | The Codex build of graphify. Genuinely differs from the Claude one, so it's stored separately rather than symlinked. |
 
 ### Commands (`claude/commands/` → `~/.claude/commands/`)
 

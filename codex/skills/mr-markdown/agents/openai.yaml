@@ -1,0 +1,4 @@
+interface:
+  display_name: "MR markdown"
+  short_description: "Condensed MR description for the current branch"
+  default_prompt: "Use $mr-markdown to write the MR description for this branch."
