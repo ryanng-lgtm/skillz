@@ -9,6 +9,10 @@
 #   --force    replace a conflicting real directory (backed up first) with the repo link
 #   --no-hook  skip installing the auto-sync hook into ~/.claude/settings.json
 #
+# @file install.sh
+# @brief Link shared agent configuration and install declared Codex plugins.
+# @description Re-running refreshes links and repairs conflicting plugin marketplace sources.
+
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,7 +28,7 @@ for arg in "$@"; do
   case "$arg" in
     --force)   FORCE=1 ;;
     --no-hook) INSTALL_HOOK=0 ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
     *) echo "unknown flag: $arg" >&2; exit 2 ;;
   esac
 done
@@ -150,26 +154,40 @@ fi
 #
 # Entry format: <plugin>@<marketplace>=<git url>
 #
-# No `grep -q` below: `codex plugin list` dumps the whole remote catalog (500KB+),
-# -q would exit on the first match, printf would die of SIGPIPE, and pipefail
-# would turn a found plugin into "not installed". Plain grep reads it all.
+# Plain grep consumes all output, avoiding SIGPIPE under pipefail.
 CODEX_PLUGINS="
 caveman@caveman-repo=https://github.com/yibie/caveman-codex
 "
 if command -v codex >/dev/null 2>&1; then
   echo
   echo "Codex plugins:"
-  installed="$(codex plugin list 2>/dev/null || true)"
-  markets="$(codex plugin marketplace list 2>/dev/null || true)"
   for entry in $CODEX_PLUGINS; do
-    plugin="${entry%%=*}"; url="${entry#*=}"; market="${plugin#*@}"
-    if ! printf '%s\n' "$markets" | grep "^$market[[:space:]]" >/dev/null; then
-      codex plugin marketplace add "$url" >/dev/null && echo "  added marketplace $market"
+    plugin="${entry%%=*}"
+    url="${entry#*=}"
+    market="${plugin#*@}"
+    # Listing only shows discoverable roots; a conflicting saved source can
+    # still exist when its checkout is missing. Let add check the source.
+    if market_result="$(codex plugin marketplace add "$url" 2>&1)"; then
+      echo "  marketplace $market ready"
+    else
+      case "$market_result" in
+        *"Error: marketplace '$market' is already added from a different source; remove it before adding this source"*)
+          echo "  replacing marketplace $market with $url"
+          codex plugin marketplace remove "$market" >/dev/null
+          codex plugin marketplace add "$url" >/dev/null
+          ;;
+        *)
+          printf '%s\n' "$market_result" >&2
+          exit 1
+          ;;
+      esac
     fi
-    if printf '%s\n' "$installed" | grep "^$plugin[[:space:]]*installed" >/dev/null; then
+    installed="$(codex plugin list --marketplace "$market")"
+    if printf '%s\n' "$installed" | grep "^${plugin}[[:space:]]\{1,\}installed" >/dev/null; then
       echo "  $plugin already installed"
     else
-      codex plugin add "$plugin" >/dev/null && echo "  installed $plugin"
+      codex plugin add "$plugin" >/dev/null
+      echo "  installed $plugin"
     fi
   done
 else
