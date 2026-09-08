@@ -49,6 +49,8 @@ Raw `rg`/`find` is still fine for trivial single-file lookups where a graph quer
 
 ## Commits — all projects
 
+Commit as you go: after each coherent unit of work, stage only task-owned changes and use the commit skill to create a local checkpoint without waiting for a separate request. Run the relevant checks first, state any incomplete validation honestly, and keep commits on the task branch. Do not push without explicit authorization.
+
 Every commit goes through the `$commit` skill (`~/.codex/skills/commit/SKILL.md`), main thread included: stage with `git add`, then run the skill to commit what's staged — no raw `git commit`. One summary line plus at most three bullets, no AI/co-authored-by watermark.
 
 Whenever a subagent makes a git commit, it must ALWAYS do the same: first stage its changes (`git add`), then follow the `commit` skill. When dispatching any subagent that may commit, include this requirement explicitly in its prompt.

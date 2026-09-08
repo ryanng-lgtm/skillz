@@ -45,7 +45,9 @@ Raw Grep/Glob is still fine for trivial single-file lookups where a graph query 
 - Plan mode pins its plan file at the plans root (harness-assigned path, not editable during planning): keep working with the pinned path while plan mode is active, then move the file into today's dated dir as the first action after plan mode ends.
 - **Never commit plan/spec documents.** Session-authored plans, specs, and design docs live in the plans vault only — never `git add` or commit them into a project repo, and exclude them from any staging sweep (`git add -A` included). If one is needed in a repo temporarily, it stays untracked.
 
-## Subagent commits — all projects
+## Commits — all projects
+
+Commit as you go: after each coherent unit of work, stage only task-owned changes and use the commit skill to create a local checkpoint without waiting for a separate request. Run the relevant checks first, state any incomplete validation honestly, and keep commits on the task branch. Do not push without explicit authorization.
 
 Whenever a subagent makes a git commit, it must ALWAYS: first stage its changes (`git add`), then invoke the `/commit` skill to commit what's staged — no raw `git commit` from subagents. When dispatching any subagent that may commit, include this requirement explicitly in its prompt.
 
