@@ -13,9 +13,20 @@ set -uo pipefail
 MONO=${OM_MONO:-$HOME/Documents/GitLab/openmarket-internal}
 GUI=${OM_GUI:-$HOME/Documents/GitLab/openmarket-chat}
 SLOT="$MONO/packages/cli/assets/rooms-gui"
-PLIST=~/Library/LaunchAgents/xyz.openmarket.runner.plist
-HEALTH=http://127.0.0.1:31337/healthz
-ROOMS=http://127.0.0.1:31337/rooms/
+# $HOME, not ~ -- tilde does not expand inside ${VAR:-default}, so a literal '~'
+# path would silently fail the plist parse and fall through to the PATH lookup.
+PLIST=${OM_PLIST:-$HOME/Library/LaunchAgents/xyz.openmarket.runner.plist}
+PORT=${OM_PORT:-31337}
+HEALTH=http://127.0.0.1:$PORT/healthz
+ROOMS=http://127.0.0.1:$PORT/rooms/
+
+# stat(1) is not portable. Dispatch on uname; do NOT write `stat -Lf ... || stat -Lc ...`,
+# because -f is a valid GNU flag too (--file-system), so on Linux the first form
+# does not cleanly fail -- it prints filesystem info for the wrong operand.
+case "$(uname -s)" in
+  Darwin) inode() { stat -Lf '%i' "$1" 2>/dev/null; } ;;
+  *)      inode() { stat -Lc '%i' "$1" 2>/dev/null; } ;;
+esac
 
 GATE_ONLY=0; FORCE=0; NO_GUI=0
 for a in "$@"; do case "$a" in
@@ -53,12 +64,21 @@ done
 
 # Where does the daemon actually live? Read it, never assume -- the plist has
 # been repointed at the repo build tree before (openmarket-chat #603).
-TARGET=$(sed -n '/ProgramArguments/,/<\/array>/p' "$PLIST" 2>/dev/null \
-         | grep -o '<string>[^<]*om</string>' | head -1 | sed 's/<[^>]*>//g')
-[ -n "$TARGET" ] || TARGET=$(realpath /opt/homebrew/bin/om 2>/dev/null)
-[ -n "$TARGET" ] || die "cannot determine the daemon binary from $PLIST or PATH"
+# Resolution order, first hit wins:
+#   OM_TARGET  explicit; the only path that works with no launchd at all
+#   $PLIST     this Mac's launchd agent, parsed
+#   PATH       whatever `om` resolves to, symlinks followed
+if [ -n "${OM_TARGET:-}" ]; then
+  TARGET=$OM_TARGET; SRC=OM_TARGET
+else
+  TARGET=$(sed -n '/ProgramArguments/,/<\/array>/p' "$PLIST" 2>/dev/null \
+           | grep -o '<string>[^<]*om</string>' | head -1 | sed 's/<[^>]*>//g')
+  SRC=plist
+fi
+[ -n "$TARGET" ] || { TARGET=$(realpath "$(command -v om)" 2>/dev/null); SRC=PATH; }
+[ -n "$TARGET" ] || die "cannot determine the daemon binary -- set OM_TARGET, or check $PLIST"
 case "$TARGET" in *dist/om) MODE=repo ;; *) MODE=versioned ;; esac
-say "daemon target:         $TARGET  [$MODE]"
+say "daemon target:         $TARGET  [$MODE, via $SRC]"
 case "$TARGET" in *"/Cellar/openmarket/"*) die "target is a Homebrew install -- see SKILL.md hard rules" ;; esac
 
 # ---------------------------------------------------------------- skip gate
@@ -69,9 +89,9 @@ health=$(curl -s --max-time 5 "$HEALTH")
 pid=$(printf '%s' "$health" | sed -n 's/.*"pid":\([0-9]*\).*/\1/p')
 
 if [ -z "$pid" ]; then
-  flag "daemon not answering on 31337"
+  flag "daemon not answering on $PORT"
 else
-  disk=$(stat -Lf '%i' "$TARGET" 2>/dev/null)
+  disk=$(inode "$TARGET")
   # match /om$, NOT /bin\/om/ -- the narrow pattern silently misses a repo-tree
   # daemon and reports an empty inode as if the daemon were sick.
   live=$(lsof -p "$pid" 2>/dev/null | awk '$4=="txt" && $NF ~ /\/om$/ {print $(NF-1); exit}')
@@ -136,6 +156,11 @@ else
   say "BUILD -- $why"
 fi
 [ "$GATE_ONLY" = 1 ] && exit 0
+
+# Everything above is portable and read-only, so --gate works from any machine.
+# Everything below drives launchd through `om service` and installs into this
+# Mac's versioned layout. Port that (systemd, direct exec) before lifting this.
+[ "$(uname -s)" = Darwin ] || die "build/install is macOS-only (launchd via \`om service\`); --gate works anywhere"
 
 # ---------------------------------------------------------------- build
 if [ "$NO_GUI" = 0 ]; then
@@ -262,12 +287,12 @@ fi
 J=$(mktemp); curl -s -c "$J" -o /dev/null --max-time 5 "$ROOMS"
 AUTH=$(curl -s --max-time 9 -b "$J" -H "Connection: Upgrade" -H "Upgrade: websocket" \
   -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
-  "http://127.0.0.1:31337/ws/rooms" 2>/dev/null | strings | grep -oE '"type":"[A-Z_]+"|"username":"[^"]*"' | head -2 | tr '\n' ' ')
+  "http://127.0.0.1:$PORT/ws/rooms" 2>/dev/null | strings | grep -oE '"type":"[A-Z_]+"|"username":"[^"]*"' | head -2 | tr '\n' ' ')
 rm -f "$J"
 say "auth:                  ${AUTH:-NO HANDSHAKE}"
 case "$AUTH" in *AUTH_SUCCESS*) ;; *) say "  ^^ sign-in did not complete -- check the protocol pin" ;; esac
 
-BIND=$(lsof -nP -iTCP:31337 -sTCP:LISTEN | awk 'NR==2{print $9}')
+BIND=$(lsof -nP -iTCP:$PORT -sTCP:LISTEN | awk 'NR==2{print $9}')
 say "listener:              ${BIND:-none}"
 case "$BIND" in 127.0.0.1:*) ;; *) say "  ^^ not IPv4 loopback -- the MacBook tunnel cannot reach it" ;; esac
 
@@ -275,4 +300,4 @@ LE=$(printf '%s' "$h" | sed -n 's/.*"last_error":"\([^"]*\)".*/\1/p' | head -c 1
 [ -n "$LE" ] && say "last error:            $LE"
 say "pending consents:      $(om agent grants requests --status pending 2>/dev/null | head -1)"
 say ""
-say "OPEN: http://localhost:31337/rooms#/"
+say "OPEN: http://localhost:$PORT/rooms#/"
