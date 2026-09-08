@@ -149,6 +149,10 @@ fi
 # per-machine. This step re-creates them on a fresh box. Idempotent.
 #
 # Entry format: <plugin>@<marketplace>=<git url>
+#
+# No `grep -q` below: `codex plugin list` dumps the whole remote catalog (500KB+),
+# -q would exit on the first match, printf would die of SIGPIPE, and pipefail
+# would turn a found plugin into "not installed". Plain grep reads it all.
 CODEX_PLUGINS="
 caveman@caveman-repo=https://github.com/yibie/caveman-codex
 "
@@ -159,10 +163,10 @@ if command -v codex >/dev/null 2>&1; then
   markets="$(codex plugin marketplace list 2>/dev/null || true)"
   for entry in $CODEX_PLUGINS; do
     plugin="${entry%%=*}"; url="${entry#*=}"; market="${plugin#*@}"
-    if ! printf '%s\n' "$markets" | grep -q "^$market[[:space:]]"; then
+    if ! printf '%s\n' "$markets" | grep "^$market[[:space:]]" >/dev/null; then
       codex plugin marketplace add "$url" >/dev/null && echo "  added marketplace $market"
     fi
-    if printf '%s\n' "$installed" | grep -q "^$plugin[[:space:]]*installed"; then
+    if printf '%s\n' "$installed" | grep "^$plugin[[:space:]]*installed" >/dev/null; then
       echo "  $plugin already installed"
     else
       codex plugin add "$plugin" >/dev/null && echo "  installed $plugin"
