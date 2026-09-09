@@ -1,6 +1,6 @@
 ---
 name: openmarket-orders
-description: Place orders directly on a paired execution venue (Hyperliquid or Polymarket CLOB) via `om order place`. Use this skill when the user wants to act NOW — limit-bid a level, take a position, exit a position — rather than wire a condition-triggered alert with `on_fire.execute`. Covers Hyperliquid flags, JSON-stdin specs for both venues, venue account reads, sizing modes, bracket children where supported, and the preview/confirm pattern. Always shell to `om` for these actions — `om order place …` to submit, `om execute list` / `om execute summary` to inspect what landed. NEVER pass `--yes` unless the user explicitly says "submit it" / "no preview needed" / "yes do it" — preview-then-confirm is the safety contract. If the requested venue is not paired, route the user to `om setup hyperliquid` or `om setup polymarket` and stop.
+description: Place orders directly on a paired execution venue (Hyperliquid or Polymarket CLOB) via `om order place`. Use this skill when the user wants to act NOW — limit-bid a level, take a position, exit a position — rather than wire a condition watch with a money step. Covers Hyperliquid flags, JSON-stdin specs for both venues, venue account reads, sizing modes, bracket children where supported, and the preview/confirm pattern. Always shell to `om` for these actions — `om order place …` to submit, `om execute list` / `om execute summary` to inspect what landed. NEVER pass `--yes` unless the user explicitly says "submit it" / "no preview needed" / "yes do it" — preview-then-confirm is the safety contract. If the requested venue is not paired, route the user to `om setup hyperliquid` or `om setup polymarket` and stop.
 user-invocable: false
 allowed-tools:
   - Bash(om *)
@@ -43,9 +43,9 @@ Route "do X now" here and "do X when Y" to the alerts skill — the table maps c
 | *"Buy $200 of BTC at 95k right now"* | **this skill** — one-shot order |
 | *"Bid $200 of BTC at 95k and let it rest"* | **this skill** — one-shot limit order |
 | *"Close my SOL position"* | **this skill** — one-shot reduce-only order |
-| *"Buy $200 of BTC when it crosses 95k"* | **alerts skill** — alert with `on_fire.execute` |
+| *"Buy $200 of BTC when it crosses 95k"* | **watch skill** — a condition watch with a money step (`om watch create ... --money order`) |
 | *"Watch BTC and tell me when RSI < 30"* | **alerts skill** — notification-only alert |
-| *"Long BTC every time RSI < 30 (up to 3 times)"* | **alerts skill** — alert with top-level `fire_mode: "recurring"` + `on_fire.execute` + `caps.max_fires: 3` |
+| *"Long BTC every time RSI < 30 (up to 3 times)"* | **watch skill** — a recurring condition watch with a money step capped at `max_fires: 3` |
 
 Rule of thumb: if the user's phrasing is **"do X"**, this skill. If it's **"do X when Y"**, the alerts skill.
 
@@ -159,7 +159,7 @@ Polymarket CLOB read-side commands are separate from `om polymarket ...` analyti
 
 ## The order shape
 
-`om order place` accepts either a flag form (quick) or a JSON spec via stdin. Both validate against the same schema, used in identical form by `on_fire.execute` on alerts:
+`om order place` accepts either a flag form (quick) or a JSON spec via stdin. Both validate against the same schema a watch's order step uses for its terms:
 
 ```jsonc
 {
@@ -177,7 +177,7 @@ Polymarket CLOB read-side commands are separate from `om polymarket ...` analyti
     "stop_loss_px": 92000,
     "take_profit_px": 101000
   },
-  "caps": {                                // optional; for parity with `on_fire.execute`
+  "caps": {                                // optional; for parity with a watch's order step
     "max_size": 250                        // per-order notional ceiling in USD
   }
 }
@@ -401,7 +401,7 @@ om execute summary --since 7d            # rollup: counts, total notional
 
 Render in plain English, one row per receipt. Show: status, venue, notional, OID (or short cloid), and how long ago. Don't dump JSON unless the user explicitly asks for raw.
 
-Receipts whose `alert_id` is null are manual orders. Receipts with an alert_id came from an alert's `on_fire.execute` — for those, the user can also run `om execute history <alert_id>` (alerts skill territory).
+Receipts whose `alert_id` is null are manual orders. Receipts with a watch id came from a watch's money step — for those, the user can also run `om execute history <watch_id>` (watch skill territory).
 
 ## Errors
 
@@ -438,7 +438,7 @@ Out-of-scope order types and reply habits: no stop-market / trailing stop / OCO,
 
 The neighbouring skills — alerts for "do X when Y", metrics for a pre-flight indicator read.
 
-- `openmarket-alerts` — author alerts that watch a condition and (optionally) auto-execute on fire via `on_fire.execute`. Use that skill when the user's intent is "do X when Y", not "do X now."
+- `watch` — author watches that read a condition and (optionally) act on each row through a money step, armed with `om watch arm <watch> <chain>`. Use that skill when the user's intent is "do X when Y", not "do X now."
 - `openmarket-metrics` — read live scalar metric values (RSI, MACD, EMA, funding rate, open interest, etc.) for a symbol. Useful as a pre-flight check before authoring an order ("what's the 4h RSI on BTC?" then "below 30, oversold" then user decides whether to long here).
 
 <!-- AUTO: ARGUMENT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
@@ -507,7 +507,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 
 Every `om` command this skill covers, one line each with its action name — check exact verbs and spellings here.
 
-- `om execute history` (action: `execute_history`) — Read the execution receipts a watch's execute action placed, newest-first.
+- `om execute history` (action: `execute_history`) — Read the execution receipts a watch's money steps placed, newest-first.
 - `om execute list` (action: `execute_list`) — List execution receipts ordered newest-first.
 - `om execute summary` (action: `execute_summary`) — Aggregate execution receipt counts by status, plus total notional.
 

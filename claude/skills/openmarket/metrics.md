@@ -1,6 +1,6 @@
 ---
 name: openmarket-metrics
-description: Compute named scalar metric values ad-hoc via `om metric get`, scan a universe of symbols via `om metric screen`, and discover the registry via `om metric list`. Covers the registered indicators (RSI, EMA, SMA, MACD, Bollinger Bands, ATR, Stochastic) plus the alert-engine schema-parity metrics (price, delta_pct, delta_abs, volume, funding_rate, open_interest). Chart-only indicators (CCI, MFI, OBV, VWAP, ADL, ADX, PSAR, Ichimoku) are NOT computable here — they exist only as chart overlays via `om chart indicator add`. NOT for raw-price chat questions — "what's the price of X" / "what's BTC at" / 24h-change queries always route to the `markets` tool (sparkline + lastPrice), never to `metric_get`. Use this skill when the user asks for a named indicator value ("what's RSI on BTC?", "give me MACD for ETH 4h"), wants to find symbols matching a condition ("find oversold majors", "scan top 50 by volume for high RSI"), wants to verify an alert threshold against the live value, or needs to discover what metrics exist. Always shell to `om metric`; never recompute math locally.
+description: Compute named scalar metric values ad-hoc via `om metric get`, scan a universe of symbols via `om metric screen`, and discover the registry via `om metric list`. Covers the registered indicators (RSI, EMA, SMA, MACD, Bollinger Bands, ATR, Stochastic) plus the alert-engine schema-parity metrics (price, delta_pct, delta_abs, volume, funding_rate, open_interest). Chart-only indicators (CCI, MFI, OBV, VWAP, ADL, ADX, PSAR, Ichimoku) are NOT computable here — they exist only as chart overlays via `om chart indicator add`. NOT for raw-price chat questions — "what's the price of X" / "what's BTC at" / 24h-change queries route to the `markets` tool (lastPrice, priceChange24h) and price history to `points`, never to `metric_get`. Use this skill when the user asks for a named indicator value ("what's RSI on BTC?", "give me MACD for ETH 4h"), wants to find symbols matching a condition ("find oversold majors", "scan top 50 by volume for high RSI"), wants to verify an alert threshold against the live value, or needs to discover what metrics exist. Always shell to `om metric`; never recompute math locally.
 user-invocable: false
 allowed-tools:
   - Bash(om *)
@@ -14,7 +14,7 @@ Four tools: `metric_get` (one symbol, one or many metrics — §"Compute"), `met
 
 ### Guardrails
 
-**Never answer a price question with `metric_get`.** For "what's BTC at" / "price of SOL" / 24h-change questions call the `markets` tool — `lastPrice` plus a sparkline-ready `prices` array in one call; `metric_get` accepts `price` only so an alert spec can be sanity-checked.
+**Never answer a price question with `metric_get`.** For "what's BTC at" / "price of SOL" / 24h-change questions call the `markets` tool (`lastPrice`, the venue's rolling `priceChange24h`); price history is `points` candles on every venue; `metric_get` accepts `price` only so an alert spec can be sanity-checked.
 
 **Never loop `metric_get` across a list of symbols.** One `metric_screen` call replaces N gets; a loop burns the per-turn tool budget before answering. The one exception — a few gets after a screen has already narrowed the field — is in §"Scan".
 
@@ -24,7 +24,7 @@ Chart-only indicators (CCI, MFI, OBV, VWAP, ADL, ADX, PSAR, Ichimoku) are not co
 
 Never present one venue's numbers as another's: when the requested venue can't serve a metric, refuse with the venue named, or state the substitution explicitly.
 
-Prediction markets leave this surface entirely: route to the `polymarket_*` tools.
+Prediction markets: `metric_screen` cannot rank them (browse with `markets`); odds and depth are the `polymarket_*` tools.
 
 Unsure a metric name exists in this build? Probe `metric_list` first; if it's absent, say so and stop — never guess a metric id.
 
@@ -41,6 +41,8 @@ Quick routing — the common asks, the call, the defaults to assume, and the one
 | "Bollinger Bands on SOL" | `metric_get`, three `queries[]` | bb_upper/bb_middle/bb_lower (20, 2); the one follow-up is the chart overlay |
 | "find oversold perps" / vague scan | `metric_screen` | top 25 by VOLUME_24H, rsi(14) lt:30; the scope goes in the answer line, don't ask first; the one follow-up is the alert |
 | "compare RSI across BTC, ETH, SOL" | one `metric_screen`, `universe.kind: symbols` | never a per-symbol `metric_get` loop |
+| "footprint" / "volume profile" on BTC | `points`, type VOLUME_PROFILE_AGG | the default summary IS the answer (window POC, value area, delta, per-bar rows); never scan raw levels; for one bar's levels narrow `lookback` to that bar and pass `detail: full` |
+| "TPO" / "auction profile" / "market profile" on BTC | `points`, type TPO_AGG, `tpoSession` TPO_SESSION_DAILY, `rawSymbol` + `exchanges` pinned | never a bare `coin` (every market of the coin merges under one id) unless `transform.groupBy.type` is GROUP_BY_TYPE_SUM; the session block (POC, value area, day type) is the answer |
 | "alert me when …" | `alert_create` | a screen is a one-shot snapshot, not a watch |
 
 ### Reply shape
@@ -125,7 +127,7 @@ One metric's per-bar history with metric_series: the trend/context sibling of me
 
 Result shape: `{ asOf, selector, metric, params, series }` where `series` is `[barOpenSec, value]` pairs (epoch seconds), oldest first. Warm-up and not-ready bars are omitted, so the array can be shorter than `bars`; the newest pair reads the still-forming bar and moves until that bar closes. Timestamps let you speak in time ("since 14:00 UTC"); never paste raw epoch seconds to the user.
 
-Boundaries, same as the rest of this surface: price history routes to `markets` (its `prices` array is the price sparkline), one metric per call (several metrics = several calls), and a many-symbols question is a §"Scan", not a per-symbol series loop. A series is still a snapshot of the past: for the standing version of the ask, offer the alert.
+Boundaries, same as the rest of this surface: price history routes to `points` candles on every venue with `lookback` narrowed to the bars the question needs, one metric per call (several metrics = several calls), and a many-symbols question is a §"Scan", not a per-symbol series loop. A series is still a snapshot of the past: for the standing version of the ask, offer the alert.
 
 ## Scan
 
@@ -217,7 +219,7 @@ Every failure shape on this surface: typed codes (invalid_query, tier_forbidden)
 | code | Meaning | Recovery — and what to say |
 | --- | --- | --- |
 | `invalid_query` | Unknown metric name, an out-of-range param value, a missing param on the three rows that document none (`volume_sma`, `rolling_high`, `rolling_low`), a period whose window exceeds the lookback cap, or an unknown interval. | Fix what the message names, or call `metric_list` to confirm the metric exists and what it takes. An indicator you simply left params off reads its documented default, so a rejection on a params key is about the VALUE, never the omission. Tell the user what was corrected when it changes their ask. |
-| `unsupported_exchange_for_metrics` | Exchange has no OHLCV-style data (e.g. POLYMARKET). | Route to the right action surface; for prediction markets use the `polymarket_*` tools. Name the boundary in words ("Polymarket has odds, not candles"). |
+| `unsupported_exchange_for_metrics` | `metric_screen` cannot rank this exchange (e.g. POLYMARKET); candles still come from `points` on every venue. | Browse prediction markets with `markets`, read one market's scalar with `metric_get`, odds and depth with the `polymarket_*` tools. Name the boundary in words ("the screen can't rank Polymarket"). |
 | `unsupported_universe_for_exchange` | A `top_n` universe on a venue with no ranked listings — POLYGON (equity listings serve, ranking stats don't), POLYGON_FX, POLYGON_INDICES, FX_OTC, CME (entitlement-gated). | Re-screen with `universe.kind: "symbols"` and an explicit list; `symbol_resolve` finds the venue spellings. Say the venue can't be *ranked*, never that it has no data. |
 | `missing_api_key` | No credential at all. | Tell the user to run `om init` (a guest key normally mints itself; this usually means the auth service was unreachable). |
 | `api_key_invalid` | The key is dead (401). | Call `auth_relogin`: it returns an approval URL + code to relay; the user approves in a signed-in browser and the machine heals itself. Say what's happening in words while the flow runs. Do NOT suggest minting/pasting keys first. |

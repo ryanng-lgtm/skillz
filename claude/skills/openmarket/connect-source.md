@@ -1,6 +1,6 @@
 ---
 name: openmarket-connect-source
-description: Turn a source the user owns or names (their inbox, their CI, a URL they point at, an internal webhook, a log pipe) into a first-class event feed through the daemon's inbound ingest door. Use when the information lives at the user's own place rather than in the world's public coverage ("watch my X", a URL plus watch intent, push/pipe/webhook/ingest language). Builds the watch and the glue, hands at most one paste, and is finished only when the first real event has arrived and classified.
+description: Turn a source the user owns or names (their inbox, their CI, a URL they point at, an internal webhook, a log pipe) into a first-class event feed through the daemon's inbound ingest door. Use when the information lives at the user's own place rather than in the world's public coverage ("watch my X", a URL plus watch intent, push/pipe/webhook/ingest language). Builds the watch and the glue, hands at most one paste, and is finished only when the first real event has arrived and classified; when the user wants followers, shares the watch and prints both doors (the local command and one relay mailbox link per named sender).
 user-invocable: false
 allowed-tools:
   - Bash(om *)
@@ -32,22 +32,33 @@ Use this skill when:
 One inbound watch is the destination for every lane. Create it first, with the goal distilled from the user's own sentence, because the goal IS the filter:
 
 ```bash
-om event-watch create --inbound --goal "Fire on real CI failures on main. Do not fire on flaky reruns, scheduled jobs, or branch builds"
+om watch create "CI failures" --inbound --goal "Fire on real CI failures on main. Do not fire on flaky reruns, scheduled jobs, or branch builds"
 ```
 
 - `--inbound` means there is no vendor stream: the watch IS the endpoint. The create prints the door once: the `/ingest/v1/<watch>` endpoint plus a bearer token, shown exactly once (only its hash is stored). Losing or leaking the token has one answer, `om watch rotate-token <watch>`, and rotation is revocation.
 - The default classifier (`llm_every_event`) judges every push against the goal under the watch's normal daily budgets, so a chatty source still yields a clean journal. `--classifier-mode accept_all` journals everything and is the user's explicit opt-out, same doctrine as `news.md`.
-- Delivery, channels, muting, and noise tuning are ordinary watch mechanics (`event-watches.md`); the feed also appears in `om news list --provider inbound` like any other feed.
+- Delivery, channels, muting, and noise tuning are ordinary watch mechanics (`watch.md`); the feed also appears in `om news list --provider inbound` like any other feed.
 
 Then build the glue that feeds the door. Build everything you can reach yourself (the watch, the goal, the glue script, the test push); the user's hands are for the one thing only they can touch.
 
-## The five lanes
+## The six lanes
 
-1. **Vendor-covered.** Check before building: a named PUBLIC place a vendor already carries (government releases, agency feeds, big public accounts) is a vendor feed wearing a URL. `om news catalog` and a follow/add beat any glue, and the result is maintained by someone else. Glue for a covered source is waste; route it back to `news.md`.
-2. **Public poller.** A public page or endpoint no vendor carries: first check the declared poller below (a well-formed RSS, Atom, or JSON feed needs no glue at all); otherwise write the poller yourself (a few lines that fetch, diff against the last seen marker, and push only what is new via `om event push <watch> --text ...`), and put it on a cadence with the machine's own scheduler (cron, a launchd or systemd timer) on a box that can reach both the page and the daemon. Pass `occurred_at` and a stable `id` per item so retries dedupe and history lands in source-time order.
-3. **Webhook, one paste.** The source can already POST (CI systems, internal scanners, SaaS webhook settings): the door IS the webhook target. Hand one paste for their settings page: the endpoint URL and the `Authorization: Bearer <token>` header, complete, nothing to assemble.
-4. **Email rule.** The information arrives in their inbox: hand one paste for their mail provider's rule or script box that turns a matching message into a door POST (subject or sender filter, body as `text`). A provider that can only forward, never POST, gets local glue below (a small fetcher on the user's side of the mailbox) instead of a rule.
-5. **Local glue.** Anything already on their machine (a log, a folder, a process, a pipe): a few lines that tail or scan and push. Local glue needs no token at all: `om event push` authenticates as the operator, and with the daemon down an `accept_all` push is still written through the same store path.
+One inbound watch, six ways to feed it, and the same share branch at the end of each; pick by where the information lives and who can reach the daemon.
+
+1. **Vendor-covered.** Check before building: a named PUBLIC place a vendor already carries (government releases, agency feeds, big public accounts) is a vendor feed wearing a URL. `om news catalog` and a follow/add beat any glue, and the result is maintained by someone else. Glue for a covered source is waste; route it back to `news.md`. Share it: the vendor's coverage is theirs; what the user shares is a watch of their own that reads it (§"Share it").
+2. **Public poller.** A public page or endpoint no vendor carries: first check the declared poller below (a well-formed RSS, Atom, or JSON feed needs no glue at all); otherwise write the poller yourself (a few lines that fetch, diff against the last seen marker, and push only what is new via `om event push <watch> --text ...`), and put it on a cadence with the machine's own scheduler (cron, a launchd or systemd timer) on a box that can reach both the page and the daemon. Pass `occurred_at` and a stable `id` per item so retries dedupe and history lands in source-time order. Share it: the poller stays on the user's box and pushes through the local door, so every accepted row carries `push` and reaches followers (§"Share it").
+3. **Webhook, one paste.** The source can already POST (CI systems, internal scanners, SaaS webhook settings): the door IS the webhook target. Hand one paste for their settings page: the endpoint URL and the `Authorization: Bearer <token>` header, complete, nothing to assemble. Share it: the sender keeps posting to the same door; followers receive what the goal accepts (§"Share it").
+4. **Email rule.** The information arrives in their inbox: hand one paste for their mail provider's rule or script box that turns a matching message into a door POST (subject or sender filter, body as `text`). A provider that can only forward, never POST, gets local glue below (a small fetcher on the user's side of the mailbox) instead of a rule. Share it: the rule keeps firing into the door; the share forwards the accepted rows, never the mail (§"Share it").
+5. **Local glue.** Anything already on their machine (a log, a folder, a process, a pipe): a few lines that tail or scan and push. Local glue needs no token at all: `om event push` authenticates as the operator, and with the daemon down an `accept_all` push is still written through the same store path. Share it: local glue is the owner's door, so its rows carry `push` and reach followers with nothing further to switch on (§"Share it").
+6. **Relay mailbox.** The sender runs on someone else's servers and can never reach this Mac (TradingView alerts, Zapier, a GitHub Action, an email bridge): the relay holds a mailbox for the watch, one private link per named sender, and the daemon collects the mail (§"The relay mailbox"). Needs the share first, because the mailbox is a door on the shared topic. Share it: a new sender starts off; switch its forwarding on, or a share whose every named sender is off refuses (§"Share it").
+
+## Share it: the branch at the end of every lane
+
+Every lane ends with the same offer once the first event arrived; read this when the user wants followers for a connected source.
+
+Share the watch from one card, `watch_share` (`om watch share <ref>`), with three choices the user makes in prose: `share_mode: "fires_only"` (`--fires-only`; the manifest plus the signed fire history ships, and the recipe, the script, the glue and the sources never do, so a private signal stays private; the default `recipe` mode ships the inbound recipe as a template the installer connects their own sender to), the `door` (`public`, `knock` or `private`; `--door <policy>`), and the price when they want one (`pricing` with `price_usd`; `--price 5` or `--price 20/month`; the seller rules and what each share mode can carry: `marketplace.md §"Paid listings"`). `dry_run: true` shows the card first; the yes publishes and mints the topic.
+
+Then print both doors, complete: the local command, `om event push <ref> --text "..."` (the operator's own door; from a shell on this Mac it needs no token, and a script on another box uses the `/ingest/v1/<ref>` endpoint with the bearer token the create printed), and one mailbox link per sender the user named, `om watch relay-door <ref> --sender <name>` (each printed exactly once). What forwards: a row through the local door carries `push` and reaches followers (the implicit sender `local`, always forwarding, never a link); mailbox mail reaches them only from a sender that is named and switched on (`om watch senders <ref>`; a new name starts off); a share whose every named sender is off refuses with the exact `om watch senders <ref> --forward on <sender>` that fixes it, so switch one on, or push once through the local door, before the card. `om relay trace @scope/name` (`relay_trace`) is then the creator's own view of the topic: head, followers, last fire. Followers cannot tell a cron push from a TradingView alert: every fire arrives signed by this daemon and numbered.
 
 ## The declared poller: lane 2 without the glue
 
@@ -63,21 +74,24 @@ When the public place is already a well-formed feed (RSS, Atom, or a JSON list o
 - The fetcher is deliberately narrow, and the limits route for you: https only, private and link-local hosts refused on every poll and every redirect, no cookies and no auth headers ever, one document per poll capped at 2 MiB. A feed behind a login is not a public source (lane 4 or 5); a page that is not one of the three formats needs lane-2 glue, because the declared poller never scrapes HTML.
 - First open sweeps the feed's current items silently so a fresh watch does not ping on the backlog; history enters on request via `om watch backfill`.
 
-## TradingView and other cloud senders: the relay mailbox
+## The relay mailbox: lane 6 for senders that cannot reach the Mac
 
-TradingView alerts POST from TradingView's servers, so they can never reach a laptop's loopback door. When the watch is live-shared over a relay topic (`om watch share --live --carrier topic`), skip the tunnel: mint the topic's relay mailbox and hand TradingView the drop URL.
+Lane 6 in full: one private link per named sender, forwarding per sender, rotation, and what the relay holds; read this for TradingView, Zapier or any sender off the user's box.
+
+TradingView alerts, Zapier, a GitHub Action and an email bridge POST from someone else's servers, so they can never reach a laptop's loopback door; the relay holds a mailbox for the watch instead, one private link per named sender, and the daemon collects the mail.
 
 ```bash
-om event-watch relay-door <watch>
+om watch relay-door ci-failures --sender tradingview
 ```
 
-- The drop URL prints exactly once (only its hash is stored at the relay). Paste it into the alert's Webhook URL box in TradingView. Re-running the verb rotates: the old URL stops accepting mail immediately, and every sender still using it must be re-keyed by hand.
-- Set the alert's Message to the ingest door's JSON body. TradingView placeholders interpolate before sending, so a complete paste is: `{"text": "{{ticker}} crossed {{close}}", "kind": "tradingview", "market": "{{ticker}}"}`. Same wire rules as the local door: `text` required, unknown keys refused, 64KB cap.
-- The relay only HOLDS mail (about 30 messages per minute per mailbox, kept up to 72 hours). Your daemon collects it on the stream drain cadence, judges each message against the watch's goal under the normal budgets, and only then publishes to the topic. A malformed message is skipped and counted, never published and never wedging the queue.
-- Requires the topic share first: an unshared or room-shared watch is refused with the exact share command to run. A relay that does not offer mailbox doors yet answers with a typed hint; the share itself is unaffected.
-- Verification is unchanged: fire a test alert in TradingView, then read the event back (`om watch events <watch> --format json`) after the next collect pass and say what the classifier did with it.
+- The link prints exactly once (only its hash is stored at the relay); paste it into the sender's webhook box. Re-running the verb rotates: the old link stops accepting mail the instant the new hash lands, and the sender is re-keyed by hand. The relay holds one mailbox per topic, so a mint for any sender rotates every other sender's link dead as well: mint every sender's link in one sitting, and after any rotation re-paste every sender. Rotation is revocation; a leaked link is junk on this one watch until rotated, never a key, an account or another watch. A link minted without `--sender` is a link for nobody: its mail is journaled and never forwards.
+- One name per sender, one line per sender. `om watch senders <ref>` (`watch_senders`) lists the implicit `local` sender (the owner's own pushes through the local door, always forwarding, never a link) and each named sender with whether it forwards, whether it holds the live link, its last push and its 7-day count; `om watch senders <ref> --forward on|off <sender>` flips one switch. A new name starts off. Mail from a link nobody named, or from a sender switched off, is judged and kept locally and never reaches followers, so a leaked link cannot publish under the creator's name. A sender name is lowercase letters, digits, `-` and `_`, at most 32 characters, the way its dashboard spells it (`tradingview`, `zapier`, `github`); `local` is reserved.
+- The body is the same JSON the local door takes (`text` required, unknown keys refused, 64KB cap). TradingView interpolates its placeholders before sending, so a complete paste is `{"text": "{{ticker}} crossed {{close}}", "kind": "tradingview", "market": "{{ticker}}"}`. A row arrives stamped `inbound` with the sender's name, which is what `watch_history` and the ai steps see.
+- The relay only holds mail (about 30 messages per minute per mailbox, kept up to 72 hours). The daemon collects it on the stream drain cadence, judges each message against the watch's goal under the normal budgets, and only then signs and forwards. A malformed message is skipped and counted, never forwarded and never wedging the queue.
+- Requires the watch to be shared live over a topic first: an unshared or room-shared watch is refused with the exact share command to run. A relay that does not offer mailbox doors answers with a typed hint; the share itself is unaffected.
+- Verification is unchanged: fire a test alert at the sender, then read the row back (`om watch history <ref>`, `watch_history`) after the next collect pass and say what the classifier did with it.
 
-Use the mailbox only for senders that cannot reach the daemon. A source on the user's own machine or network still takes lanes 2 through 5: the local door is judged immediately, needs no share, and holds nothing at a third party.
+Use the mailbox only for senders that cannot reach the daemon. A source on the user's own machine or network takes lanes 2 through 5: the local door is judged immediately, needs no share, and holds nothing at a third party.
 
 ## The one-paste contract
 
@@ -85,7 +99,7 @@ Hand at most ONE paste, and only when the source sits behind the user's own acco
 
 ## Verified means the first event arrived
 
-The word "configured" is banned as an endpoint. Nothing here is done because it is set up; it is done when the first real event arrived and classified as intended, and completion is reported as exactly that: "first event arrived, classified irrelevant, as intended." Wait for the first natural event when the cadence makes that reasonable; otherwise send a test push yourself (`om event push <watch> --text "test: ..."`), read it back (`om watch events <watch> --format json`), and say what the classifier did with it. A test event the goal rejects as `irrelevant` is the filter PASSING, not the pipe failing; say it that way.
+The word "configured" is banned as an endpoint. Nothing here is done because it is set up; it is done when the first real event arrived and classified as intended, and completion is reported as exactly that: "first event arrived, classified irrelevant, as intended." Wait for the first natural event when the cadence makes that reasonable; otherwise send a test push yourself (`om event push <watch> --text "test: ..."`), read it back (`om watch history <watch>`, `watch_history`), and say what the classifier did with it. A test event the goal rejects as `irrelevant` is the filter PASSING, not the pipe failing; say it that way.
 
 ## Failure modes, named out loud
 
