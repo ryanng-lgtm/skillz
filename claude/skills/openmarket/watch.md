@@ -561,9 +561,9 @@ What a reply must carry from each result-bearing action here; the per-branch gui
   - discloses `entries[].deliveries[].error` — The channel's error on a failed send, the reason on a cancelled one; null otherwise.
   - discloses `entries[].steps[].text` — The step's result, its no-action reason or its error text.
 - `follow_list`
-  - discloses `follows[].reason` — A plain sentence on a denied or ended row (the publisher denied your request, closed this share, removed you, or the request expired), or on a live follow held by a relay outage (the relay has been unreachable since hh:mm); null otherwise.
+  - discloses `follows[].reason` — A plain sentence on a denied or ended row (the author turned down your request, closed this share, removed you, or the request expired), or on a live follow whose home cannot reach OpenMarket (unreachable since hh:mm); null otherwise.
 - `follow_show`
-  - discloses `reason` — A plain sentence on a denied or ended row (the publisher denied your request, closed this share, removed you, or the request expired), or on a live follow held by a relay outage (the relay has been unreachable since hh:mm); null otherwise.
+  - discloses `reason` — A plain sentence on a denied or ended row (the author turned down your request, closed this share, removed you, or the request expired), or on a live follow whose home cannot reach OpenMarket (unreachable since hh:mm); null otherwise.
   - discloses `history[].sentence` — The one line the surfaces print for this row.
   - discloses `suggested[].reason` — Why a chain is not offered on a follow (needs a condition source, ...); null otherwise.
 - `watch_action_add`
@@ -617,12 +617,12 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om watch action adopt` (action: `watch_action_adopt`) — Adopt ONE of the author's suggested chains onto a FOLLOW watch (follow_show.suggested[] lists them; a recipe-mode share ships them).
 - `om watch action remove` (action: `watch_action_remove`) — Detach one step from a watch by its id or name (or its kind when the watch holds one step of that kind).
 - `om watch action rename` (action: `watch_action_rename`) — Give one step of a watch a new name (its `label`): what the delivery header, `om watch history`, `om watch show`, /notis and every card print for the step instead of its id.
-- `om watch action take` (action: `watch_edit`) — Update a watch's goal, filters, extra guidance, classifier, notify, an inbound watch's ingest daily cap, overview, related-market tags, or the brief_condition_fires switch.
+- `om watch action take` (action: `watch_edit`) — Update a watch's label (its name), goal, filters, extra guidance, classifier, notify, an inbound watch's ingest daily cap, overview, related-market tags, or the brief_condition_fires switch.
 - `om watch amend` (action: `watch_amend`) — Correct an event this watch already streamed over its TOPIC lane.
 - `om watch arm` (action: `watch_arm`) — : Give the steps of ONE chain of a watch their OK (every step connected through `input` or a cancel target arms together) under the approval card's authorization; the chain is named by its id, an unambiguous prefix, or any of its step ids, and may be omitted when exactly one chain of the watch waits for an OK (two or more refuse and list them).
 - `om watch backfill` (action: `watch_backfill`) — Run a historical backfill for an existing (live or paused) or newly-created event watch.
 - `om watch create` (action: `watch_create`) — Create a watch on one source: a market condition (alert me when BTC crosses 100k, when funding goes negative, when RSI hits 30, when price goes above a level), a timer, an upstream fan-in over local watches (`upstream`), several sources presented as one watch (`sources`), or a structured stream reference (an X handle, a feed, a vendor stream, an inbound door) the user named or a probe verified.
-- `om watch edit` (action: `watch_edit`) — Update a watch's goal, filters, extra guidance, classifier, notify, an inbound watch's ingest daily cap, overview, related-market tags, or the brief_condition_fires switch.
+- `om watch edit` (action: `watch_edit`) — Update a watch's label (its name), goal, filters, extra guidance, classifier, notify, an inbound watch's ingest daily cap, overview, related-market tags, or the brief_condition_fires switch.
 - `om watch execute` — (bespoke; see narrative above)
 - `om watch execute digest` (action: `watch_execute_digest`) — Read stored strategy-digest editions (a daily prose briefing over the last 24h of every enabled strategy: fills, reversals, exits, P&L, skip gates, anomalies) and manage THE daily schedule.
 - `om watch execute digest every` (action: `watch_execute_digest`) — Read stored strategy-digest editions (a daily prose briefing over the last 24h of every enabled strategy: fills, reversals, exits, P&L, skip gates, anomalies) and manage THE daily schedule.
@@ -666,7 +666,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om watch share` (action: `watch_share`) — Publish a watch from ONE card, or several watches as one pack of recipes and owned live signals (refs with name, or group for every watch under a label: one address, one page, one install; every chain arms on the installing machine with om watch arm <watch> <chain>; with_execute ships money steps' terms, box values never; the dry run returns assembly_sha256 and the commit refuses assembly_changed on drift).
 - `om watch show` (action: `watch_show`) — Show one watch by id or slug, or a whole watch group (a composite) by its label (`group: <label>`).
 - `om watch source` — (bespoke; see narrative above)
-- `om watch source take` (action: `watch_edit`) — Update a watch's goal, filters, extra guidance, classifier, notify, an inbound watch's ingest daily cap, overview, related-market tags, or the brief_condition_fires switch.
+- `om watch source take` (action: `watch_edit`) — Update a watch's label (its name), goal, filters, extra guidance, classifier, notify, an inbound watch's ingest daily cap, overview, related-market tags, or the brief_condition_fires switch.
 - `om watch state clear` (action: `watch_state_clear`) — Wipe a script-condition watch's persistent memory.
 - `om watch state show` (action: `watch_state_show`) — Return the JSON state blob a script-condition watch last persisted via next_state.
 - `om watch stats` (action: `watch_stats`) — Reliability receipts for condition watches, computed on read from the engine's ledgers (fire trail, catch-up runs, delivery outbox, runtime): fires and late fires, per-channel delivery outcomes, catch-up verification, and health over a 7d (default) or 30d window.
