@@ -194,7 +194,7 @@ with `hold-long.json` (the strategy half is creatable verbatim via `om watch cre
 }
 ```
 
-`--candidate-file <path>` replays a strategy that exists nowhere on disk — a JSON file of shape `{strategy, signal?}` where `strategy` carries the authoring fields of `om watch create` (slug, signal, market, sizer, optional label/exit/daemon) and the optional inline `signal` carries `{slug, spec, label?}`. Omit `signal` to reference a saved signal by the strategy's `signal` slug. Nothing is persisted, and the report's `backtest.query.candidate: true` marks its origin.
+`--candidate-file <path>` replays a strategy that exists nowhere on disk — a JSON file of shape `{strategy, signal?}` where `strategy` carries the authoring fields of `om watch create` (slug, signal, market, sizer, optional label/exit/daemon) and the optional inline `signal` carries `{slug, spec, label?}`. Omit `signal` to reference a saved signal by the strategy's `signal` slug. Nothing is persisted, and the report's `backtest.query.candidate: true` marks its origin. On the agent lane the strategy fields and the metric-rule spec arms are deferred parts of `backtest_spec` and `backtest_sweep`: `schema_read {intent: "backtest_strategy"}` or `{intent: "backtest_signal"}` loads their full shape before the call.
 
 **A candidate replays under its signal kind's rules.** The worked example above is the occurrence-anchored `constant` shape (`--watch` anchors entries to accepted rows); a candidate whose signal (inline or referenced) is a metric or text kind takes the same invocation flags and bar-mode rules as a saved strategy of that kind — before running a non-constant candidate, read `skill_read("research", section = "Replaying a saved strategy")` for the flags per signal kind.
 
@@ -247,6 +247,8 @@ The venue models no short-side margin or liquidation: an adverse short rides to 
 
 `web_research` answers outside-world questions by running one isolated call on the user's own model with the provider's hosted web search (plus X search on xAI).
 
+It is one of four reaching rows on a watch's tool menu (`Search the web (and X on Grok)`, on by default; `page_read`, `search_files` and `make_image` below are the other three, off until ticked): a model run or an ai step calls the same function on its sealed lane, and the card's `Reaches out:` line names it (`watch.md §"Model source"`).
+
 There is nothing to read before using it: call the tool directly with a complete question and it returns grounded prose with source URLs inline. News, filings, posts, interviews and docs are its territory.
 
 - Use it for fresh external facts. Never for market data om already serves (prices, funding, OI, candles: use the market tools).
@@ -266,6 +268,28 @@ Give it the URL exactly as the user or a `web_research` citation supplied it (ne
 - Typed refusals to relay plainly: `page_read_blocked` (private, loopback, link-local or metadata addresses are never fetched), `redirected_origin` (the page moved to another origin, an http URL that upgrades to https included; call again with the URL the error names so that origin gets its own card, unless the error says it landed on x.com: then use `web_research` with `sources: ["x"]`), `x_domain_unsupported` (x.com / twitter.com serve no readable page: use `web_research` with `sources: ["x"]`), `page_too_large` (over 2 MB), `unsupported_content_type` (HTML, text and markdown are always readable, PDF and office documents when the build carries the document converter; nothing else), `document_conversion_unavailable` (this build has no converter: ask for an HTML version), `page_http_error`.
 - HTML is reduced to plain visible text (scripts, styles and hidden elements dropped, not a readability pass), so navigation and footer text can surround the article; PDF and office files convert through the local document converter when the build carries one.
 - `om config set agent.page_read off` disables the reader for this daemon.
+
+## Files you uploaded to the maker (the `search_files` tool)
+
+`search_files` asks one question over documents the user uploaded to their AI maker's file store, in one isolated call on the user's own model.
+
+The store is the maker's handle (an OpenAI vector store id such as `vs_...`, a Google file search store name such as `fileSearchStores/...`); the maker's file search tool is on for that one request and no om tools ride inside it. `om research search-files <store> <ask>` is the same read from the CLI.
+
+- Give it the store handle exactly as the maker spells it and a complete question. It answers `text` (fenced, untrusted: the documents were written by whoever wrote them), `provider`, `model` and `store`.
+- OpenAI (Responses) and Google API keys run it; every other lane (Anthropic, xAI, OpenRouter, a subscription credential) answers `maker_tool_unsupported` with the fix in the hint. Say so instead of retrying.
+- A model run names only the store its approval sealed; another store answers `file_store_not_sealed`.
+- Typed refusals: `search_files_timeout`, `search_files_empty`, `search_files_failed`, `llm_not_configured`.
+
+## Make images (the `make_image` tool)
+
+`make_image` draws one image on the user's AI maker's image API, never the chat model, and the daemon files the bytes under this home's media directory.
+
+The wire per maker: OpenAI `images.generate`, Google Imagen or a Gemini image model, xAI's images endpoint. `om research make-image <prompt>` is the same call from the CLI and prints where the file landed.
+
+- The result is an artifact id (`wm-...`) with `mime`, `bytes`, `width`/`height` (when the header states them), `provider` and `image_model`: never a path. A model run's finding carries the id and the delivery attaches the image through the media fence; in chat, relay the id and the size.
+- Attended, the home's default maker draws with its first image model; `size` takes the maker's spelling (OpenAI `1024x1024`, `1536x1024`, `1024x1536` or `auto`; Google an aspect ratio such as `16:9`, or `1K`/`2K`). A model run sends the size and quality its approval sealed, whatever the call names.
+- OpenAI, Google and xAI API keys run it; Anthropic, OpenRouter and a subscription credential answer `maker_tool_unsupported` with the fix in the hint.
+- Typed refusals: `image_option_unsupported` (a size or quality the maker cannot take), `image_empty`, `image_unsupported_type`, `media_too_large` (over 8 MiB), `make_image_timeout`, `make_image_failed`, `image_lane_unsealed` (a model run whose approval ticked no images row).
 
 <!-- AUTO: ARGUMENT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
@@ -307,6 +331,8 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 - `backtest_sweep`
   - `interval` — Defaults to the base signal's declared interval on bar-cadence sweeps (implicitly HOUR when its selector omits one), else MINUTE
   - `max_llm_calls` — Default: 500.
+- `make_image`
+  - `size` — Omitted: the maker's default.
 - `page_read`
   - `max_chars` — Cap on the returned text in characters (default 12000, ceiling 40000), counted as the model receives it (JSON-escaped); the text is cut shorter still when the result's own fields (final_url, title, page_path) need the room.
 - `research_study`
@@ -345,11 +371,13 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om backtest sweep` (action: `backtest_sweep`) — Replay N spec variants of one base strategy (saved slug or unsaved candidate) over ONE shared market-data pass.
 
 - `om research` — (bespoke; see narrative above)
+- `om research make-image` (action: `make_image`) — Make one image with the user's AI maker's image API on the sealed image lane (the maker, image model, size and quality the run's approval named; attended, the home's default maker with its first image model), never the chat model.
 - `om research page` (action: `page_read`) — Read one web page or document the user or a search result named, and return its readable text.
 - `om research page-grants` — (bespoke; see narrative above)
 - `om research page-grants clear` — Forget every page_read origin grant.
 - `om research page-grants list` — List the origins page_read may read again without an approval card, newest first.
 - `om research page-grants revoke` — Forget one origin's grant so the next page_read there raises a fresh approval card.
+- `om research search-files` (action: `search_files`) — Ask a question over documents the user uploaded to their AI maker (an OpenAI vector store id, a Google file search store name): one isolated model request on the user's own credential with the maker's file search tool enabled and no om tools attached.
 - `om research study` (action: `research_study`) — Run a strictly correlational event-anchored study over accepted event-watch rows and one asset's candles, or use locate_only to return just the event occurrences.
 
 <!-- AUTO: END COMMAND REFERENCE -->

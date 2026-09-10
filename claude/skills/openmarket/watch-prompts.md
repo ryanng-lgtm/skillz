@@ -1,6 +1,6 @@
 ---
 name: openmarket-watch-prompts
-description: "What an ai step on a watch sees when it runs and how to write one: the header the daemon generates (verbatim), the INPUT row per source kind, every function on the leash with its return shape, the three answer shapes and which readers accept each, the definitions fields for a decision or a word list, the @{Name} mention syntax, worked prompts (a judge, a note, a screen) and the refusal-is-the-fix table. Read before writing or editing any ai step's prompt, toolsAllow, output or definitions, and whenever a create answers watching_unknown_source, watching_unknown_tool, watching_reader_unsatisfied or watching_definitions_overlap."
+description: "What an ai step on a watch sees when it runs and how to write one: the header the daemon generates (verbatim), the INPUT row per source kind, the tool menu (the default set, the reaching rows and where each reaches out, every function's return shape), the three answer shapes and which readers accept each, the definitions fields for a decision or a word list, the @{Name} mention syntax, worked prompts (a judge, a note, a screen) and the refusal-is-the-fix table. Read before writing or editing any ai step's prompt, tools, output or definitions, and whenever a create answers watching_unknown_source, watching_unknown_tool, watching_reader_unsatisfied or watching_definitions_overlap."
 user-invocable: false
 allowed-tools:
   - Bash(om *)
@@ -9,12 +9,12 @@ allowed-tools:
 
 # Writing an ai step
 
-An ai step is one model turn per row. The daemon hands the turn a header it generated from the watch, the one update that triggered the run, and the author's instructions; the turn reads, calls the functions on its leash, and answers in the shape the step declared. The author writes only the instructions, and every name in them must exist on the watch.
+An ai step is one model turn per row. The daemon hands the turn a header it generated from the watch, the one update that triggered the run, and the author's instructions; the turn reads, calls the functions its menu ticks, and answers in the shape the step declared. The author writes only the instructions, and every name in them must exist on the watch.
 
 **Guardrails**
 
-- Read the watch first (`watch_show`), then list the callable functions (`watch_tools`): never invent a source name or a tool name. A source is mentioned as `@{Name}` exactly as `watch_show` prints it; a tool is named exactly as `watch_tools` lists it (§"Mentions", §"The leash").
-- The prompt has no hands: the turn acts only through the functions on its leash. There is no run-a-script, write-a-file or call-any-URL function, and a money function never resolves on a leash; a prompt asking for one ends with "tool not available" in the record.
+- Read the watch first (`watch_show`), then the menu (`watch_tools`): never invent a source name or a tool name. A source is mentioned as `@{Name}` exactly as `watch_show` prints it; a tool is named exactly as `watch_tools` lists it (§"Mentions", §"The leash").
+- The prompt has no hands: the turn acts only through the functions its menu ticks, and the menu is the default set unless the step says otherwise (`tools` absent = every read plus web search, `[]` = none, a list = exactly those). There is no run-a-script, write-a-file or call-any-URL function, and a money function never resolves on a menu; a prompt asking for one ends with "tool not available" in the record.
 - Choose the answer shape from the reader: a person, a webhook or a next ai step reads `text`; an `order` reads a `word` from a list covering `buy`, `sell`, `none`; a `strategy` reads a `verdict`. A mismatch refuses at create, never at run time (§"Answer shapes").
 - A decision or a word list is written as `definitions` fields, never as prose paragraphs; the daemon composes the INSTRUCTIONS block from them and runs one model check for overlap at create (§"Definitions").
 - Test the saved step with `watch_test` preview before arming. Inspect its real input and typed output; offline fixtures are simulations, not evidence of model judgment. `run_models: true` requests a charged model preview with tools and delivery sandboxed.
@@ -23,7 +23,7 @@ An ai step is one model turn per row. The daemon hands the turn a header it gene
 
 **Routing**
 
-- What the turn receives, with the header verbatim → §"What the model sees"; the fields of the one update, per source kind → §"INPUT per source kind"; the callable functions and their return shapes → §"The leash"; `text`, `word`, `verdict` and their readers → §"Answer shapes"; the fields of a decision or a word list → §"Definitions"; `@{Name}` and the read-first rule → §"Mentions"; three complete steps → §"Worked prompts"; every refusal and its one change → §"Refusal is the fix".
+- What the turn receives, with the header verbatim → §"What the model sees"; the fields of the one update, per source kind → §"INPUT per source kind"; the menu, the default set, the reaching rows and every function's return shape → §"The leash"; `text`, `word`, `verdict` and their readers → §"Answer shapes"; the fields of a decision or a word list → §"Definitions"; `@{Name}` and the read-first rule → §"Mentions"; three complete steps → §"Worked prompts"; every refusal and its one change → §"Refusal is the fix".
 - A model run's prompt (`watch_model_add`: a standing question answered on a cadence, with no firing row, no INPUT and no mentions), the header it sees and its two answer shapes → §"A source prompt is not a step prompt"; the run itself, its card, its pick and its caps are `watch.md §"Model source"`.
 - The watch around the step (sources and their roles, filters, chains, delivery, the preview, arming, publishing) is `watch.md §"Compose end to end"`; the money step a word or verdict feeds is `watch.md §"Money step"`.
 
@@ -121,7 +121,7 @@ INSTRUCTIONS
 Explain the decision in two sentences for the desk channel: the direction and confidence, and the one reading that decided it. No advice, no hedging.
 ```
 
-What to take from the header: the `Sources:` lines are the only source names that exist, spelled exactly as a mention must spell them; the `Tools:` lines are the whole leash, nothing else exists, and each line's `returns:` is the shape to read the result by; the `Answer as:` line is enforced (an answer outside it is a `no_action` row and nothing downstream runs); `Fired:` names the source, or the producer step of a chained step, or `the clock (no source row)` for a timer, which has no INPUT block at all. A word step's line reads `Answer as: one word from: buy, sell, none`.
+What to take from the header: the `Sources:` lines are the only source names that exist, spelled exactly as a mention must spell them; the `Tools:` lines are the whole menu as sealed (machine names, whatever plain rows a person ticked), nothing else exists, and each line's `returns:` is the shape to read the result by; the `Answer as:` line is enforced (an answer outside it is a `no_action` row and nothing downstream runs); `Fired:` names the source, or the producer step of a chained step, or `the clock (no source row)` for a timer, which has no INPUT block at all. A word step's line reads `Answer as: one word from: buy, sell, none`.
 
 ## INPUT per source kind
 
@@ -147,7 +147,7 @@ Every INPUT block opens `INPUT ("<source name>", <row kind>):`, the row kind bei
 
 ## A source prompt is not a step prompt
 
-A model run's prompt has no firing row: what the run sees, the two answer shapes, the leash rule and what a good source prompt states; read this before writing one.
+A model run's prompt has no firing row: what the run sees, the two answer shapes, the menu rule and what a good source prompt states; read this before writing one.
 
 A model run (`watch_model_add`, `watch.md §"Model source"`) fires on its cadence, not on a row, so the turn receives two fenced blocks, not three: the header as `watch_header`, then the prompt whole as `untrusted_instructions` (`INSTRUCTIONS:` then the text, exactly as the card printed it). No `untrusted_source`, no `untrusted_observation`, no INPUT block, no `Fired:` line. `@{Name}` has nothing to point at: a braced or bare mention in a source prompt is plain text that nobody validates, so name nothing that way. The header, as the daemon renders it:
 
@@ -164,7 +164,7 @@ Tools:
 Answer as: a JSON object {"findings": [...]}, one item per distinct finding, newest first
 ```
 
-`Sources:` holds the watch's own arm (a model run watches nothing but itself); `Tools:` is the leash with return shapes, exactly as an ai step's header prints it, `(none)` on an empty leash; `Answer as:` reads `text (one answer; NO_REPLY when there is nothing to report)` for `output: "answer"`. `Now:` and `Last run:` are the window the prompt reasons over; the prompt never restates them.
+`Sources:` holds the watch's own arm (a model run watches nothing but itself); `Tools:` is the sealed list with return shapes, exactly as an ai step's header prints it (machine names; the menu's plain rows are for the person), `(none)` on an empty list; `Answer as:` reads `text (one answer; NO_REPLY when there is nothing to report)` for `output: "answer"`. `Now:` and `Last run:` are the window the prompt reasons over; the prompt never restates them.
 
 The two answer shapes, with the contract lines the system prompt carries for each:
 
@@ -173,12 +173,12 @@ The two answer shapes, with the contract lines the system prompt carries for eac
 | `rows` (the default) | one JSON object, `{"findings": [...]}`, one item per distinct finding, newest first; `{"findings": []}` when nothing | `Your final reply is exactly one JSON object and nothing else: {"findings": [{"title": "...", "summary": "...", "url": "https://..." or null, "source": "..." or null, "date": "YYYY-MM-DD" or null}]}. One item per distinct finding, newest first; summary is one or two concrete sentences; url is the item's own address when it has one; date is the publication date as stated, else null.` then `No other keys, no prose before or after it. Nothing to report answers {"findings": []}.` | one source row per finding: `title` up to 240 characters, `summary` up to 1,200, `source` up to 120, `url` kept only as a valid http(s) address (else dropped, the text kept), `date` kept only as `YYYY-MM-DD` and stored as a claim (`reported_date`), never as the row's time; an item with neither title nor summary is dropped; the reply is read up to 20,000 characters; a finding's id is its url, else a digest of its title and summary, so a repeat never becomes a second row |
 | `answer` | one text answer; exactly `NO_REPLY` when nothing | `Your final reply IS the deliverable. It is sent as-is to the destination the watch names. Write it for that reader, complete and self-contained.` then `If there is nothing worth delivering, reply with exactly NO_REPLY and nothing else.` (the text step's own lines) | one row per run whose text is the answer, up to 4,000 characters; none on `NO_REPLY` |
 
-The leash rule:
+The menu rule (the same rule as a step's, §"The leash"):
 
-- Only the names on `tools` exist for the run (`watch_tools` lists them, up to 16; a name outside refuses `watching_unknown_tool` with the nearest callable), and the header's `Tools:` lines are the whole leash.
-- `watch_history` on the leash is bound to the watch itself: `{source, last}` reads this run's own accepted rows (the `Source:` name), never another watch's, so "skip what you already reported" is one call.
-- `web_research` is the one spender and exists only when named: an isolated nested call on the sealed model, each call one more model request on it, with the reach of the picked lane (X only on xai; the card's `Search reach:` line); no other function on the leash searches.
-- `max_tool_calls` (default 20, at most 32) bounds the calls per run; the run's deadline (`OM_DEADLINE_MODEL_SOURCE_RUN`, 600s by default) ends it, and a run stopped by the deadline lands no rows.
+- `tools` absent seals the default set (every read on this home plus web search, minus a default row the sealed lane cannot run); `[]` seals none; a list seals exactly those names (`watch_tools` lists them; a name outside refuses `watching_unknown_tool` with the nearest callable). The header's `Tools:` lines are the sealed list, whole.
+- `watch_history` on the list is bound to the watch itself: `{source, last}` reads this run's own accepted rows (the `Source:` name), never another watch's, so "skip what you already reported" is one call.
+- The reaching rows are where a run leaves this home: `web_research` (an isolated nested call on the sealed model, each call one more request, with the reach of the picked lane: X only on xai), `page_read` (OpenMarket's own fetcher, every lane), `search_files` (the one store the seal names), `make_image` (the sealed image lane). The card's `Reaches out:` line states them for the pick; a row the lane cannot run prints its capability row and refuses `maker_tool_unsupported` at run time.
+- `max_tool_calls` (default 20, at most 32) bounds the calls per run and `max_runs_per_day` (the person's number, absent = the cadence alone) the runs per UTC day; the run's deadline (`OM_DEADLINE_MODEL_SOURCE_RUN`, 600s by default) ends it, and a run stopped by the deadline lands no rows.
 
 What a good source prompt states (the header already says what the watch, the cadence, the tools and the shape are; say none of it again):
 
@@ -192,9 +192,28 @@ What a good source prompt states (the header already says what the watch, the ca
 
 ## The leash
 
-Every function an ai step may call, one line each with its return shape, and the names never callable from a step; read this before naming a tool anywhere.
+The tool menu a step and a model run share: the default set, the reaching rows, what each function returns, and the names never callable; read this before naming a tool.
 
-`toolsAllow` omitted seals the wide-reads default: every audited read below, as a concrete list frozen at the arm, so a function shipped later never joins an approved chain. `[]` is a reply-only step (INPUT and the header are all it has; the header then prints `Tools:` `(none)`). Name `web_research` explicitly when the task needs hosted search: it spends the user's own AI credential on every run and the arm card says so in its own line. Each name resolves on the installing home at the arm (`unattended_tool_unresolved` names any that does not). The header prints each function as `<name>(returns: <shape>)`, the shape derived from the function's own output schema (an object lists its keys, `key[]` an array, `key{}` a nested object, `[]{...}` an array of objects, clipped past 220 characters); `watch_tools` lists the same lines for the watch at hand and is the read to make before naming one. Unattended, `metric_get` takes at most 8 queries per call and both metric reads take built-in metrics only (a `wrun/` id refuses: a condition source reads installed indicators, a step does not).
+`tools` is one field with one rule on both the step and the model run: ABSENT seals the default set (every audited read on this home plus `web_research`, minus a default row the sealed lane cannot run), `[]` seals no tools (a reply-only step: INPUT and the header are all it has, and the header prints `Tools:` `(none)`), a list seals exactly those names. The seal stores the concrete list, frozen at the arm, so a function shipped later never joins an approved chain, and each name resolves on the installing home at the arm (`unattended_tool_unresolved` names any that does not). `watch_tools` (`om watch tools`) is the read to make before naming one: it returns every function with the plain row it sits on (`row`, `plain`, `when`, `group`, `default`, `account`, `spend`, `warn`, `needs`, `runs_on`), the concrete `default_set`, and the rows this build greys out (`not_offered`). The header prints each function as `<name>(returns: <shape>)`, the shape derived from the function's own output schema (an object lists its keys, `key[]` an array, `key{}` a nested object, `[]{...}` an array of objects, clipped past 220 characters); the plain rows are for the person, the header keeps the machine names. Unattended, `metric_get` takes at most 8 queries per call and both metric reads take built-in metrics only (a `wrun/` id refuses: a condition source reads installed indicators, a step does not).
+
+The menu as a person sees it (the form's checklist, the cards, `om watch tools`), each row with when you want it and what comes back; every row under the master row is on by default and unticks on its own:
+
+| Row | Functions | When you want it | What comes back | Default |
+| --- | --- | --- | --- | --- |
+| Everything OpenMarket can read (the master row) | the six rows below | most prompts | numbers and rows with the time they were read | on |
+| Prices, stats and history | `markets`, `points`, `polymarket_orderbook` | a price, a move, an order book, a candle history | live prices and 24h change, candles, funding, open interest and order books | on |
+| Indicators | `metric_get`, `metric_list`, `metric_rule`, `metric_series` | RSI, MACD, EMA, funding or open-interest reads, and a rule over them | the indicator's numbers, a series over time, or a long/short/flat decision | on |
+| Market lookups | `block_sizes`, `coins`, `enum`, `exchanges`, `hyperliquid_dexes`, `market_resolve`, `normalized_symbols`, `polymarket_market_lookup`, `symbol_resolve`, `symbols`, `tenors` | turning a name into the exact market | the venue, symbol, ids and lists a market goes by | on |
+| The news journal | `event_journal_get`, `event_journal_list`, `event_journal_search` | what this home already logged about a subject | journal text and matching past events | on |
+| This watch's own past rows | `watch_history` | comparing with what this watch found before | this watch's earlier rows with their outcome and time | on |
+| Your positions and balances | `hyperliquid_*` and `polymarket_*` account reads, `execute_*`, `usage` | a prompt about your own book | balances, positions, resting orders, fills, funding, fee tier, receipts and API quota; the card warns that what it reads can end up in what the run searches for or sends | on |
+| Search the web (and X on Grok) | `web_research` | anything newer than the model's memory | headlines, snippets and links; one model request per call | on |
+| Read a web page by address | `page_read` | a page the prompt names or a search returned | the page's text, bounded, through OpenMarket's own fetcher on every lane | off |
+| Search files you uploaded to the maker | `search_files` | a prompt over your own documents | passages with their file names; one model request per call; the store id is typed on the row and sealed | off |
+| Make images | `make_image` | a chart, a card or a picture a run should send | a file that rides the delivery; one image request per call; the image model is picked on the row and sealed | off |
+| Run code on the maker's servers, Call one of your MCP connections, Drive a browser | none | | greyed in this build with the reason on the row; never tickable | off |
+
+The reaching rows are the egress: the card's `Reaches out:` line names each one the list carries (`web + X search on this model; pages by address through OpenMarket's own fetcher; images on xAI; what it searches for and the pages it reads may carry what this run has read`) and reads `nothing beyond this home` for a list of reads alone. A row the sealed lane cannot run (images on Anthropic, files on xAI, a subscription credential for anything beyond chat) prints its capability row on the install, arm and reseal cards (`Make images: not on your lane (anthropic/claude-x: Anthropic has no image API). Connect OpenAI, xAI or Google in setup, or arm without images.`), the yes proceeds without it, and the function refuses `maker_tool_unsupported` at run time.
 
 Market data, as the header prints them:
 
@@ -226,9 +245,9 @@ event_journal_list(returns: {journals[]{slug, watch_id, label}})
 event_journal_search(returns: {query, total, results[]{slug, label, file, matches[]}, newest_story_at, live_fetch, cross_feed{}})
 ```
 
-`watch_history` on a leash takes `{source, last}`: `source` is a source name from the header, exactly as listed (without the quotes), `last` how many of the newest accepted rows (1 to 50, default 10); the watch is the daemon's to add, so a step can never read another watch's history through it, and a published workflow's history reads stay inside its declared sources. `event_journal_get` reads `events.md` only, bounded and fenced.
+`watch_history` on a menu takes `{source, last}`: `source` is a source name from the header, exactly as listed (without the quotes), `last` how many of the newest accepted rows (1 to 50, default 10); the watch is the daemon's to add, so a step can never read another watch's history through it, and a published workflow's history reads stay inside its declared sources. `event_journal_get` reads `events.md` only, bounded and fenced.
 
-The operator's own venue accounts (account reads; the arm card carries an account-and-web warning when a leash includes one):
+The operator's own venue accounts (the `Your positions and balances` row; the card's `Tools:` line says `incl. your positions and balances` when they are on, and the row's warning rides the menu):
 
 ```text
 hyperliquid_balance(returns: {perp{}, spot[]{coin, token_id, total, hold, entry_notional_usd}, account_mode{}, hip3_perp[]{dex, perp{}}, dex})
@@ -252,13 +271,18 @@ execute_summary(returns: {count, pending_submission, submitted, filled, rejected
 usage(returns: {limit, remaining, used, reset, window_seconds, daily{}, last_plan_refusal{}})
 ```
 
-Hosted search, named and never bundled:
+The reaching rows, each one OpenMarket function running its own isolated request:
 
 ```text
 web_research(returns: {text, provider, model, x_search, x_mirror{}, x_search_hint})
+page_read(returns: {text, final_url, title, content_type, chars, truncated, page_path})
+search_files(returns: {text, provider, model, store})
+make_image(returns: {artifact_id, mime, bytes, width, height, provider, image_model})
 ```
 
-Not callable from an ai step (a prompt or a `toolsAllow` naming one refuses `watching_unknown_tool` and names the nearest callable): `news_brief` (its schema reaches generation and scheduling), `metric_screen` (a fan-out the firing budget cannot bound), `research_study`, `doc_read`, `page_read`, the Polymarket analytics reads (`polymarket_odds`, `polymarket_leaderboard`, `polymarket_market_summary`, `polymarket_trader_profile`, ...), every `chart_*` read, every room, doc and news verb, every watch verb, and every money function (`order_place`, `wallet_send`, `listing_buy`, `hyperliquid_transfer`). Two functions belong to a tool step, with arguments the author freezes on the card, never to an ai step's leash: `chart_screenshot(returns: {path, bytes, shortId})` (the image rides the delivery as an attachment) and `metric_rule` (the rule step: a metric against a level or a band, emitting a verdict at confidence 1 that a strategy reads without a model).
+`web_research` searches on the sealed lane (X only on xai, web on a lane with hosted search); `page_read` takes `{url, max_chars?}` and answers the page's text fenced as data (private addresses and cross-origin redirects refused, `page_read_blocked`); `search_files` takes `{store, ask}` and answers only for the store the seal names (`file_store_not_sealed` otherwise); `make_image` takes `{prompt, size?}` and answers an artifact id the delivery attaches as the image (`image_lane_unsealed` when the images row was not ticked, `image_option_unsupported` for a size the maker cannot take). Each is one more request on the user's own credential and each answer is untrusted data, never an instruction.
+
+Not callable from an ai step (a prompt or a `tools` naming one refuses `watching_unknown_tool` and names the nearest callable): `news_brief` (its schema reaches generation and scheduling), `metric_screen` (a fan-out the firing budget cannot bound), `research_study`, `doc_read`, the Polymarket analytics reads (`polymarket_odds`, `polymarket_leaderboard`, `polymarket_market_summary`, `polymarket_trader_profile`, ...), every `chart_*` read, every room, doc and news verb, every watch verb, and every money function (`order_place`, `wallet_send`, `listing_buy`, `hyperliquid_transfer`). Two functions belong to a tool step, with arguments the author freezes on the card, never to an ai step's menu: `chart_screenshot(returns: {path, bytes, shortId})` (the image rides the delivery as an attachment) and `metric_rule` (the rule step: a metric against a level or a band, emitting a verdict at confidence 1 that a strategy reads without a model).
 
 ## Answer shapes
 
@@ -306,7 +330,7 @@ What each answer does depends on the step that reads it:
 
 The reader fixes the shape: an `order` reads `buy` / `sell` / `none`, a `strategy` reads a verdict, and a producer that declares another shape or a list missing a reader's word refuses `watching_reader_unsatisfied` at create, import and install, naming the shape or the words the reader needs (§"Answer shapes").
 
-One model check runs at create over the definitions and names an overlap or a contradiction (`watching_definitions_overlap`: "long and flat can both be true when the crossing holds and a bearish post exists; say which wins"). It warns and raises a card question with the pair; the definitions stay the author's. Resolve it with `overlap_resolution: {winner, loser}` (composed into the block as `(flat wins over long)`), never by deleting a case. Write a case as a test the turn can run against INPUT and the leash: a reading, a threshold, a window over a named source. A case the turn cannot check ("the market feels weak") is what `unsure` is for.
+One model check runs at create over the definitions and names an overlap or a contradiction (`watching_definitions_overlap`: "long and flat can both be true when the crossing holds and a bearish post exists; say which wins"). It warns and raises a card question with the pair; the definitions stay the author's. Resolve it with `overlap_resolution: {winner, loser}` (composed into the block as `(flat wins over long)`), never by deleting a case. Write a case as a test the turn can run against INPUT and the menu: a reading, a threshold, a window over a named source. A case the turn cannot check ("the market feels weak") is what `unsure` is for.
 
 ## Mentions
 
@@ -317,12 +341,13 @@ The `@{Name}` syntax for naming a source inside a prompt or a definition, and th
 - Never number a source in a prompt: the header lists names, not numbers, and a mention is the only thing the validator checks.
 - A mention of a name the watch does not have, in the prompt or in any definition, refuses at create with the names that exist (`watching_unknown_source`), so read the watch first: `watch_show` for the sources and their names; `watch_tools` for the functions; then write. A source the prompt needs and the watch lacks is added first (`watch_create` with `sources[]`, or `watch_page_add` for a URL), as context when it should not start runs (`watch.md §"Trigger and context roles"`).
 - A mention reaches a source's history through `watch_history({source, last})`, and only that: mentioning a source does not paste its rows into the prompt.
+- Steps are named too, and a prompt never has to say a step's id: give every step a `label` (1 to 60 chars, unique on the watch) when you author it, because that name is what the person reads in the delivery header, `om watch history`, `om watch show`, /notis and every card (`ETH test 2 · dip or noise`, never `ETH test 2: ai-97966206`). A step left unnamed is named from what it does (its word list `dip or noise`, a verdict `long/short/flat call`, the first five words of a free-text prompt, `metric_get on BTCUSDT`, `buy ETH 100`); `om watch action rename <watch> <step> "<name>"` names it later without standing the chain down. A name is not a mention: `@{Name}` names sources only.
 
 ## Worked prompts
 
 Three complete steps as `watch_action_add` calls: a judge (a verdict from a price fire with two context sources), a note for a person, a screen answering a word.
 
-Every example starts the same way: `watch_show` on the watch (the source names, the steps already there), `watch_tools` (the callable functions), then the call. Each step lands disabled and the result names `om watch arm <watch> <chain>`.
+Every example starts the same way: `watch_show` on the watch (the source names, the steps already there), `watch_tools` (the menu), then the call; a step that names no `tools` runs on the default set, so name a list only to narrow. Each step lands disabled and the result names `om watch arm <watch> <chain>`.
 
 A judge. The watch `btc-breakout` has `"BTC rule"` (a Bollinger crossing, the trigger), `"@DeItaone"` and `"Synoptic macro"` (context); a `strategy` money step reads this step through `input: {"action_id": "judge-1"}`, so the shape is a verdict:
 
@@ -343,13 +368,13 @@ A judge. The watch `btc-breakout` has `"BTC rule"` (a Bollinger crossing, the tr
         "extra": "weigh @{Synoptic macro} items from the last 2 hours (watch_history, last 3); a surprise print overrides the crossing"
       },
       "overlap_resolution": { "winner": "flat", "loser": "long" },
-      "toolsAllow": ["metric_get", "markets", "watch_history"]
+      "tools": ["metric_get", "markets", "watch_history"]
     }
   }
 }
 ```
 
-A note for a person. The watch `fed-calendar` has one page source; the reader is the channel, so the shape is text and the leash is empty (INPUT holds the change):
+A note for a person. The watch `fed-calendar` has one page source; the reader is the channel, so the shape is text and `tools` is `[]` (INPUT holds the change; nothing reaches out):
 
 ```json
 {
@@ -360,7 +385,7 @@ A note for a person. The watch `fed-calendar` has one page source; the reader is
     "payload": {
       "prompt": "Write three lines for a person: what changed, what it means for front-end rates, and the link from INPUT. Answer NO_REPLY when the update is a schedule change with no decision in it.",
       "output": { "type": "text" },
-      "toolsAllow": []
+      "tools": []
     },
     "channel": "telegram-desk"
   }
@@ -383,13 +408,13 @@ A screen answering a word. The watch `eth-funding-negative` fires when ETH fundi
         "sell": "funding printed below zero but open interest is rising: shorts are still building",
         "none": "anything else, and whenever a reading is older than 2 hours (data_age_seconds above 7200)"
       },
-      "toolsAllow": ["metric_get"]
+      "tools": ["metric_get"]
     }
   }
 }
 ```
 
-The money step then reads it: `{"kind": "money", "input": {"action_id": "screen-1"}, "payload": {"mode": "order", "terms": {"venue": "hyperliquid", "asset": "ETH", "order_type": "market", "size_mode": "quote"}, "boxes": {"size": {"hint": "quote size in USDC"}}, "caps": {"max_fires": 1}}}`; `none` does nothing and the row is recorded. The three steps share one rule: the definition names the reading and the threshold the turn can check, the leash holds exactly the functions those checks need, and the shape is the reader's.
+The money step then reads it: `{"kind": "money", "input": {"action_id": "screen-1"}, "payload": {"mode": "order", "terms": {"venue": "hyperliquid", "asset": "ETH", "order_type": "market", "size_mode": "quote"}, "boxes": {"size": {"hint": "quote size in USDC"}}, "caps": {"max_fires": 1}}}`; `none` does nothing and the row is recorded. The three steps share one rule: the definition names the reading and the threshold the turn can check, the list holds exactly the functions those checks need (or nothing, when the default set already does), and the shape is the reader's.
 
 ## Refusal is the fix
 
@@ -398,7 +423,7 @@ The typed refusals a prompt can get back, what each says, and the one change tha
 | Code | What it says | Change |
 | --- | --- | --- |
 | `watching_unknown_source` | `"Funding" is not a source on this watch; sources: "BTC rule", "@DeItaone", "Synoptic macro"` | mention one of the listed names as `@{Name}` (or its bare `@token` form), in the prompt and in every definition, or add the source to the watch first, then resubmit |
-| `watching_unknown_tool` | `"funding_rate" is not callable; nearest: metric_get` | name the nearest callable, in `toolsAllow` and in the text, or drop the name; a name outside the leash is never a tool |
+| `watching_unknown_tool` | `"funding_rate" is not callable; nearest: metric_get` | name the nearest callable, in `tools` and in the text, or drop the name; a name outside the menu is never a tool |
 | `watching_reader_unsatisfied` | the producer's output does not satisfy its reader: a strategy needs a verdict, an order a word from a list covering `buy`, `sell`, `none` | set the producer's `output` to the shape the reader needs (a verdict for a strategy, the mode's words for a money step), or point the reader at a producer that answers it |
 | `watching_fanout_incompatible` | one producer feeds readers that need different shapes | split the producer: one step per requirement |
 | `watching_definitions_overlap` | `long and flat can both be true when the crossing holds and a bearish post exists; say which wins` | a warning with a card question: add `overlap_resolution: {winner, loser}`, or accept the overlap on the card |
@@ -406,6 +431,6 @@ The typed refusals a prompt can get back, what each says, and the one change tha
 | `invalid_input` on `definitions` | `definitions need output.type word or verdict; a text step takes a prompt`, `definitions must define every answer; missing: none`, `definitions.<key> names no answer of this step; answers: buy, sell, none` | match the fields to the declared answers: one per answer, the two extras at most, none on a text step |
 | `watching_chain_too_deep` | `9 steps from the source; the limit is 8` | shorten the chain, or split it across two watches joined by an upstream |
 | `watching_unknown_producer` | `input` names a step that does not exist | name a step of this watch, or of a sibling source of the same composite |
-| `unattended_tool_unresolved` (at the arm) | a `toolsAllow` name does not resolve on this home, or is not on the unattended list | remove the name, or install what provides it, then arm again |
+| `unattended_tool_unresolved` (at the arm) | a `tools` name does not resolve on this home, or is not on the unattended list | remove the name, or install what provides it, then arm again |
 
 Three rules ride every row of the table: change the spec, never the user's intent (a level, a door, a price, a box value are the user's to change); never resubmit unchanged; a refusal is not an error to relay, it is the next edit. Ask the user only when the fix changes what the watch means.
