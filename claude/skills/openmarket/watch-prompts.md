@@ -25,7 +25,7 @@ An ai step is one model turn per row. The daemon hands the turn a header it gene
 
 - What the turn receives, with the header verbatim → §"What the model sees"; the fields of the one update, per source kind → §"INPUT per source kind"; the menu, the default set, the reaching rows and every function's return shape → §"The leash"; `text`, `word`, `verdict` and their readers → §"Answer shapes"; the fields of a decision or a word list → §"Definitions"; `@{Name}` and the read-first rule → §"Mentions"; three complete steps → §"Worked prompts"; every refusal and its one change → §"Refusal is the fix".
 - A model run's prompt (`watch_model_add`: a standing question answered on a cadence, with no firing row, no INPUT and no mentions), the header it sees and its two answer shapes → §"A source prompt is not a step prompt"; the run itself, its card, its pick and its caps are `watch.md §"Model source"`.
-- The watch around the step (sources and their roles, filters, chains, delivery, the preview, arming, publishing) is `watch.md §"Compose end to end"`; the money step a word or verdict feeds is `watch.md §"Money step"`.
+- The watch around the step (sources and their roles, filters, chains, delivery, the preview, arming, publishing) is `watch.md §"Build from a description"`; the money step a word or verdict feeds is `watch.md §"Money step"`.
 
 ## What the model sees
 

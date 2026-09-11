@@ -41,6 +41,12 @@ Name a moment and the user wants a Fast alert ("tell me WHEN X happens" — late
 - Backtest a feed's fires before proposing any signal or strategy on them (§"Backtest before arming anything").
 - "What am I watching?" is one `watching_overview` call, every warning surfaced (§"What am I watching").
 
+| Ask | Call | Assume and disclose |
+| --- | --- | --- |
+| "preview this alert condition" | `news_preview` | `next` carries the previewed sentence into `news_create`; existing feeds and Topics offer no create |
+| "find a published feed" | `news_catalog` | `next` opens the first feed's sheet with its provider and id |
+| "show this feed" | `news_show` | `next` repairs local delivery with `news_attach` when the held feed has no linked watch and its source stands; a follow whose source is gone offers nothing |
+
 ## X coverage and the Grok hint
 
 Live X search exists only on a Grok credential (a SuperGrok / X Premium subscription or an xAI API key); a home without one covers X indirectly through news echoes and feeds.

@@ -24,7 +24,7 @@ allowed-tools:
 
 - A vague "would it have worked" ask → §"Reach for backtest_run FIRST"; pick the specific surface from the section index.
 - Backfilled rows have no `observed_at`: pass `--time-basis source_event_time --data-mode backfill` or the study misleads or returns nothing (§"Event studies").
-- Replay flags depend on the strategy's signal kind, and `constant` is replay-only — a constant winner is promoted by re-authoring its signal (§"Candidates and promotion").
+- Replay flags follow the signal kind; a `fixed_view` is a research input, not a signal — its winner is promoted by authoring a signal (§"Candidates and promotion").
 
 ## Reach for backtest_run FIRST
 
@@ -134,7 +134,7 @@ Backtest a saved strategy by slug: flags per signal kind, bar-mode rules, identi
 
 `--strategy-slug <slug>` replays a strategy created with `om watch create` through the SAME live decision core (`planStrategyTick`), including its exit config. **Stored-spec honesty:** when the saved file needed a read-time repair (a legacy field stripped, a value migrated), the report discloses each repair as a `spec_repaired_on_read` note; a repair that changed the exit or sizer block — e.g. an out-of-bounds stop dropped on read — refuses the run with `spec_repair_changes_semantics` instead (the replay will not quietly test a stop-less variant of the strategy you saved; fix the stored spec with `om watch edit` and re-run — the daemon reads the same repaired spec, so those fields never applied live either). The replay includes the (possibly repaired) exit config (take-profit / stop-loss behave like brackets RESTING at the venue: each held bar's real high/low can touch a trigger level, the fill prices at that level — or at the open when the bar gapped through it — on the touching bar, and when one bar touches both levels the stop-loss wins, conservatively — unless the bar OPENS at-or-beyond the take-profit level, which fills at the open first; the time-stop evaluates at bar closes and flattens at the next bar open; trigger fills are exempt from `--latency-bars`; trades carry an `exit_reason`). The invocation depends on the strategy's signal kind:
 
-- **Constant signal** — occurrence-anchored: keep `--watch` (entries anchor to accepted rows), add `--strategy-slug`.
+- **Fixed view** — occurrence-anchored: keep `--watch` (entries anchor to accepted rows); the candidate's `fixed_view` rides `--candidate-file`.
 
 - **Text signal (`text_long_short`)** — invocation and costs live in §"Text-signal costs" (the watch is derived from the signal; the replay classifies with real LLM calls).
 - **Bar-mode metric signal (`metric_level_rule` / `metric_band_rule`)** — strategy-native: NO `--watch`; the signal decides on every bar of the traded asset. Requires `--asset` and both `--from`/`--until` (the decision window; align them to bar boundaries — a partially-covered bar at either edge is excluded whole, since it would trade on data outside the window). `--hold`, `--time-basis`, and the event filters (`--outcome`, `--min-confidence`, `--source`, `--data-mode`, `--limit`) are rejected here — they shape event-watch occurrences, which a bar-cadence replay has none of. Tick-mode metric signals cannot be replayed (a bar is the backtest's cadence). A condition carrying a **per-operand selector** (a cross-market operand naming its own market) replays natively: the prefetch fetches one series per (market, data type) across every operand — sweep variants included, unioned into one covering pass — and each foreign operand is sampled as-of the clock (shared-selector) bar's close, exactly as live evaluation samples it (an operand selector's omitted interval/quote default to HOUR/USD). Signals on installed WRUN metrics (`wrun/@scope/name/output`) replay exactly like built-ins — the package must be installed, or the gate rejects with `wrun_metric_not_installed`. When a signal's own decision acts on a bar, the decision owns that bar and the bracket is not evaluated there — so fast mean-reversion signals can close trades before their brackets ever stamp; bracket stamps under-count bracket-level breaches by design. A `bar_extremes_repaired` warning means some source bars under-reported their own open/close range and the trigger evaluation widened them — treat tp/sl fills on those bars as data-quality-limited. **Band-regime seeding:** a `metric_band_rule` replay always seeds its regime FLAT at the window start and folds it forward per bar at the signal level, independent of fill outcomes — live instead seeds from the strategy's persisted regime and advances it only when a decision's fills actually reach. Two consequences to keep in mind when comparing against a live run: a window opening while the live strategy is mid-regime replays as a fresh entry, and an entry whose fill dies leaves the fold already advanced (the replay can enter inside the hysteresis dead zone where live would have re-evaluated the enter condition and stayed flat). **Asset/market identity is enforced**: the strategy's venue and `--asset` must agree — a Polymarket strategy replays only against its OWN condition's series (`--asset POLYMARKET:<conditionId>`), a non-Polymarket strategy never against a Polymarket series (non-Polymarket proxy series stay allowed for non-Polymarket venues); mismatches refuse with `asset_market_mismatch`. Polymarket runs also resolve which side of the binary the series prices: when the strategy's `long_outcome` is the complement (second) outcome the series is complement-mapped before the replay and the report's `backtest.price_axis` says `"complement"`; an unresolvable outcome order (CLOB unreachable, non-binary market, unknown `long_outcome`) refuses with `long_outcome_axis_unresolved` rather than guessing an axis.
@@ -152,11 +152,11 @@ om backtest spec \
 
 ## Candidates and promotion
 
-Backtest an unsaved candidate and promote a winner: the {strategy, signal?} file shape, the creatable-kind contract, and the constant carve-out.
+Backtest an unsaved candidate and promote a winner: the {strategy, signal?, fixed_view?} file shape, the creatable-kind contract, and the fixed-view carve-out.
 
 A registry strategy template is the marketplace funnel's business: `backtest_run` — its default next step — backtests the tuned template candidate and mints its install token; bring one here only for manual replay knobs.
 
-To simulate a hold-after-event strategy over the same occurrence set, use `om backtest spec` with a strategy source. There is no strategy-less lane: prescribe the trade-intent explicitly — an inline candidate whose signal is a `constant` (direction bull or bear, conviction as the weight) reproduces the classic hold-after-event run without saving anything. Prefer compact JSON for agent summaries unless the user needs the full fill/equity artifact.
+To simulate a hold-after-event strategy over the same occurrence set, use `om backtest spec` with a strategy source. There is no strategy-less lane: prescribe the trade-intent explicitly — an inline candidate carrying a `fixed_view` (direction 1 or -1, conviction as the weight) in place of a signal reproduces the classic hold-after-event run without saving anything. Prefer compact JSON for agent summaries unless the user needs the full fill/equity artifact.
 
 ```bash
 om backtest spec \
@@ -173,7 +173,7 @@ om backtest spec \
   --compact
 ```
 
-with `hold-long.json` (the strategy half is creatable verbatim via `om watch create`; the `constant` signal is replay-only — the kind is retired from the signal create tools, so to trade a winner re-author its signal as a metric/text kind; the sizer owns the weight):
+with `hold-long.json` (the strategy half is creatable verbatim via `om watch create`; the `fixed_view` is a research input no watch produces, so to trade a winner author its signal as a metric/text kind; the sizer owns the weight):
 
 ```json
 {
@@ -187,18 +187,15 @@ with `hold-long.json` (the strategy half is creatable verbatim via `om watch cre
       "capital": { "source": "fixed", "amount": 10000 }
     }
   },
-  "signal": {
-    "slug": "hold-long-signal",
-    "spec": { "kind": "constant", "direction": 1, "conviction": 0.05 }
-  }
+  "fixed_view": { "direction": 1, "conviction": 0.05 }
 }
 ```
 
-`--candidate-file <path>` replays a strategy that exists nowhere on disk — a JSON file of shape `{strategy, signal?}` where `strategy` carries the authoring fields of `om watch create` (slug, signal, market, sizer, optional label/exit/daemon) and the optional inline `signal` carries `{slug, spec, label?}`. Omit `signal` to reference a saved signal by the strategy's `signal` slug. Nothing is persisted, and the report's `backtest.query.candidate: true` marks its origin. On the agent lane the strategy fields and the metric-rule spec arms are deferred parts of `backtest_spec` and `backtest_sweep`: `schema_read {intent: "backtest_strategy"}` or `{intent: "backtest_signal"}` loads their full shape before the call.
+`--candidate-file <path>` replays a strategy that exists nowhere on disk — a JSON file of shape `{strategy, signal?, fixed_view?}` where `strategy` carries the authoring fields of `om watch create` (slug, signal, market, sizer, optional label/exit/daemon) and the optional inline `signal` carries `{slug, spec, label?}`. Omit `signal` to reference a saved signal by the strategy's `signal` slug, or carry `fixed_view: {direction, conviction}` in its place — the side acted on at every fire, with the strategy's `signal` slug a name only (never both). Nothing is persisted, and the report's `backtest.query.candidate: true` marks its origin. On the agent lane the strategy fields and the metric-rule spec arms are deferred parts of `backtest_spec` and `backtest_sweep`: `schema_read {intent: "backtest_strategy"}` or `{intent: "backtest_signal"}` loads their full shape before the call.
 
-**A candidate replays under its signal kind's rules.** The worked example above is the occurrence-anchored `constant` shape (`--watch` anchors entries to accepted rows); a candidate whose signal (inline or referenced) is a metric or text kind takes the same invocation flags and bar-mode rules as a saved strategy of that kind — before running a non-constant candidate, read `skill_read("research", section = "Replaying a saved strategy")` for the flags per signal kind.
+**A candidate replays under its signal's rules.** The worked example above is the occurrence-anchored fixed-view shape (`--watch` anchors entries to accepted rows); a candidate whose signal (inline or referenced) is a metric or text kind takes the same invocation flags and bar-mode rules as a saved strategy of that kind — before running a signal candidate, read `skill_read("research", section = "Replaying a saved strategy")` for the flags per signal kind.
 
-The contract is **promotability, scoped to the creatable signal kinds**: the strategy fields pass to `om watch create` verbatim, and an inline signal of a creatable kind (`text_long_short`, `metric_level_rule`, `metric_band_rule`) maps mechanically onto its kind's create tool, `signal_create_text` or `signal_create_metric` (its `spec` fields become the flat create inputs — selector, condition, long/short, eval, plus `kind` on the metric tool). The one exception is `constant`: it backtests but is replay-only — the kind is retired from the create surface — so a winning constant candidate is promoted by re-authoring its signal as a metric/text kind. Candidate slugs must NOT collide with saved ones — including by DERIVED id (slugs slugify to ids by collapsing separator runs) — pick fresh names.
+The contract is **promotability, scoped to the creatable signal kinds**: the strategy fields pass to `om watch create` verbatim, and an inline signal of a creatable kind (`text_long_short`, `metric_level_rule`, `metric_band_rule`) maps mechanically onto its kind's create tool, `signal_create_text` or `signal_create_metric` (its `spec` fields become the flat create inputs — selector, condition, long/short, eval, plus `kind` on the metric tool). The one exception is a `fixed_view`: it is a research control no watch produces, so a winning fixed-view candidate is promoted by authoring its signal as a metric/text kind. Candidate slugs must NOT collide with saved ones — including by DERIVED id (slugs slugify to ids by collapsing separator runs) — pick fresh names.
 
 **Authoring the inline signal's spec:** the per-kind spec shapes and worked JSON examples live in `skill_read("signal", section = the kind name)`: e.g. `metric_band_rule` for hysteresis regimes (a golden cross is `long.enter` `{"left":{"metric":"sma","params":{"period":50}},"op":"gt","right":{"metric":"sma","params":{"period":200}}}` with `lt` on exit). Do not guess condition shapes; the operators are word-form (`gt`/`lt`, never `>`), and there is no `compare` wrapper.
 
@@ -221,7 +218,7 @@ om backtest sweep \
 
 Rules of the road: all variants share the run knobs (asset, window, costs, watch/hold, and the occurrence filters — `--time-basis`, `--data-mode`, `--outcome`, `--min-confidence`, `--source`, `--limit` — so backfill sweeps use `--time-basis source_event_time --data-mode backfill` exactly like a solo backtest) — only the specs vary; variants must stay in the base's data lane (metric bar-cadence vs occurrence-anchored — cross-lane comparisons are separate sweeps); patching a saved base's signal runs an ephemeral shadow, never a write-back.
 
-Reading the summary: each row carries the full metrics block, warning magnitude per code, and `exit_reasons` counts for MANAGED exits only (take_profit / stop_loss / time_stop — signal-driven closes are unlabeled; their count is `trade_count` minus the labeled sum). The summary is for ranking; re-run the winning variant solo with `om backtest spec` for its full report, and promote it with `om watch create` when it earns it (a `constant`-signal winner needs its signal re-authored as a metric/text kind first — the kind is replay-only).
+Reading the summary: each row carries the full metrics block, warning magnitude per code, and `exit_reasons` counts for MANAGED exits only (take_profit / stop_loss / time_stop — signal-driven closes are unlabeled; their count is `trade_count` minus the labeled sum). The summary is for ranking; re-run the winning variant solo with `om backtest spec` for its full report, and promote it with `om watch create` when it earns it (a fixed-view winner needs a metric/text signal authored first — a `fixed_view` is a research input no watch produces, and a fixed-view base takes strategy patches only).
 
 `metric_not_ready` (the signal's data went missing — abstained bars held exposure) and `window_edge_undecidable` (the last bars of any window cannot fill under next-bar-open) name the exposure a row's headline hides.
 
@@ -367,7 +364,7 @@ Every `om` command this skill covers, one line each with its action name — che
 
 - `om backtest` (action: `backtest_run`) — THE DEFAULT BACKTEST TOOL: whenever the user asks to backtest something or whether a strategy/signal/news idea would have worked, call THIS, not backtest_spec.
 - `om backtest run` (action: `backtest_run`) — Explicit spelling of the bare `om backtest <target>` one-shot (the default kind of the backtest group).
-- `om backtest spec` (action: `backtest_spec`) — Replay a strategy (constant, text_long_short, or bar-mode metric signal) from a saved slug OR an unsaved candidate spec; the strategy prescribes the trade-intent (direction, sizing, exits) the simulation replays.
+- `om backtest spec` (action: `backtest_spec`) — Replay a strategy (a fixed view, a text_long_short signal, or a bar-mode metric signal) from a saved slug OR an unsaved candidate spec; the strategy prescribes the trade-intent (direction, sizing, exits) the simulation replays.
 - `om backtest sweep` (action: `backtest_sweep`) — Replay N spec variants of one base strategy (saved slug or unsaved candidate) over ONE shared market-data pass.
 
 - `om research` — (bespoke; see narrative above)
