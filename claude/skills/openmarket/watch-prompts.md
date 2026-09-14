@@ -17,7 +17,7 @@ An ai step is one model turn per row. The daemon hands the turn a header it gene
 - The prompt has no hands: the turn acts only through the functions its menu ticks, and the menu is the default set unless the step says otherwise (`tools` absent = every read plus web search, `[]` = none, a list = exactly those). There is no run-a-script, write-a-file or call-any-URL function, and a money function never resolves on a menu; a prompt asking for one ends with "tool not available" in the record.
 - Choose the answer shape from the reader: a person, a webhook or a next ai step reads `text`; an `order` reads a `word` from a list covering `buy`, `sell`, `none`; a `strategy` reads a `verdict`. A mismatch refuses at create, never at run time (§"Answer shapes").
 - A decision or a word list is written as `definitions` fields, never as prose paragraphs; the daemon composes the INSTRUCTIONS block from them and runs one model check for overlap at create (§"Definitions").
-- Test the saved step with `watch_test` preview before arming. Inspect its real input and typed output; offline fixtures are simulations, not evidence of model judgment. `run_models: true` requests a charged model preview with tools and delivery sandboxed.
+- Judge a step by its real runs: `watch_history` (`om watch history <id>`) holds each row's typed result.
 - INPUT is one update. Anything else the instructions want, the turn fetches call by call under `maxToolCalls` and `budgetMs`; context never wakes the step, and instructions cannot schedule a later run: express a check over history that already exists, or add a trigger.
 - A refusal is the fix: `watching_unknown_source`, `watching_unknown_tool`, `watching_reader_unsatisfied` and `watching_definitions_overlap` each say what to change. Change the spec and resubmit; never change the user's intent to dodge one, never retry unchanged, never relay one as an error (§"Refusal is the fix").
 
@@ -25,7 +25,7 @@ An ai step is one model turn per row. The daemon hands the turn a header it gene
 
 - What the turn receives, with the header verbatim → §"What the model sees"; the fields of the one update, per source kind → §"INPUT per source kind"; the menu, the default set, the reaching rows and every function's return shape → §"The leash"; `text`, `word`, `verdict` and their readers → §"Answer shapes"; the fields of a decision or a word list → §"Definitions"; `@{Name}` and the read-first rule → §"Mentions"; three complete steps → §"Worked prompts"; every refusal and its one change → §"Refusal is the fix".
 - A model run's prompt (`watch_model_add`: a standing question answered on a cadence, with no firing row, no INPUT and no mentions), the header it sees and its two answer shapes → §"A source prompt is not a step prompt"; the run itself, its card, its pick and its caps are `watch.md §"Model source"`.
-- The watch around the step (sources and their roles, filters, chains, delivery, the preview, arming, publishing) is `watch.md §"Build from a description"`; the money step a word or verdict feeds is `watch.md §"Money step"`.
+- The watch around the step (sources and their roles, filters, chains, delivery, arming, publishing) is `watch.md §"Build from a description"`; the money step a word or verdict feeds is `watch.md §"Money step"`.
 
 ## What the model sees
 
