@@ -16,7 +16,7 @@ sequence.
 ## Hard rules
 
 - **Publishing is irreversible.** A version number can never be reused, even
-  after `npm unpublish`. Confirm the version with Ryan before step 4 unless he
+  after `npm unpublish`. Confirm the version with Ryan before step 5 unless he
   named it in the invocation.
 - **Never invent an npm token.** If auth fails, stop and ask — do not try other
   registries, other accounts, or `--force`.
@@ -34,7 +34,7 @@ git branch --show-current                # publish expects main
 grep '"version"' packages/rooms-client/package.json
 ```
 
-Also read the consumers' current pins, so step 6 has a before/after:
+Also read the consumers' current pins, so step 7 has a before/after:
 
 ```bash
 grep '"@openmarket/rooms-client"' ~/Documents/GitLab/openmarket-chat/package.json \
@@ -78,17 +78,64 @@ a CHANGELOG entry if the repo's recent releases carry one — check
 `git log --oneline -5 -- CHANGELOG.md`), using the `/commit` skill with the
 repo's convention: `chore(rooms-client): 0.X.0 (<what it adds>)`.
 
-### 4. Publish
+### 4. Land the bump on main through a PR
+
+`main` in `openmarket-internal` is PR-only, and the reason is mechanical rather
+than cultural: the required status check `model-rehearsal` declares
+`on: pull_request` and no `push:` trigger, so a commit pushed straight to `main`
+can never report it. The push is rejected with:
+
+```
+GH013: Repository rule violations found for refs/heads/main.
+- Required status check "model-rehearsal" is expected.
+```
+
+"Expected" means the check has never reported for that commit — not that it
+failed. Do not retry the push, and do not look for a way around the rule.
+
+So the bump commit reaches `main` the same way any other commit does: a branch,
+a PR, a merge. Publishing is gated on `HEAD == origin/main`, so **publish only
+after the PR merges and the local `main` is refreshed**. Confirm with Ryan who
+opens the PR; he often drives it himself.
+
+The check is cheap for a normal release. It only spends its live-model run when
+the PR touches the `PROTECTED` paths named in
+`.github/workflows/model-rehearsal.yml` (agent prompt, tool catalog, watch
+surfaces, the chat-flow rig); every other PR, rooms-client-only ones included,
+reports green without spending.
+
+When the change being released is already committed, it may carry the version
+bump with it — then one PR covers both and `prepare` refuses with `target
+version 0.X.0 must be newer than 0.X.0`. That is not a gate failure. Run the
+gates directly instead, from `packages/rooms-client`: `bun run typecheck`,
+`bun test`, `bun run build`.
+
+### 5. Publish
 
 ```bash
 bun run rooms-client:release publish 0.X.0
 ```
 
-The script asserts a clean worktree on `main`, that `package.json` already reads
-the target version, runs `npm whoami`, runs the package gates, publishes, then
-polls the registry until the version is readable (about a minute).
+The script asserts a clean worktree on `main` that matches `origin/main`, that
+`package.json` already reads the target version, runs `npm whoami`, runs the
+package gates, publishes, then polls the registry until the version is readable
+(about a minute).
 
-### 5. If auth fails
+**Verify the published artifact, do not trust the accepted line.** A version has
+shipped before carrying the wrong tree — published from a checkout that predated
+the change, so the number was burned on a build missing the very code it was cut
+for. Unpack what the registry actually serves and grep it for the new surface:
+
+```bash
+npm pack @openmarket/rooms-client@0.X.0 && tar xzf openmarket-rooms-client-0.X.0.tgz
+grep -c '<a new export>' package/src/<file>.ts package/dist/<file>.d.ts
+```
+
+A gate can also fail on a flaky test rather than a real break. Re-run the failing
+test in isolation before concluding anything; if it passes there and fails only
+under full-suite load, say so rather than retrying blindly.
+
+### 6. If auth fails
 
 `npm whoami` failing, `ENEEDAUTH`, `E401`, or `E403` all mean the same thing:
 the token is missing, expired, or lacks publish rights on the `@openmarket`
@@ -106,7 +153,7 @@ If the script instead reports the version is already published, **do not bump
 past it silently** — the release may have half-landed. Verify with
 `npm view @openmarket/rooms-client@0.X.0 version` and report what you find.
 
-### 6. Update both GUI consumers
+### 7. Update both GUI consumers
 
 Once npm reports the new version:
 
@@ -131,7 +178,7 @@ Two traps, both real:
   `cd <monorepo>/packages/rooms-client && bun run build && npm pack`, then
   install that tarball in the consumer.
 
-### 7. Verify and report
+### 8. Verify and report
 
 ```bash
 grep '"@openmarket/rooms-client"' ~/Documents/GitLab/openmarket-chat/package.json \
