@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @file om-hosted
+# @description Build and install the daemon GUI. GUI commands load the GUI root .env and isolate user npm configuration.
 # om-build --hosted, end to end. See ../SKILL.md for why each step exists.
 #
 #   hosted.sh            build + install if the gate says to
@@ -12,6 +14,7 @@ set -uo pipefail
 
 MONO=${OM_MONO:-$HOME/Documents/GitLab/openmarket-internal}
 GUI=${OM_GUI:-$HOME/Documents/GitLab/openmarket-chat}
+GUI_BUN="$(dirname "$(realpath "${BASH_SOURCE[0]}")")/gui-bun.sh"
 SLOT="$MONO/packages/cli/assets/rooms-gui"
 # $HOME, not ~ -- tilde does not expand inside ${VAR:-default}, so a literal '~'
 # path would silently fail the plist parse and fall through to the PATH lookup.
@@ -180,7 +183,7 @@ if [ "$NO_GUI" = 0 ]; then
     say "rooms-client:          $(grep -o '"[0-9][0-9.]*"' "$MONO/packages/rooms-client/dist/version.js" | head -1 | tr -d '"')"
   fi
 
-  ( cd "$GUI" && bun install ) >/dev/null 2>&1 || die "GUI bun install"
+  bash "$GUI_BUN" "$GUI" install --frozen-lockfile || die "GUI bun install"
   # bun install restores the PINNED registry copy and clobbers the symlink, so
   # the link has to be re-asserted AFTER it, not only before: a GUI branch using
   # rooms-client APIs newer than its pin otherwise builds against the old
@@ -191,7 +194,7 @@ if [ "$NO_GUI" = 0 ]; then
     say "rooms-client:          re-linked after bun install"
   fi
   BUILDLOG=$(mktemp)
-  ( cd "$GUI" && bun run build ) >"$BUILDLOG" 2>&1
+  bash "$GUI_BUN" "$GUI" run build >"$BUILDLOG" 2>&1
   STAMPLINE=$(grep 'stamp-asset-versions OK' "$BUILDLOG")
   if [ -z "$STAMPLINE" ]; then
     # The reason lives in the build output; dying without it made every GUI

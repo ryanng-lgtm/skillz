@@ -1,6 +1,6 @@
 # Hosted script tests
 
-Requires Bun, Bash 4+, GNU coreutils and GNU sed. On macOS install the GNU
+Requires Bun, Bash 4+, GNU coreutils, GNU sed, and GNU grep. On macOS install the GNU
 utilities and place their `gnubin` directories on PATH for this test run.
 
 The repository-root `vendor.bash/github.com/reconquest/` directory must

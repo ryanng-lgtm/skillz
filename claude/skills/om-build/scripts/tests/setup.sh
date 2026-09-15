@@ -6,7 +6,8 @@ TEST_RECORD="$(tests:get-tmp-dir)/config-path"
 mkdir -p "$TEST_GUI" "$(tests:get-tmp-dir)/bin" "$(tests:get-tmp-dir)/user-config"
 printf 'NPM_READ_TOKEN=dummy-openmarket\nORANGECHARTS_NPM_READ_TOKEN=dummy-orangecharts\n' >"$TEST_GUI/.env"
 export TEST_SCRIPT TEST_REAL_BUN TEST_GUI TEST_RECORD
-export XDG_CONFIG_HOME="$(tests:get-tmp-dir)/user-config"
+XDG_CONFIG_HOME="$(tests:get-tmp-dir)/user-config"
+export XDG_CONFIG_HOME
 export TEST_USER_CONFIG="$XDG_CONFIG_HOME"
 printf '//registry.npmjs.org/:_authToken=dummy-wrong-token\n' >"$XDG_CONFIG_HOME/.npmrc"
 unset NPM_READ_TOKEN ORANGECHARTS_NPM_READ_TOKEN
@@ -22,4 +23,5 @@ printf '%s\n' "$*"
 exit "${TEST_BUN_EXIT:-0}"
 SHIM
 chmod +x "$(tests:get-tmp-dir)/bin/bun"
-export PATH="$(tests:get-tmp-dir)/bin:$PATH"
+PATH="$(tests:get-tmp-dir)/bin:$PATH"
+export PATH
