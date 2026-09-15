@@ -17,7 +17,7 @@ You can build a custom sandboxed indicator from a plain description ("score BTC 
 - Consent rule for the whole loop: a draft the user named in this conversation flows end to end (author, build, local install, preview) with receipts instead of asks; the approval gates live where trust changes hands, installing REGISTRY packages and PUBLISHING.
 - `@local` is reserved — author under the user's own scope before publishing (§"The authoring loop").
 - WRUN source reads params, inputs, and outputs ONLY through the generated accessors (`p_<param>()`, `in_<input>()`, `out_<output>(value)` then `emitRow()`): a raw positional literal such as `getFloat(0)` or `setOutput(0, ...)` is a BUILD ERROR in scaffold builds (§"The authoring loop"). In WRUN metadata a feed pin is `symbol` AND `exchange` together (the schema refuses a lone half) and an `interval` pin is legal: a coarser source aligns as-of its candle close (§"Input pins").
-- Publishing is the user's call and the marketplace's gate: `package_publish` with `dry_run=true` first (uploads nothing, raises no card), then the real publish only on the user's explicit go — the approval card on chat surfaces, `yes=true` over MCP (`marketplace.md §"Publishing and discontinuing"`).
+- Publishing is the user's call and the marketplace's gate: `package_publish` with `dry_run=true` first (uploads nothing, raises no card), then the real publish only on the user's explicit go — the approval card on chat surfaces, `yes=true` over MCP (`marketplace.md §"Publishing and deleting"`).
 
 ### Routing
 
