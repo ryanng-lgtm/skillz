@@ -615,12 +615,12 @@ What a reply must carry from each result-bearing action here; the per-branch gui
   - discloses `entries[].deliveries[].error` — The channel's error on a failed send, the reason on a cancelled one; null otherwise.
   - discloses `entries[].steps[].text` — The step's result, its no-action reason or its error text.
 - `follow_list`
-  - discloses `follows[].reason` — A plain sentence on a denied or ended row (the author turned down your request, the stream closed and om is checking with the registry, the author removed you, deleted the package, or the request expired), or on a live follow whose home cannot reach OpenMarket (unreachable since hh:mm); null otherwise.
+  - discloses `follows[].reason` — A plain sentence on a denied or ended row (the author turned down your request, the stream closed and om is checking with the registry, the author removed you, deleted the package, or the request expired), on a live follow whose home cannot reach OpenMarket (unreachable since hh:mm), or on a paused row another of your devices took over (moved to another of your devices) or a saved copy the library pulled (saved copy, r runs it here); null otherwise.
 - `follow_review`
   - discloses `note` — The author's one-line note to followers, when they wrote one.
   - discloses `changed` — The `Changed:` rows the author's move computed: kinds, fields, rate, door, sources; empty once answered.
 - `follow_show`
-  - discloses `reason` — A plain sentence on a denied or ended row (the author turned down your request, the stream closed and om is checking with the registry, the author removed you, deleted the package, or the request expired), or on a live follow whose home cannot reach OpenMarket (unreachable since hh:mm); null otherwise.
+  - discloses `reason` — A plain sentence on a denied or ended row (the author turned down your request, the stream closed and om is checking with the registry, the author removed you, deleted the package, or the request expired), on a live follow whose home cannot reach OpenMarket (unreachable since hh:mm), or on a paused row another of your devices took over (moved to another of your devices) or a saved copy the library pulled (saved copy, r runs it here); null otherwise.
   - discloses `history[].sentence` — The one line the surfaces print for this row.
   - discloses `suggested[].reason` — Why a chain is not offered on a follow (needs a condition source, ...); null otherwise.
   - discloses `moved.note` — The author's one-line note to followers, if any.
@@ -727,6 +727,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om watch list` (action: `watch_list`) — List configured watches and folders with their status.
 - `om watch listing` (action: `watch_listing_edit`) — Change the title, the one line or the README of a published watch at the registry without publishing a new version: the stream, its followers and installed copies are untouched, and the registry page shows the new words at once.
 - `om watch model-add` (action: `watch_model_add`) — Add a model run as a source of a watch (a named one, or a new one-source watch): a prompt the model answers on a cadence with the tools you allow, on the user's own AI account; every finding becomes a source row.
+- `om watch move-here` (action: `watch_move_here`) — Publish a shared watch from THIS device: the copy of a published watch on this machine takes over posting (its followers see nothing; the device that published until now pauses its copy when it next posts).
 - `om watch mute` (action: `watch_mute`) — Stop channel deliveries for one watch, exact `ids`, or every watch in the folder (the `group` label): fires keep committing to the journal.
 - `om watch page-add` (action: `watch_page_add`) — : Watch a URL (a page, a document, a JSON endpoint) for new items, as it is.
 - `om watch pause` (action: `watch_pause`) — Disable one watch by id or slug, several by exact id in ONE call (`ids`), or every watch under a group label (`group: <label>`); its steps stop with it and get their OK again when it resumes, and journals are preserved.
