@@ -254,17 +254,26 @@ fi
 say ""; say "== install =="
 if [ "$MODE" = repo ]; then
   say "in place at $OUT (launchd runs it directly)"
-  [ "$STOPPED" = 1 ] && { om service start >/dev/null 2>&1 || die "service start"; } \
-                     || { om service restart >/dev/null 2>&1 || die "service restart"; }
+  # Keep the supervisor's stderr: launchd swallows the daemon's, and a bare
+  # "FAIL: service restart" hides whether bootout, unload, or bootstrap failed.
+  if [ "$STOPPED" = 1 ]; then RS=$(om service start 2>&1) || die "service start: $RS"
+  else RS=$(om service restart 2>&1) || die "service restart: $RS"; fi
 else
   DEST=~/.local/opt/openmarket/"$NEWVER"/bin/om
   [ -e "$DEST" ] && say "NOTE: overwriting $NEWVER in place -- the outgoing binary is gone, rollback reverts the version"
   mkdir -p "$(dirname "$DEST")"
   mv "$OUT" "$DEST" || die "mv into $DEST"      # mv, never cp
   chmod +x "$DEST"
-  ln -sfn "$DEST" "$TARGET" || die "symlink repoint"
+  # `om service restart` rewrites the plist to the resolved versioned path, so
+  # on the next run with an unbumped version TARGET == DEST. `ln -sfn X X`
+  # unlinks X and leaves a symlink to itself (2026-09-17: killed `om` on PATH
+  # and the launchd program in one go). Only repoint when they differ.
+  if [ "$DEST" != "$TARGET" ]; then
+    ln -sfn "$DEST" "$TARGET" || die "symlink repoint"
+  fi
+  [ -x "$(realpath "$TARGET" 2>/dev/null)" ] || die "$TARGET does not resolve to an executable after install"
   say "installed:             $DEST"
-  om service restart >/dev/null 2>&1 || die "service restart"
+  RS=$(om service restart 2>&1) || die "service restart: $RS"
 fi
 sleep 15
 

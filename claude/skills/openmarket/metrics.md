@@ -43,7 +43,7 @@ Quick routing — the common asks, the call, the defaults to assume, and the one
 | "compare RSI across BTC, ETH, SOL" | one `metric_screen`, `universe.kind: symbols` | never a per-symbol `metric_get` loop |
 | "footprint" / "volume profile" on BTC | `points`, type VOLUME_PROFILE_AGG | the default summary IS the answer (window POC, value area, delta, per-bar rows); never scan raw levels; for one bar's levels narrow `lookback` to that bar and pass `detail: full` |
 | "TPO" / "auction profile" / "market profile" on BTC | `points`, type TPO_AGG, `tpoSession` TPO_SESSION_DAILY, `rawSymbol` + `exchanges` pinned | never a bare `coin` (every market of the coin merges under one id) unless `transform.groupBy.type` is GROUP_BY_TYPE_SUM; the session block (POC, value area, day type) is the answer |
-| "alert me when …" | `alert_create` | a screen is a one-shot snapshot, not a watch |
+| "alert me when …" | `watch_create` with a `condition` source | a screen is a one-shot snapshot, not a watch |
 
 ### Reply shape
 
@@ -62,7 +62,7 @@ What to send, per field:
 | `queries[].metric` | From the user request (`rsi`). Registry ids only — the probe rule in the intro; the full id list is §"Technical indicators". |
 | `queries[].params` | Optional wherever §"Technical indicators" shows numbers: omit them and the documented values apply (`rsi` 14, `macd` 12/26/9, `bb_*` 20/2), filled before validation and echoed back on the value so you can state what was read. A partial object keeps the keys you sent and fills the rest. Send params when the ask means something other than the textbook setting — "RSI 7", "the 50-day SMA" — verbatim, and don't ask just to confirm a default. Three ids document no value and are rejected with `invalid_query` without one: `volume_sma` (`period`), `rolling_high` / `rolling_low` (`bars`). |
 | `selector.symbol` | Required. Venue-raw (`BTCUSDT`) when `exchange` is named; a bare coin (`BTC`) is enough only when `exchange` is omitted. With `exchange` omitted the tool resolves the coin's default listing itself — spot for price-class reads, the perpetuals book for funding/OI, a US equity on its primary listing — reads it, and echoes it in `selector` and `listing_note`. State that listing in one line, in words. The `symbols` tool enumerates a coin's listings when the wording doesn't fit. |
-| `selector.exchange` | Optional. From the user when named — canonical IDs via the `exchanges` tool; "Binance Futures" maps to `BINANCE_FUTURES`, "Bybit" to `BYBIT` — and never substituted. Otherwise omit it: the tool chooses the default listing and discloses it; a coin listed only on venues without a default is refused as `venue_unresolved`, naming them — relay them and ask. Only `metric_get` (and `signal_create_metric`) resolve an omitted venue; `metric_series`, `metric_screen` and `alert_create` need it named. A `wrun/…` metric needs it named too — its source book is not known before the package resolves, so the omitted form is refused as `venue_unresolved`. A read never blocks on a venue question otherwise — ask only when the choice commits real money. |
+| `selector.exchange` | Optional. From the user when named — canonical IDs via the `exchanges` tool; "Binance Futures" maps to `BINANCE_FUTURES`, "Bybit" to `BYBIT` — and never substituted. Otherwise omit it: the tool chooses the default listing and discloses it; a coin listed only on venues without a default is refused as `venue_unresolved`, naming them — relay them and ask. Only `metric_get` resolves an omitted venue; `metric_series`, `metric_screen` and a `watch_create` condition source need it named. A `wrun/…` metric needs it named too — its source book is not known before the package resolves, so the omitted form is refused as `venue_unresolved`. A read never blocks on a venue question otherwise — ask only when the choice commits real money. |
 | `selector.interval` | Defaults to `HOUR`. Map a mentioned timeframe to its canonical token — the interval enum is inline in the tool schema; the `enum` tool lists all. |
 | `selector.quote` | Defaults to `USD`. Override only when the user explicitly asks for a quote currency. |
 
@@ -243,9 +243,9 @@ Per-symbol skip reasons on a screen (non-fatal — the row moves to `skipped`, t
 
 ## Alerts
 
-alert_create shares this registry and validators — read the live value before arming, take the spec from skill_read("alerts"); no chained follow-ups.
+Read a metric before arming its watch condition; `watch_create` shares this registry, and watch.md §"Condition source" carries the shape; no chained follow-ups.
 
-`metric_get` uses **the same metric registry, the same parameter validators, and the same data-fetch path** the alert engine uses. If you can compute it here, you can alert on it via `alert_create` with the same metric name and the same params shape — `skill_read("alerts")` carries the spec. If a metric doesn't show up in `metric_list`, it can't be used in an alert either.
+`metric_get` uses **the same metric registry, the same parameter validators, and the same data-fetch path** as a watch condition. If you can compute it here, you can watch it via `watch_create` with a `condition` source using the same metric name and params shape. `skill_read("watch", section = "Condition source")` carries the shape. If a metric does not show up in `metric_list`, it cannot be used in a watch condition either.
 
 A common pattern: read the metric's current value with `metric_get`, then write the alert with thresholds informed by that value — offer it at the threshold the reply just compared against (70/30 for RSI).
 

@@ -37,7 +37,7 @@ om watch create "CI failures" --inbound --goal "Fire on real CI failures on main
 
 - `--inbound` means there is no vendor stream: the watch IS the endpoint. The create prints the door once: the `/ingest/v1/<watch>` endpoint plus a bearer token, shown exactly once (only its hash is stored). Losing or leaking the token has one answer, `om watch rotate-token <watch>`, and rotation is revocation.
 - The default classifier (`llm_every_event`) judges every push against the goal under the watch's normal daily budgets, so a chatty source still yields a clean journal. `--classifier-mode accept_all` journals everything and is the user's explicit opt-out, same doctrine as `news.md`.
-- Delivery, channels, muting, and noise tuning are ordinary watch mechanics (`watch.md`); the feed also appears in `om news list --provider inbound` like any other feed.
+- Delivery, channels, muting, and noise tuning are ordinary watch mechanics (`watch.md`); find the saved feed with `om watch list`.
 
 Then build the glue that feeds the door. Build everything you can reach yourself (the watch, the goal, the glue script, the test push); the user's hands are for the one thing only they can touch.
 
