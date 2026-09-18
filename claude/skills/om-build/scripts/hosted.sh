@@ -97,7 +97,8 @@ else
   disk=$(inode "$TARGET")
   # match /om$, NOT /bin\/om/ -- the narrow pattern silently misses a repo-tree
   # daemon and reports an empty inode as if the daemon were sick.
-  live=$(lsof -p "$pid" 2>/dev/null | awk '$4=="txt" && $NF ~ /\/om$/ {print $(NF-1); exit}')
+  # Only inspect executable mappings; resolving socket names can stall the gate.
+  live=$(lsof -nP -a -p "$pid" -d txt 2>/dev/null | awk '$4=="txt" && $NF ~ /\/om$/ {print $(NF-1); exit}')
   say "  [1] inode disk=$disk live=$live"
   [ "$disk" = "$live" ] || flag "daemon runs inode ${live:-<none>}, disk has $disk"
 fi
