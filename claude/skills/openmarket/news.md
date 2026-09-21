@@ -17,7 +17,6 @@ The news store discovers text feeds and manages vendor links, subscriptions, pre
 - Attempt an authorized request; only a typed backend error establishes a plan restriction. Read the account's actual entitlement with `news_billing` (§"Wall phrasing").
 - Buying, upgrading and cancelling require the person's terminal. Name `om news subscribe`, `om news upgrade` or `om news billing`; paid Streams are acquired from the news store (§"Paid Synoptic Streams").
 - **Zero `news_*` calls raise a card** on their bare name. `news_brief` scheduling or sending to a channel raises one; a local read or generation follows the approval mode.
-- `backtest_news` with `materialize: true` requires confirmation before paid reconstruction (§"Backtest before arming anything").
 - A vendor feed id is not a local watch id or a registry address. Discover the feed in the store, then use its saved watch for changes. `watch_follow` follows an OpenMarket `@scope/name` stream.
 - State the one-key-at-a-time consequence when offering Synoptic linking (§"Account and linking gates").
 
@@ -100,7 +99,7 @@ Never state a price from the agent catalog, offer an unattended purchase, or tre
 
 `backtest_news` answers "would trading this feed's fires have paid?" before any signal — the study lane is free, `--classify` spends (cached).
 
-`om backtest news <feed>` (action `backtest_news`) answers "would trading this feed's fires have made money?" with zero authoring: a free correlational study first (does price move after fires?), then a P&L replay of a synthesized hold-after-fire strategy. Run it before proposing any signal or strategy on a feed's fires; the printed breadcrumb at the end names the exact `om watch action add --judge` + `om watch create` commands. The study lane and `--side` replays cost no LLM calls; `--classify` spends real ones (durably cached, so reruns are free) and classifies each fire with the signal's default prior context, rebuilt as of that fire (`--context-replay normal|advanced` selects how; refused with `--study-only`). An advanced replay over spans with no qualifying snapshot needs `materialize` (`--materialize`): without it the run refuses with the projected call count, and with it the paid timeline synthesis runs outside the run's own call cap and persists reconstructed snapshots — the one shape of this verb that saves anything, and the reason it raises a card in every approval mode. The asset defaults from the watch's single `related_markets` tag: tag first, backtest second.
+`om backtest news <feed>` (action `backtest_news`) answers "would trading this feed's fires have made money?" with zero authoring: a free correlational study first (does price move after fires?), then a P&L replay of a synthesized hold-after-fire strategy. Run it before proposing any signal or strategy on a feed's fires; the printed breadcrumb at the end names the exact `om watch action add <feed> --ai <prompt> --output verdict` and strategy-step commands. The study lane and `--side` replays cost no LLM calls; `--classify` grades the feed's own ai verdict step over its fires, the producer a promoted watch runs: the step's model is asked once per fire the verdict memo cannot answer (`max_llm_calls` caps the model requests, and a turn that reads history is two; reruns ask nothing), and the step reads the feed's earlier fires as of each fire through `watch_history`. The asset defaults from the watch's single `related_markets` tag: tag first, backtest second.
 
 ## The daily brief
 
@@ -176,7 +175,7 @@ Chat turns may arrive with a `news:` badge on the turn-context line (unread coun
 - `/news countdown on` / `/news countdown off`: the beta countdown, also set through `om config set news.beta_countdown`. Off keeps the date on the plan line and in JSON.
 - `/news side` names no surface and returns a notice; there is no docked news rail. `/brief` opens the daily edition, generating it when needed.
 
-HOT TODAY keeps the vendor's ordering and coverage. A missing section says nothing about how quiet the day was. Fire cards in the transcript and the header ticker carry arrivals. There is no `/news browse` form.
+HOT TODAY keeps the vendor's ordering and coverage. A missing section says nothing about how quiet the day was. Fire cards in the transcript and the footer count carry arrivals. There is no `/news browse` form.
 
 ## Console handoff
 
@@ -197,14 +196,11 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `hold` — Default 4h.
   - `from` — Default: 30 days ago.
   - `side` — Fixed side to trade on every fire (default long).
-  - `classify` — Each fire classifies WITH the signal's default prior context, rebuilt as of that fire (context_replay selects the mode); the result discloses it.
-  - `context_replay` — With classify: how the default prior context is rebuilt per fire — normal (default; the watch's durable development timeline as of the fire) or advanced (as-of overview snapshots where history survives).
-  - `materialize_page_size` — Materialization page size, 1..100 (default 100).
   - `history` — live (default): rows the daemon observed in real time (quiet catch-up recovery rows are excluded; their observed_at is the catch-up moment, not live-actionable).
   - `fee_bps` — Default 0.
   - `slippage_bps` — Default 0.
   - `latency_bars` — Default 0.
-  - `max_llm_calls` — Default: 200 — a classify run always carries a ceiling, and reaching it refuses with the spend so far, every verdict already paid for durably cached.
+  - `max_llm_calls` — Default: 400, two per fire the run reads by default — a classify run always carries a ceiling, and reaching it refuses with the spend so far, every verdict already answered kept in the memo.
 - `backtest_news` · `chart_pins`
   - `until` — Default: now.
 - `chart_pins`
@@ -216,7 +212,6 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `workspace` — The default (no workspace) is the view's own titled day workspace and needs no confirmation.
   - `fresh` — Default is fresh-or-same-view: the same view re-plotted the same day reuses its workspace.
   - `live` — Default TRUE everywhere (a plotted view stays live).
-  - `follow` — Honored when `live` is absent; passing both with different values is refused.
   - `unfollow` — Control op: stop the live view on the target workspace (default: the whole view; pass `source` to drop one member).
 - `news_brief`
   - `limit` — list only: how many of the newest stored briefs to return, 1..60 (default: all stored).
@@ -238,7 +233,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 What a reply must carry from each result-bearing action here; the per-branch guidance itself rides on the tool result.
 
 - `backtest_news`
-  - discloses `disclosures[]` — The run's honesty notes: asset defaulting, the classify lane's context-replay mode, sparse-corpus warnings.
+  - discloses `disclosures[]` — The run's honesty notes: asset defaulting, the classify lane's ai step, sparse-corpus warnings.
 - `news_brief`
   - discloses `brief.body_md` — The briefing markdown: story-grouped items deduplicated across feeds, major developments first, with a quiet note for feeds with nothing new. Relay it to the user as-is; do not re-summarize away detail. When generator=fallback it is a labeled raw per-feed fire list instead, whose '(raw rollup: ...)' first line states what THAT run did and carries no setup advice — what to do about it depends on what is configured now, so read llm_error and the user's current state before advising anything. The body's relative ages are frozen at body_ages_at (created_at on older briefs): never repeat one as though it were measured now.
   - on `not_found` — No stored brief matched: follow the error's own hint (list or re-select a stored one, or mode 'generate' when none exists); if nothing exists at all, the events live in watch_history / event_journal_search — and in alert_events on a home whose watches all shadow alerts.

@@ -127,12 +127,13 @@ What to take from the header: the `Sources:` lines are the only source names tha
 
 The one update each source kind hands the step, field by field; read this to know what a prompt can point at without a tool call.
 
-Every INPUT block opens `INPUT ("<source name>", <row kind>):`, the row kind being `price fire`, `text row`, `page item`, `page section`, `page change` or `chained step`; then the row's fields for its kind, in this order.
+Every INPUT block opens `INPUT ("<source name>", <row kind>):`, the row kind being `price fire`, `text row`, `page item`, `page section`, `page change`, `reading` or `chained step`; then the row's fields for its kind, in this order.
 
 | Source kind | Row kind | INPUT carries |
 | --- | --- | --- |
 | condition fire | `price fire` | `Market:` the selector as `EXCHANGE:SYMBOL`; `Fired at:` the fire instant; `Values:` each metric leaf's current value as `name=value`, comma separated, in the rule's order (both sides of a Compare); `Rule:` the condition as one line (every leg of an `all` / `any`). A catch-up fire (the daemon was down) is reported late and a money step never runs on it. |
 | page change | `page item`, `page section` or `page change` | `Kind:` the stored kind; `Title:`; `Link:` (the row's own `source_url`); `At:` the observed instant; `Summary:` the classifier's line, when one ran; `Changed lines (- before, + after):` when an earlier excerpt exists; `Text:` then the committed raw text on the next lines, at most 2048 characters, then `(cut)`. |
+| reading (a page in `reading` mode: a number a publisher serves as JSON, read on a clock) | `reading` | `Kind:` `reading`; `Title:` the reading line (`<name> <value>`, the unit appended when the field has one); `Link:` the publisher's address; `At:` the instant om read it; `Summary:` one line per sealed field (`<name>: <value>`); `Values:` the numbers as `key=value` (up to 8, the store's own column); `Text:` the same lines. No model judged it: the rule ran in om before the row was admitted, so the row is the reading that met it (or, with no rule, the newest reading). |
 | feed item (RSS, Atom, JSON, EDGAR, a declared poller) | `text row` | `Kind:` the stored kind; `Title:`; `Link:`; `At:` (`source_event_time`, the item's own clock); `Summary:`; `Text:` then the item's text, bounded like a page. |
 | X post | `text row` | `Kind:`; `Title:` when the mirror gives one; `Link:` the post; `At:` the post's clock; `Summary:`; `Text:` then the post. |
 | news-stream item (a vendor stream: Synoptic, Attention; a hosted search finding) | `text row` | `Kind:`; `Title:`; `Link:`; `At:`; `Summary:`; `Text:` then the story text the vendor sent. |

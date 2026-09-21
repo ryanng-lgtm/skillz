@@ -59,6 +59,10 @@ Quick routing — the common asks, each row a recipe (tool + the decisions to ma
 | "draw the fib / trendline for the swing" | `chart_drawing_auto` — anchors computed from candles; read the drawing detail file first. |
 | "plot my headlines / alert fires" | `chart_pins` — its own day workspace by default, no approval; a NAMED workspace or `here` needs the user's explicit yes. |
 | "what's on my chart?" | `chart_refresh` with the workspace id omitted — never answered from `chart_list`. |
+| "plot watch readings" | `chart_series_push`; read §"Numeric series" or §"Chart targets" for a main plot. |
+| "show a table or comparison beside the chart" | `chart_panel_push`; read §"Panels". |
+| "show a book, feed or timer" | `chart_widget_push`; read §"Widgets". |
+| "show this market scan" | `chart_scan_push`: complete snapshots for live viewers; read §"Scan". |
 
 **Events on charts are their own lane: `chart_pins`.** It plots event sources (news feeds, custom watches, price-alert fires) onto a chart's event lane as a live view; the call shape is §"Pins", and the defaults, filters, depth and workspace consent live in §"Pins". Do not confuse it with `chart_events`, the session-edit stream: that verb READS the human's and peers' recent manual chart edits and plots nothing.
 
@@ -228,6 +232,85 @@ When `role` is **`VIEWER`**:
 
 When `role` is `HOST`/`CO_HOST` (or absent — your own workspace), chart actions work as normal.
 
+## Numeric series
+
+Use `chart_series_push` for numeric history, price levels or a compact inset; a watch source keeps the plot updated from committed readings.
+
+`om chart series push` takes one source: `--watch <slug> --key <key>`, `--metric <metric>`, or `--times <json> --values <json>`.
+Use `--id` to replace the same plot and `--clear` to remove it. Watch publication needs the `series_watch_follow` effect in chat.
+
+| Plot | Flags and input |
+| --- | --- |
+| Ordinary series | `--kind line|area|histogram|step|markers`; `--pane lower|overlay`; `--scale shared|own` only on overlay |
+| Price levels | `--kind levels --pane overlay --dock right|left`; `--prices` with `--values`, or `--rows '[[price,value,color?],...]'`; `--width-frac`, `--poc`, `--labels` |
+| Inset | `--kind inset --pane overlay --dock top|bottom`; `--height-px 16..120`, `--shape histogram|area|line`; times and values |
+| Main plot | `--pane main --kind line|area|step --cadence <interval>`; watch sources derive cadence when omitted |
+
+Action inputs put level options in `levels`, inset options in `inset`, and main cadence in `cadence_s`.
+Levels use strictly monotonic `prices`, matching `values` and optional hex `colors`, with no `times`.
+Main plots floor seconds to their cadence grid and keep the last reading per bucket.
+Supported grids are 1m, 5m, 15m, 30m, 1h, 4h, 1d and 1w.
+Limits: 2000 time rows, 512 levels, 16 series per chart, and 96 KiB for the whole intent.
+
+## Panels
+
+Use `chart_panel_push` for a plot with its own axes or a table, below the chart or in a separate layout cell beside it.
+
+`om chart panel push` requires `--id` and a source. Choose `--rows <json>`, `--screen <file-or->`, or `--watch <slug> --keys k1,k2`.
+Screen files contain `metric_screen` output; `-` reads stdin. The action source is `{kind: "screen", screen: <output>}`.
+Supply `--title` except for screens, which use the metric name. `--clear` removes the panel.
+
+Kinds: `bars`, `line`, `scatter`, `histogram`, `pie`, `heatmap`, `table`, `tiles`.
+Set `--x time|index|category` and `--place below|side`.
+Bars, lines and tables require `--series <json>` column definitions for a rows source.
+Optional styling: `--orientation vertical|horizontal` for bars/histograms, `--stacked` for bars/lines,
+`--labels`, `--bins 2..200` for histograms, and `--hole 0..0.8` for pies.
+Table cells may carry `text`, `color`, `bar` and `spark`; sparks contain 1..64 finite numbers.
+
+A screen becomes symbol/value/distance/age columns in a table or a single value series in bars.
+Watch bars show the newest committed values by key; watch tables show the last 32 events;
+watch lines show the last 2000 events on a time axis. Watch publication requires `panel_watch_follow` and continues until cleared.
+
+Side placement grows a one-pane workspace to `2H`, sets pane 1 to `panel:<id>` on exchange `OM`, and pushes there.
+On an existing grid it reuses that target or the first non-primary panel cell without a live panel.
+`panel_no_free_pane` means choose `--chart-index`; an explicit index always skips layout and symbol changes.
+Use the returned chart index for subsequent updates or clears.
+Limits: 2000 rows, 32 table rows, 24 pie slices or tiles, eight panels per chart, 96 KiB for the complete intent.
+
+## Widgets
+
+Use `chart_widget_push` for cards, orderbook ladders, event feeds and progress meters that share the chart display.
+
+Every widget takes `--id`, `--title`, and `--kind card|ladder|feed|meter`; `--clear` removes it.
+Cards retain `--rows`, `--watch`, `--keys`, `--state`, `--no-state`, and `--no-next-check`.
+A card row may include `spark`, 1..64 finite numbers. Cards, feeds and meters accept `--anchor`, `--offset` and `--z`.
+
+| Kind | Source and flags |
+| --- | --- |
+| Ladder | `--rows '[[price,value,fraction,color?],...]' --side right|left --divider <json>`, or `--polymarket <token-or-market> --depth 5..50` |
+| Feed | `--lines '[[timeMs,text,color?],...]'` or `--watch <slug>` |
+| Meter | `--label --fraction --ramp <json> --text`, or `--watch <slug>` |
+
+Ladders have no anchor, offset, z or state. Polymarket market names select the Yes outcome;
+use a token id for another outcome. Displayed book rows stay within 64, favoring levels nearest the spread.
+Size fractions use the largest displayed size; asks are red and bids green.
+Watch feeds show the newest 50 committed source events, with text clipped to 80 characters.
+Watch meters show elapsed fraction since the last check, clamped to 0..1, and time to the next check.
+Watch widgets require `widget_watch_follow` and keep updating until cleared.
+Limits: eight widgets per chart and 32 KiB for the whole serialized intent, including narration.
+
+## Chart targets
+
+Use a series target when watch readings should be the main plot; use a panel target when a layout cell belongs to a panel.
+
+`om chart create --series watch/<slug>/<key>` creates `series:watch.<slug>.<key>` on exchange `OM`,
+then publishes its numeric history through `chart_series_push` with `pane: main`.
+The stored source cadence rounds up to a supported main-plot interval; an unknown cadence uses 1h.
+`symbol` and `exchange` are ignored for this create form. Named workspace reuse keeps the existing setup.
+An `@scope/name` address refuses with `series_ref_unsupported`; use `om series` for that address form.
+`chart_symbol` accepts `series:<id>` or `panel:<id>` with exchange `OM` and sets the matching `OM|<target>` transform.
+Targets are not market selectors. A metric series cannot replay onto a target pane; watch series, panels and widgets replay independently of market.
+
 ## Panes and layout
 
 Symbol, interval (`1m` minutes vs `1M` months), plot type, view zoom/pan; layout grids (`2H`/`3V`/`4`, 4-pane cap), sync, multichart cells, `NO_CHANGE`, `chartIndex out of range`.
@@ -331,6 +414,37 @@ This is the `chart_view` path — ephemeral viewport change, broadcasts to peers
 2. **Resolve the workspace id** (same default rules — see §"Workspaces").
 3. **Compute `startTime` and `endTime`** in integer epoch MILLISECONDS — a seconds value is schema-valid and lands the viewport in 1970. `endTime` must be after `startTime`. `cursorTimestamp` is optional and defaults to the midpoint, so pass it only when the user named a focus instant.
 4. **Execute** `chart_view` — no preview, no confirmation (ephemeral, reversible). Success response has `version: 0` — expected, not an error.
+
+## Scan
+
+Push complete scan snapshots and clear the transient canvas and run HUD; use this for a running market scan on the active or named workspace.
+
+`chart_scan_push` takes the frame fields plus optional `workspaceId`. Each
+non-clear frame carries `run`, `phase`, `progress` and `hud`. Include `wall`
+with exactly 16 slots to show the canvas; omit it to retain only the HUD.
+Keep the same `run.id` and `run.startedAt` throughout a run. Use `clear: true`
+with identity only to end it. The sender supplies a durable revision.
+
+Send probabilities to two decimals and sparks to four significant
+digits. Frames over 24 KiB refuse. A successful submit reaches current viewers;
+there is no persistence or join replay. Both the daemon and chart service must
+support this lane. CLI forms live in §"CLI equivalents"; field bounds live in
+`docs/SCAN_STATE_CONTRACT.md`.
+
+A slot showing a backtest (keeper or not) carries its equity curve in `spark` with
+`sparkLabel` (the variant), `sparkPct` (its return in percent) and `verdict`
+(`pass`, `fail`, `survivor`); a new label on the same slot means the next
+backtest of that coin. `counter` (`{value, label}`) is the one big number on
+screen and `board` (`title`, optional `pick`, 1..8 ranked rows of `symbol`,
+`name`, `pct`, `drawdownPct`, `trades`, `spark`) is the survivors leaderboard
+once the wall is done; a frame carries `wall` and `board` together or either
+alone, and a clear frame carries neither.
+
+To stream a whole run from one process, `om chart scan play [file]` (a JSONL
+path or `-` for stdin) sends one frame per line through the same validation
+and RPC as push, one in flight at a time in input order, and prints one JSON
+ack line per frame; a refused line never stops the stream (CLI only, no
+action).
 
 ## Indicators
 
@@ -467,16 +581,16 @@ is immune: its computed swing anchors are always time-separated.
 
 `om chart pins` (action `chart_pins`) is the plotting verb: ANY event sources onto a live price chart in ONE call. News feeds (Fast alerts, Streams), custom inbound watches, and price alerts (their fires) mix freely. A chart's event lane is a live query over the one event store, and the call writes the query (sources + filter + window + depth + market + workspace); the daemon keeps it true. The result carries the live-view URL to share plus one structured summary. Doctrine:
 
-- **Default silently and act: one call, zero questions.** "Show X on a chart", "plot @scope/name on NQ" or "see the fires on the chart" is one `chart_pins` call with the sources named. A stream address (`@scope/name`, `#member` allowed) is itself a source ref: pass it straight through and the verb resolves every bound role (own, followed, installed) as its own labeled source. Plotting NEVER starts with `chart_show`, `chart_create` or `chart_status`: `chart_pins` finds or mints the workspace itself, so those calls before it are wasted turns (typed refs `{kind: "watch"|"feed"|"alert", ref}` beat bare strings; a bare string works when it is unique across all three namespaces). No sources at all plots every chartable owned source, and a home with none gets a catalog preview. Market defaults from the active chart pane, else the sources' sole market tag; the workspace defaults to the view's own titled day workspace (same view, same day: same chart; `fresh: true` when the user asks for a NEW chart). Never pre-ask what a default resolves, and never hand-build pins from `watch_history` plus drawing tools: the verb owns selection, framing, caps, dedup, and live updates.
+- **Default silently and act: one call, zero questions.** "Show X on a chart", "plot @scope/name on NQ" or "see the fires on the chart" is one `chart_pins` call with the sources named. A stream address (`@scope/name`, `#member` allowed) is itself a source ref: pass it straight through and the verb resolves every bound role (own, followed, installed) as its own labeled source. Plotting NEVER starts with `chart_show`, `chart_create` or `chart_status`: `chart_pins` finds or mints the workspace itself, so those calls before it are wasted turns (a source ref is a watch id, slug, or label, or a feed id or label, which resolves through the feed's recorder watch; a ref must be unique across watches and feeds, and an ambiguous one returns the candidates). No sources at all plots every chartable owned source, and a home with none gets a catalog preview. Market defaults from the active chart pane, else the sources' sole market tag; the workspace defaults to the view's own titled day workspace (same view, same day: same chart; `fresh: true` when the user asks for a NEW chart). Never pre-ask what a default resolves, and never hand-build pins from `watch_history` plus drawing tools: the verb owns selection, framing, caps, dedup, and live updates.
 - **A market named in human form resolves first, never guesses.** "NQ", "Apple", "EURUSD" are not `EXCHANGE:SYMBOL` yet: one `symbol_resolve` call turns the phrase into the chart plane's exact ref (`CME:NQ1!`), TradFi venues included, and a `bound` answer's `market` pastes straight into this verb (a colon-less `market` also self-resolves inside the verb when the directory answers). Ambiguity comes back as named candidates: pick with the user, never guess, and never substitute a crypto proxy for a market the chart plane carries. Candle-backed verbs (backtests, price alerts) work on the TradFi venues the data transport serves (Polygon equities today; `om exchanges` is the coverage answer); a resolved market on a venue outside that set (CME, FX) still refuses with the boundary named, while plotting pins needs no candles at all.
 - **ONE question max, and only at a true fork.** Three forks qualify: nothing resolves the market (no active chart AND no sole source tag: the typed `asset_required` names supported venues, so run `symbol_resolve` on the user's phrase first; a bound ref usually dissolves the fork, and otherwise ask which market); a multi-market source with nothing on screen (the same error lists the candidate tags: ask which one); the user names a stream they do not hold (`feed_unwatched`: adding it is an acquisition, so ask before acquiring it through the news store). Everything else defaults and is stated after acting.
 - **Echo after acting, one line from the summary.** The result's `disclosure` IS that line, precomposed ("47 events: Fast 12, Streams 29, Custom 5, Alert 1, last 30d, following live"): relay it verbatim, never re-derive the counts, then add depth requested/satisfied and the one narrow-it `hint` when something was cut. Relay every `disclosures` line and each `dropped` entry (layers: window, depth, filter_budget, fill_budget, unrecorded_sources; each names what was cut and the remedy). Auto-fill rides the same line: a journal thinner than the asked depth fills by native vendor replay where the source supports it, `filled` counts what arrived that way, and the shared per-plot fill budget binding is disclosed as a `fill_budget` drop, never silently. A source whose recording began after the asked reach cannot fill; the disclosure says so once. Never present a young journal as "no news happened".
-- **Refusals teach; relay the lesson, not the error string.** Topics do not fire (`feed_not_chartable`): offer a Fast alert or Stream on the subject instead. An ambiguous bare ref (`ambiguous_source`) returns cross-namespace candidates: send a typed ref or pick with the user.
+- **Refusals teach; relay the lesson, not the error string.** Topics do not fire (`feed_not_chartable`): offer a Fast alert or Stream on the subject instead. An ambiguous ref (`ambiguous_source`) returns the candidates with their ids: pass the full id, or pick with the user.
 - **A chart the USER chose gets the confirm language BEFORE targeting.** `workspace: <id>` puts up to 500 events onto a chart the user keeps, and `here: true` does the same to the chart they are looking at; both re-point the sources' live follows there, and the pins stay until `chart_delete` removes the whole workspace. A chat surface raises an approval card for both in every approval mode; neither auto-approval nor a session allowance answers it (the CLI confirms `--workspace`, where `--here` is a human keystroke rather than a target the model picked); and over MCP nothing gates either call, so this doctrine is the gate: get the user's explicit yes before passing `workspace` or `here: true`. The card is for a chart the user KEEPS: the agent's own minted charts (and the default day workspace, which exists for these pins) dispatch without a card, and an unreadable minted ledger fails closed to the card.
 - **Filters are chart-time predicates.** "Only actual strikes, not threats" is `filter`: one plain-English sentence judged per event on the user's own model, fail-closed (an unjudgeable sentence refuses the plot rather than plotting unfiltered), with receipts in the summary's `filter` block and the judge budget disclosed. NEVER create a new alert or feed just to see a filtered view: the journal already holds the events, and the filter is part of the query.
 - **Depth beats the window, and arrival is invisible.** Default: the newest 100 matching events (cap 500), split across sources by global recency, over the WHOLE journal; only an explicit `from`/`until` clips, and an asked depth wins over any window a source would default to. Selection is arrival-agnostic (`selection: "any"`): live, backfilled, and caught-up rows all qualify, so a followed chart never freezes in a backfill mode.
-- **Alert fires chart like any source.** `sources: [{kind: "watch", ref: <id-or-label>}]` (CLI `om chart pins --watch <id>`) pins the alert's fire history as diamond `alert_fire` pins and follows new fires as they land. Authoring a condition watch lives in watch.md §"Condition source".
-- **Follow is ON everywhere; control ops are separate calls.** A plotted view stays live by default (`follow: false` skips arming and removes nothing). `unfollow: true` stops the live view on a workspace (pins stay; `source` scopes one member); `rearm: true` resets a degraded view's delivery health in place. Never re-arm by re-plotting: a re-plot re-projects and can widen the filter frozen into the binding. Relay the result's `follow` block when the user asks why a chart went quiet.
+- **Alert fires chart like any source.** `sources: [<id-or-label>]` (CLI `om chart pins <id>`) pins the alert's fire history as diamond `alert_fire` pins and follows new fires as they land. Authoring a condition watch lives in watch.md §"Condition source".
+- **Live is ON everywhere; the control op is a separate call.** A plotted view stays live by default (`live: false` skips arming and removes nothing). `unfollow: true` stops the live view on a workspace (pins stay; `source` scopes one member). There is nothing to re-arm: a push that fails is retried on the next event or by the daemon's 15 minute reconcile, and a re-plot is never the fix for a quiet chart (it re-projects and can widen the filter frozen into the binding). Relay the result's `follow` block when the user asks why a chart went quiet.
 - **Offer once, not naggingly.** When the conversation is about a market one of the user's sources covers (its price alert, its backtest, its chart), offer the pin chart ONE time ("want the fires on the chart next to it?"), and never re-offer after a decline. Tagging once (`om watch edit <id> --market EXCHANGE:SYMBOL`) makes every later plot and backtest flag-free.
 
 ## Make chart actions visible — presence-aware live view
@@ -653,6 +767,15 @@ om chart view --workspace <workspaceId> --chart 0 \
 
 ---
 
+For a scan, pass data fields without an intent envelope. Inline JSON, `@file`
+and `-` for stdin are supported; omit `--workspace` to use the active chart.
+
+```bash
+om chart scan push --workspace <id> --frame @frame.json
+om chart scan play --workspace <id> frames.jsonl   # or `-` for stdin; one ack line per frame
+om chart scan clear --workspace <id>
+```
+
 ## For contributors
 
 Where the wire contract and bridge code live for adding or changing a chart verb.
@@ -667,22 +790,35 @@ The wire contract lives in code, not a standalone doc: envelope shapes in `packa
 
 What each tool here fills in when a field is omitted — the defaults and omit-rules its schema states on top-level fields and one object level down; prose never restates them.
 
-- `chart_events` · `chart_indicator_add` · `chart_indicator_preview` · `chart_indicator_remove` · `chart_indicator_update` · `chart_interval` · `chart_layout` · `chart_open` · `chart_plot_type` · `chart_refresh` · `chart_screenshot` · `chart_symbol` · `chart_sync` · `chart_view`
+- `chart_events` · `chart_indicator_add` · `chart_indicator_preview` · `chart_indicator_remove` · `chart_indicator_update` · `chart_interval` · `chart_layout` · `chart_open` · `chart_panel_push` · `chart_plot_type` · `chart_refresh` · `chart_scan_push` · `chart_screenshot` · `chart_series_push` · `chart_symbol` · `chart_sync` · `chart_view` · `chart_widget_push`
   - `workspaceId` — OMIT to act on the user's ACTIVE workspace (the daemon resolves it live); omitting is the default and the correct call for 'my chart' / 'this workspace'.
 - `chart_indicator_add`
   - `settings` — default {}
 - `chart_indicator_preview`
   - `params` — default {}
   - `bars` — default 300
+- `chart_indicator_preview` · `chart_panel_push` · `chart_series_push` · `chart_widget_push`
   - `clear` — default false
 - `chart_keep`
   - `workspace` — Default: the user's ACTIVE chart workspace (charts.workspace), which is where scratch canvases live.
 - `chart_list`
   - `mine` — Never the answer to a question about the user's workspaces; omit it for those.
+- `chart_panel_push`
+  - `kind` — default "bars"
+  - `x` — default "category"
+  - `place` — default "below"
+- `chart_scan_push` · `chart_series_push` · `chart_widget_push`
+  - `chartIndex` — default 0
+- `chart_scan_push`
+  - `payloadId` — Defaults to omsc:c<chartIndex>; must match chartIndex.
 - `chart_screenshot`
   - `outPath` — Defaults to ./chart-<shortId>-<epochMs>.png in the current directory.
+- `chart_series_push`
+  - `kind` — default "line"
 - `chart_view`
   - `cursorTimestamp` — Seek-intent focus within [startTime, endTime]; defaults to the midpoint.
+- `chart_widget_push`
+  - `kind` — default "card"
 - `nervous_status`
   - `limit` — default 20
 
@@ -743,7 +879,7 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 
 Every `om` command this skill covers, one line each with its action name — check exact verbs and spellings here.
 
-- `om chart create` (action: `chart_create`) — Create a chart workspace with a clean template (your name, symbol, exchange, and interval; no inherited indicators), REST direct so it works even when the daemon is down.
+- `om chart create` (action: `chart_create`) — Create a chart workspace with a clean template and no inherited indicators.
 - `om chart delete` (action: `chart_delete`) — PERMANENTLY delete chart workspaces (REST direct through the collab gateway).
 - `om chart events` (action: `chart_events`) — Recent edits on the live session, oldest first, split by author.
 - `om chart indicator add` (action: `chart_indicator_add`) — Add a technical indicator, WRUN marketplace indicator, or registry kScript indicator (RSI, MACD, EMA, LIQUIDATIONS, wrun/@scope/name/output, @scope/name, ...) to a chart pane.
@@ -756,15 +892,21 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart layout` (action: `chart_layout`) — Change the multi-chart layout / grid.
 - `om chart list` (action: `chart_list`) — List every chart workspace the account owns (REST direct, so it works even when the daemon is down): the same list, names and ids, the user sees in the web app.
 - `om chart open` (action: `chart_open`) — Open a workspace's live chart view (openmarket.xyz/chart/<id>?live=true) in a browser on this machine, and optionally wait for a human viewer to join the session.
+- `om chart panel push` (action: `chart_panel_push`) — Show rows, a metric screen or watch history in a panel with its own axes.
 - `om chart plot-type` (action: `chart_plot_type`) — Change a chart pane's plot type to one of the 18 renderer enum names.
 - `om chart refresh` (action: `chart_refresh`) — Read the LIVE workspace state by issuing REQUEST_STATE_SYNC over the bridge WS and returning the fresh snapshot.
+- `om chart scan clear` (action: `chart_scan_push`) — Replace the transient scan canvas and run HUD with a complete snapshot.
+- `om chart scan play` — Stream scan frames from a JSONL file or stdin as one run from one process: each line is a `chart scan push` frame, one in flight at a time, one JSON ack line per frame (see §"Scan").
+- `om chart scan push` (action: `chart_scan_push`) — Replace the transient scan canvas and run HUD with a complete snapshot.
 - `om chart screenshot` (action: `chart_screenshot`) — Render a PNG snapshot of a workspace by short id or share-link URL.
 - `om chart select` (action: `chart_workspace_select`) — Make a workspace the ACTIVE one: the live bridge repoints to it, it becomes the saved default, and every later chart action with `workspaceId` omitted lands on it (exactly what the TUI `/workspace` command does).
+- `om chart series push` (action: `chart_series_push`) — Plot numeric watch history, an installed live-series package, a computed metric or supplied rows on a chart.
 - `om chart show` (action: `chart_show`) — Read a workspace's content (symbol, interval, indicators, drawings, layout) by its short id or share-link URL, WITHOUT joining a live session.
 - `om chart status` (action: `chart_status`) — Report the collab bridge's WS state, peerId, and pending intent counts for every active workspace.
 - `om chart symbol` (action: `chart_symbol`) — Change a chart pane's symbol (e.g. BTCUSDT on BINANCE_FUTURES → ETHUSDT on BINANCE_FUTURES).
 - `om chart sync` (action: `chart_sync`) — Toggle a multi-chart sync setting: symbol / interval / crosshair.
 - `om chart view` (action: `chart_view`) — Set the visible time range on a chart pane (SET_VISIBLE_RANGE — ephemeral, no persist).
+- `om chart widget push` (action: `chart_widget_push`) — Show a card, orderbook ladder, event feed or progress meter on a chart.
 
 - `om nervous status` (action: `nervous_status`) — Recent nervous-system receipts, newest first: event-driven chart moments (news, alert, and strategy fires) with a story, per-verb outcomes, and the live view link; skipped ones carry the reason.
 

@@ -117,6 +117,14 @@ cursors and never tight-loop.
   Only with the per-room `post_as_you` capability and a deliberate
   operator request. Cooldown, hourly, and consecutive-post limits apply.
 
+### Editing and deleting
+
+Posts the operator or any of the operator's agents wrote may be edited or
+deleted with `room_message_edit` or `room_message_delete` when the badge holds
+`post` on that room. Other users' messages, human or badge, are never touched—a
+person's words get a reply, never a rewrite. The `ids` batch form is
+operator-only. No approval card is ever raised for these.
+
 An arm ask (`room_grant_request` with an arm entry) is how you request a
 window to reply on your own for the task at hand instead of a standing
 capability: it is time-boxed, the operator sees exactly the scope and the
