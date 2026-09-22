@@ -52,9 +52,10 @@ A watch is a source plus its steps. The daemon reads every source, writes one ro
 - Writing or editing an ai step's prompt, `tools`, `output` or `definitions`, and the refusals `watching_unknown_source` / `watching_unknown_tool` / `watching_reader_unsatisfied` / `watching_definitions_overlap` → `skill_read("watch-prompts")`: the header the step sees, INPUT per source kind, the tool menu with return shapes, `@{Name}` mentions (§"Mentions"), worked prompts, refusal-is-the-fix.
 - "What am I watching / is it armed / what is it doing" → `watching_overview`; "why is watch 3 broken" → `watch_stats` with the id; "show me its errors" → `watch_history` with `kind: "error"` (§"Read a watch").
 - "Arm it" / "turn the trade on" → `watch_arm` with the watch and the chain (the chat card arms a chain with no money step; a money chain returns the terminal command) (§"Arming").
+- "Raise those approval cards" → `watch_kit` opens the arm door; use each identified watch and chain id for `watch_arm`, and ask which chain if the reference is unclear (§"Arming").
 - "Pause / resume / delete watch 3" → `watch_pause` / `watch_resume` / `watch_remove` by id. A combined watch takes its unshared sources with it; `ids` selects exact watches, `group` selects the set. Cards: §"Lifecycle".
 - "Run / retry this failed watch again now" → `watch_retry`; it releases unowned classifier backoff immediately. `watch_resume` is only for a paused watch. Cards: §"Lifecycle".
-- "Fix my watches", "fix my h2h watch", "retry the broken ones", "do that fix" → `watch_kit` first: a watch named in the words (a whole name, or a word of one in a sentence that asks for a change) opens the change door with `watch_retry`, `watch_repair` and `watch_stats` on it; no watch named lists this home's broken watches under `broken` (the repair door) with the same verbs attached, one call per watch meant; words fitting several watches come back under `candidates` (the which door): ask the person which one, never guess, and stop.
+- "Fix my watches", "fix my h2h watch", "retry the broken ones", "do that fix" → `watch_kit` first: a watch named in the words (a whole name, or a word of one in a sentence that asks for a change) opens the change door with `watch_retry`, `watch_repair` and `watch_stats` on it; no watch named lists this home's broken watches under `broken` (the repair door) with the same verbs attached, one call per watch meant; words fitting several watches come back under `candidates` (the which door): ask the person which one, never guess, and stop. A change said with no word of the watch's name ("fix the counter-strike one", "the noisy one") goes through the composer like any sentence: its reader names the watch from this home's list and the result's `changes` rows plus `next` carry the change door on it (a row with `candidates` is the same question for the person).
 - "Change watch 3 to 4500" → `watch_edit` with the new `source.condition`; "change the size to 50" → `watch_edit` with `boxes`, then the chain re-arms (§"Edit a watch").
 - "No rankings", "less fluff", "too noisy", "why did this get through", "only Z from S", "tune <watch>", "not this", "keep this kind" → `watch_tune`, the yes through `watch_tune_apply` (§"Tune a watch").
 - "Change the prompt the package shipped" → `watch_action_add` naming that step's id (it becomes yours, kept across updates); "take the author's version back" → `watch_edit` with `take` (§"Edit a watch"); the whole installed-package customizing arc is `skill_read("marketplace", section = "Watch packs")`.
@@ -78,6 +79,7 @@ Quick routing, the call, the defaults to assume, and what to disclose:
 | "what am I watching?" | `watching_overview` | one roster; never a count in place of the rows |
 | "show this watch" | `watch_show` | `next` offers the first off chain's card or resumes a paused source with no steps; money arms at the terminal |
 | "why is watch 3 broken?" | `watch_stats` with `id` | read `condition_text`, `last_error`, `repair`; name the repair verbatim |
+| "retry this failed watch" | `watch_retry` | if a non-money chain needs approval, the result's `next` raises `watch_arm` in the same turn |
 | "arm it" | `watch_arm` with `watch` and `chain_id` | the card is the ask; a money chain answers with `om watch arm <watch> <chain>` to run at the terminal |
 | "pause / delete watch 3" | `watch_pause` / `watch_remove` | by id, once; a watch with sources sweeps them; delete cards; `ids` for several |
 | "publish my watch" / "share it live" | `watch_share` | one card: the title and one line drafted from the goal, the price, live or recipe-only, the door, what ships; `live: false` for the recipe alone |
@@ -573,6 +575,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 - `watch_create`
   - `label` — The watch's name, as the user said it; absent, one is derived, not a page title.
   - `group` — The folder label the created watch joins; absent it stands alone.
+  - `notify.chat_card` — Whether a fire raises the card in om chat (on by default); false keeps the card off while the channels still send.
   - `notify.channels` — Omit with channel.
   - `notify.style` — Omit to read as the channel does.
   - `act_within` — Default: the condition's cooldown, else 5m.
@@ -649,7 +652,6 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `enabled` — False saves a paused draft after its setup read (default true).
   - `join` — When a live page watch already reads this URL, the draft JOINS its stream by default: no setup read, no terms of its own
   - `join_authority` — With join: true only: the stream to join, by the authority id a stream_held answer named (`held.authority`); omitted, the read standing longest on the URL is joined.
-  - `source_id` — Absent re-points the watch's first page entry.
 - `watch_reclassify`
   - `limit` — Maximum error rows to re-judge in this call (default 50, max 200).
 - `watch_relay_door`
@@ -828,7 +830,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om watch listing` (action: `watch_listing_edit`) — Change the title, the one line or the README of a published watch at the registry without publishing a new version: the stream, its followers and installed copies are untouched, and the registry page shows the new words at once.
 - `om watch model-add` (action: `watch_model_add`) — Add a model run as a source of a watch (a named one, or a new one-source watch): a prompt the model answers on a cadence with the tools you allow, on the user's own AI account; every finding becomes a source row.
 - `om watch move-here` (action: `watch_move_here`) — Publish a shared watch from THIS device: the copy of a published watch on this machine takes over posting (its followers see nothing; the device that published until now pauses its copy when it next posts).
-- `om watch mute` (action: `watch_mute`) — Stop channel deliveries for one watch, exact `ids`, or every watch in the folder (the `group` label): fires keep committing to the journal.
+- `om watch mute` (action: `watch_mute`) — Stop channel deliveries and the card in om chat for one watch, exact `ids`, or every watch in the folder (the `group` label): fires keep committing to the journal.
 - `om watch page-add` (action: `watch_page_add`) — : Watch a URL (a page, a document, a JSON endpoint) for new items, as it is.
 - `om watch pause` (action: `watch_pause`) — Disable one watch by id or slug, several by exact id in ONE call (`ids`), or every watch under a group label (`group: <label>`); its steps stop with it and get their OK again when it resumes, and journals are preserved.
 - `om watch preview` (action: `watch_preview`) — Show what the next send would say, without sending or moving the schedule
@@ -864,6 +866,6 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om watch tools` (action: `watch_tools`) — The menu: every function a model run (a source on a clock, an ai step on an update) may call on this home, each with the plain row it sits on, when you want it and what comes back; the default set an absent `tools` means (every audited read plus web search); the rows this build greys out.
 - `om watch tune` (action: `watch_tune`) — Tune a watch's filter by complaint.
 - `om watch unfollow` (action: `watch_unfollow`) — Stop following a stream: remove the follow watch (its stored events go with it; the journal is preserved, exactly the watch_remove contract) and drop the durable lane cursor so a later re-follow starts clean.
-- `om watch unmute` (action: `watch_unmute`) — Resume channel deliveries for one watch, exact `ids`, or every watch in the folder (the `group` label), from the next fire on.
+- `om watch unmute` (action: `watch_unmute`) — Resume channel deliveries and the chat card for one watch, exact `ids`, or every watch in the folder (the `group` label), from the next fire on.
 
 <!-- AUTO: END COMMAND REFERENCE -->
