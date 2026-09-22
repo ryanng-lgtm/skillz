@@ -36,6 +36,12 @@ codex/
 iCloud-synced Obsidian folder (`Obsidian/Claude Plans`), so plan files from
 either agent land in one vault. Override the folder with `PLANS_VAULT_DIR`.
 
+The local daemon build commands are `om-hosted` (GitHub chat GUI) and
+`om-glab` (GitLab chat GUI), linked into `~/.local/bin`. Both use
+`openmarket-internal` and install into the same local daemon; the latest
+successful build determines its GUI. `OM_GUI` and `OM_MONO` override source
+paths, and `--gate` checks without installing.
+
 Most of `codex/skills/` is relative symlinks into `claude/skills/`: a skill that
 works the same under both agents is stored once. `graphify` and `loop-me-in` differ
 between them and are stored separately; `commit` and `mr-markdown` are Codex skill
@@ -62,6 +68,7 @@ commits, not edited by hand, and aren't listed.
 | `llm-council` | "council this", "pressure-test this" | Runs a question through 5 AI advisors who analyse it independently, peer-review each other anonymously, then synthesise a verdict. |
 | `loop-me-in` | `/loop-me-in [path]` | Turns an approved plan into a brief a fresh session can execute unattended — elicits the expected result of every change first, writes it as a spec before the code, and gates the run on those specs. |
 | `om-build` | `/om-build [--hosted\|--cloud]` | Builds an OM Chat GUI from source — the daemon-embedded `/rooms` GUI or the hosted `/chat/` cloud fork — including the swap onto the live install. |
+| `om-glab` | `/om-glab` | Runs the daemon build/install workflow with the GitLab chat GUI and openmarket-internal. `om-build` keeps its GitHub default. |
 | `prompt-ready` | `/prompt-ready` | Persistent mode that turns raw, natural-language requests into clean, self-contained, copy-paste-ready prompts for a different session. |
 | `syncup` | `/syncup [repo ...]` | Refreshes main from origin, rebases the working branch onto it, resolves every conflict, and hands uncommitted work back intact. Never pushes. |
 | `testing-harness` | `/testing-harness` | Proves a change in the real running app rather than in tests. `--parity-check` diffs the cloud deployment against the local daemon visually; `--regression` (designed, not yet built) checks the running app against invariants and a baseline. |

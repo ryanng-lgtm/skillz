@@ -102,6 +102,11 @@ for d in "$REPO"/codex/skills/*/; do
 done
 echo "  $linked linked, $adopted adopted, $skipped skipped"
 
+# Keep both local daemon build commands available; each selects its own GUI.
+mkdir -p "$HOME/.local/bin"
+link "$REPO/claude/skills/om-build/scripts/hosted.sh" "$HOME/.local/bin/om-hosted"
+link "$REPO/claude/skills/om-glab/scripts/hosted.sh" "$HOME/.local/bin/om-glab"
+
 # ---- Work skills (not carried by this repo; relinked when present) ---------
 #
 # ~/repos/llm has its own remote and stays the source of truth for these.

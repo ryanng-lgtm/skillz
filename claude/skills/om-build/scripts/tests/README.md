@@ -17,3 +17,8 @@ Tests use dummy credentials and a Bun shim. They check automatic .env loading,
 argument forwarding, isolated user configuration, failure status and cleanup,
 and refusal of conflicting project credentials. They never contact a registry
 or run the daemon installer.
+
+The gate fixtures distinguish registry-store symlinks from the selected core
+checkout and cover a missing link. Alias fixtures cover GitLab defaults,
+explicit paths with spaces, invocation through a symlink, option forwarding
+and the shared installer's exit status. Git and HTTP calls are stubbed.

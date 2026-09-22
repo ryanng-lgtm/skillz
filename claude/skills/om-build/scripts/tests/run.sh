@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # @file om-hosted shell tests
-# @description Run credential isolation tests using test-runner.bash from the repository vendor.bash directory.
+# @description Test credential isolation, source-link detection and the GitLab alias using the repository vendor.bash harness.
 # @exitcode 0 All tests passed.
 # @exitcode 1 A test failed.
 
@@ -8,6 +8,8 @@
 	local root
 	root=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel) || return
 	export TEST_SCRIPT="$root/claude/skills/om-build/scripts/gui-bun.sh"
+	export TEST_HOSTED_SCRIPT="$root/claude/skills/om-build/scripts/hosted.sh"
+	export TEST_GLAB_SCRIPT="$root/claude/skills/om-glab/scripts/hosted.sh"
 	cd "$root" || return
 	# shellcheck disable=SC1091
 	source vendor.bash/github.com/reconquest/import.bash/import.bash

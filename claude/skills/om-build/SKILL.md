@@ -18,6 +18,12 @@ Ryan's names, which read backwards if you assume "hosted" means the SaaS:
 `--hosted` is the daemon **hosting** the GUI at `/rooms`; `--cloud` is the
 `/chat/` fork. No flag means `--hosted`.
 
+[`om-glab`](../om-glab/SKILL.md) runs the same hosted workflow with
+`openmarket-chat-gitlab` as its GUI source. `om-build` retains the GitHub
+`openmarket-chat` default; `OM_GUI` and `OM_MONO` override either source path.
+Both commands install into the same local daemon, so the last successful
+install determines which GUI it serves.
+
 **Never mix them in one run.** `--cloud` never writes `~/.local/bin/om`, never
 runs `om service restart`, and never stages anything into the monorepo.
 `--hosted` never touches the cloud repo. `--mobile` is standalone: it touches
