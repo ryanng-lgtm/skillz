@@ -9,25 +9,25 @@ allowed-tools:
 
 # om wrun
 
-You can build a custom sandboxed indicator from a plain description ("score BTC conviction from Polymarket odds vs funding stress"). This is a core capability, offer it whenever the user wants a metric that isn't built in and no installable package covers it.
+Build a custom sandboxed indicator when no built-in metric or installable package covers the request.
 
 ### Guardrails
 
-- Search before you build: when a user asks for an indicator, `package_search` FIRST and propose what covers the need instead of hand-rolling; author from scratch only when search comes up empty (`marketplace.md §"Rules"`) — then offer `package_publish` so the work compounds.
-- Consent rule for the whole loop: a draft the user named in this conversation flows end to end (author, build, local install, preview) with receipts instead of asks; the approval gates live where trust changes hands, installing REGISTRY packages and PUBLISHING.
-- `@local` is reserved — author under the user's own scope before publishing (§"The authoring loop").
-- WRUN source reads params, inputs, and outputs ONLY through the generated accessors (`p_<param>()`, `in_<input>()`, `out_<output>(value)` then `emitRow()`): a raw positional literal such as `getFloat(0)` or `setOutput(0, ...)` is a BUILD ERROR in scaffold builds (§"The authoring loop"). In WRUN metadata a feed pin is `symbol` AND `exchange` together (the schema refuses a lone half) and an `interval` pin is legal: a coarser source aligns as-of its candle close (§"Input pins").
-- Publishing is the user's call and the marketplace's gate: `package_publish` with `dry_run=true` first (uploads nothing, raises no card), then the real publish only on the user's explicit go — the approval card on chat surfaces, `yes=true` over MCP (`marketplace.md §"Publishing and deleting"`).
+- Search with `package_search` before building; propose an existing match. If none fits, author and offer `package_publish` (`marketplace.md §"Rules"`).
+- A draft named in this conversation is authorized for author, build, local install and preview. Return receipts; registry installs and publishing retain their approval gates.
+- `@local` is reserved; publish under the user's own scope (§"The authoring loop").
+- Use generated `p_<param>()`, `in_<input>()`, `out_<output>(value)` and `emitRow()`. Raw positional literals fail scaffold builds (§"The authoring loop"). Feed pins require `symbol` AND `exchange`; coarser `interval` pins align at candle close (§"Input pins").
+- Publishing: `package_publish` with `dry_run=true` first, then publish only on the user's explicit go, through the chat approval card or `yes=true` over MCP (`marketplace.md §"Publishing and deleting"`).
 
 ### Routing
 
-The loop: §"The authoring loop" · what `metadata` must say: §"Metadata dialect" · or declare in the source: §"Source-declared indicators (code-first)" · a fixed reference market on a secondary input: §"Input pins" · one package for any Polymarket market: §"Bindable odds inputs" · looks: §"Chart placement and styling". Consumer tasks stay in the marketplace skill: install `marketplace.md §"Rules"` · mount on a chart, bind, repoint, list, remove `marketplace.md §"WRUN packages"`.
+Build: §"The authoring loop" · sheet: §"Metadata dialect" · source declarations: §"Source-declared indicators (code-first)" · reference markets: §"Input pins" · per-use markets: §"Bindable odds inputs" · plot styles: §"Chart placement and styling" · frames, profiles, panels, HUDs and watch series: §"Snapshots, panels and pane placement". Install: `marketplace.md §"Rules"` · mount, bind, repoint, list, remove: `marketplace.md §"WRUN packages"`.
 
 | Ask | Call | Disclose |
 | --- | --- | --- |
-| "build me an indicator" | `wrun_author` → `wrun_build` | scaffold first, edit the returned source through the generated accessors and `./sdk/ta`, fix every warning, build installs the draft locally with a receipt (no ask); publish only on the user's go |
-| "make it green when rising" / "shade the band" | `wrun_author` (metadata) | decision outputs from the module, looks declared in metadata, never computed (§"Chart placement and styling") |
-| "use it on any Polymarket market" | `wrun_author` with `binding: "required"` | one package, the market supplied per use; the bind question after install is the marketplace's |
+| Build an indicator | `wrun_author` → `wrun_build` | edit the scaffold through generated accessors and `./sdk/ta`; fix warnings before building |
+| Style a plot | `wrun_author` | declare styles in metadata or source declarations (§"Chart placement and styling") |
+| Reuse across Polymarket markets | `wrun_author`, `binding: "required"` | supply the market per use |
 
 ## The authoring loop
 Build a sandboxed indicator from a description: `wrun_author` (scaffold, edit via accessors) → `wrun_build` (local install, no ask) → preview → publish on the user's go.
@@ -74,7 +74,7 @@ The loop:
 3. **Preview**: straight after a green build, `metric_get` the new `wrun/...` metric on a symbol so the user sees a real value; `metric_series` (same selector, `bars` 1..500, default 30) when they want to see it MOVE, one `[barOpenSec, value]` pair per bar (CLI `om metric series` renders a sparkline; metrics.md §"Series"); and `chart_indicator_preview` draws the draft on their chart (no publish needed; `plot: "line"` outputs only, one output per preview).
 4. **Publish**: `package_publish` the same `packageDir` once the user approves. The human always approves publishing. Before publishing, AUTHOR UNDER A PUBLISHABLE SCOPE: `@local` is reserved and the registry rejects it; re-author the same source/metadata under the user's own scope (their account scope, e.g. `@om-core` if they own it) so the publish can succeed. Publish is also what unlocks hosted charting (bindable packages excepted, §"Bindable odds inputs"): `chart_indicator_add` mounts registry packages only (`marketplace.md §"WRUN packages"`); the local preview never needs it.
 
-Keep inputs to the OM-native sources the SDK exposes (ohlcv, funding, open interest, Polymarket odds); the module has no network of its own. Every `inputSources` pin is fixed at authoring time and no pin is user-configurable after install (repointing a PINNED odds input is `om wrun source set` on the authoring workspace followed by a rebuild — a code-first workspace edits the `input(...)` declaration instead; the consumer-side write-up is `marketplace.md §"WRUN packages"`). Before publish, a wrong pin is fixed in the normal loop (re-author, rebuild, reinstall the preview); after publish it can only be fixed by publishing a bumped version.
+Keep inputs to declared SDK sources; daemon-only `series` inputs read watch values or installed series snapshots (§"Snapshots, panels and pane placement"). The module has no network of its own. Every `inputSources` pin is fixed at authoring time and no pin is user-configurable after install (repointing a PINNED odds input is `om wrun source set` on the authoring workspace followed by a rebuild; a code-first workspace edits the `input(...)` declaration instead; the consumer-side write-up is `marketplace.md §"WRUN packages"`). Before publish, a wrong pin is fixed in the normal loop (re-author, rebuild, reinstall the preview); after publish it can only be fixed by publishing a bumped version.
 
 
 <!-- AUTO: CODE-FIRST AUTHORING - do not edit by hand; source: docs/indicators (snippet: code-first); regenerate with `bun packages/cli/scripts/gen-indicator-docs.ts` -->
@@ -219,7 +219,7 @@ The `metadata` skeleton — `params` array, `inputSources` keyed by input name, 
 ```
 - `params` is an ARRAY of `{name, default, min?, max?}` objects with unique names; each compute param is read in `init()` through its `p_<name>()` accessor (underneath, values reach the module positionally in declaration order and the accessor pins that slot; a style knob keeps its position zero-filled, so its neighbours never shift).
 - `inputSources` is keyed BY INPUT NAME and each input must have a matching entry: `inputs[i].name` == the key. Feed sources need `field`. `inputs[i].index` is the slot `in_<name>()` reads; index 0 is the PRIMARY input and sets the grid every other input aligns to.
-- `source` must be one of: `ohlcv`, `trades`, `funding`, `oi`, `liquidations`, `implied_volatility`, `skew`, `token_supply`, `odds`, `metric`, `time` (there is no "market"/"price" source; close prices are `ohlcv`+`close`). A `time` input carries the primary bar's open timestamp (sole field `bar_open_sec`, epoch seconds; never the primary input) so a module can do session/calendar math deterministically.
+- Scalar `source` must be one of: `ohlcv`, `trades`, `funding`, `oi`, `liquidations`, `implied_volatility`, `skew`, `token_supply`, `odds`, `metric`, `time`, `series` (there is no "market"/"price" source; close prices are `ohlcv`+`close`). A `time` input carries the primary bar's open timestamp (sole field `bar_open_sec`, epoch seconds; never the primary input). A `series` input has `ref` instead of `field`, is never primary, and needs the daemon (§"Snapshots, panels and pane placement").
 - A `shape_where`/`color_by` gate must be a DIFFERENT output (usually `"plot": ""` data-only); an output cannot gate or color itself.
 
 ## Input pins
@@ -253,17 +253,82 @@ An odds input declared `binding: "required"` instead of a pinned symbol serves a
 ```
 
 ## Chart placement and styling
-How outputs draw (`plot`, `panel`, `unit` per output) and the declarative styling vocabulary (colors, gates, fills, style knobs): declared in metadata, never computed in code.
+Declare numeric plot placement and styles in the sheet; use this section for palettes, gates and style knobs.
 
-**Chart placement basics**, per output: `plot` is one of `line|bar|area|histogram|candle|shape|scatter` (or `""` for data-only), `panel` is `overlay` (price chart) or `lower` (own pane), `unit` (`price`, `%`, else abbreviated) sets the axis format. `wrun_author`'s `display_name` names the package in chart legends and listings.
+**Chart placement basics**, per output: `plot` is one of `line|bar|area|histogram|candle|shape|scatter|inset` (or `""` for data-only), `panel` is `overlay` (price chart) or `lower` (own pane), `unit` (`price`, `%`, else abbreviated) sets the axis format. Insets, frame panels and anchored handles have their own placement rules in §"Snapshots, panels and pane placement". `wrun_author`'s `display_name` names the package in chart legends and listings.
 
-**Chart styling** is declared in metadata, never computed in the module: outputs are numbers, some numbers are decisions, metadata maps decisions to looks. Vocabulary:
+**Chart styling** for numeric outputs is declared in metadata: the module emits decisions and the sheet maps them to looks. Handle styling uses the generated drawing API (§"Snapshots, panels and pane placement"). Vocabulary:
 - Static, on any output: `color`/`colors`, `width`, `opacity`, `line_style`.
 - Per-bar coloring: emit the decision as an ordinary output (e.g. regime 0/1) marked `"plot": ""` (data-only, never drawn), then on the styled output set `color_by: "<that output>"` + a `colors` palette (at least 2 entries); each bar's floored value indexes the palette; a missing or out-of-range index falls back to entry 0. An output cannot color itself.
 - Gated markers: a `plot: "shape"` output with `shape_where: "<gate output>"` renders only where the gate is nonzero.
-- Shaded bands: metadata-level `fills: [{ "between": ["upper", "lower"], "color": "#94a3b8", "opacity": 0.15 }]`; both sides must be rendered outputs.
+- Band declarations: `ranges[].upper/lower` (`range(...)` code-first) reference two rendered outputs and the browser draws a filled band between them (edge width, line style, palette). `fills[].between` is accepted but not drawn; a fill between two line handles has no object, so use per-bar `box(...)` slices for that shape.
 - User style knobs: a param with `style: { "output": "<name>", "property": "color"|"width"|"opacity"|"lineStyle" }` never reaches the module (no `p_` accessor, its slot stays zero-filled), shows in the settings dialog (color knobs take string defaults like "#22c55e"), and redraws without recompute. Param names are lowercase (`line_color`).
-When the user describes looks ("green when rising, red when falling, shade the band"), emit decision outputs from the module and declare the looks here; `om watch publish` cross-validates every reference and names the broken field on mistakes.
+Emit decisions in the module and declare plot styles here; author/build validation names broken references.
+
+## Snapshots, panels and pane placement
+Choose per-bar history, a run snapshot or a persistent drawing to match the requested view; use these words for profiles, panels, compact widgets and HUDs.
+
+Name every dependency, match each frame's payload to its consumer, and preserve
+missing values. Declare only the families the requested view needs.
+
+### Frames and panels
+
+Declare `frames[]` with `frame(name, { max_bytes })` from `./sdk/declare`.
+Write UTF-8 JSON in `finalize()` through `writeFrame(slot, json)` from
+`./gen/frames`; the slot is the bound `frame()` result or generated `FRAME_<NAME>`.
+Frames require `wrun-4`: each slot holds the latest snapshot for the whole run,
+never a history row. An unwritten frame omits its view; malformed payloads refuse
+selection. Up to 8 frames, 96 KiB each; frames and strings share 2 MiB in transport.
+
+| View | Sheet and declaration | Payload and bounds |
+| --- | --- | --- |
+| Docked profile | `levels[]`; `plot.levels({ name, frame, dock, width_frac, poc, labels })` | Frame `{ prices, values, colors? }`: 1..512 strictly monotonic prices, matching values, null gaps; at most 4 profiles; left/right dock, width fraction 0.05..0.5. |
+| Separate panel | `panels[]`; `panel.bars`, `panel.line`, `panel.scatter`, `panel.histogram`, `panel.pie`, `panel.heatmap`, `panel.table`, `panel.tiles` | Every declaration binds a frame and names `name`, `title`, `x` and `place`; frame `{ rows }`. At most 8 panels. |
+| Price ladder | `drawings[]`, kind `ladder`; `draw.ladder({ name, frame, side, divider })` | Frame `{ rows, divider? }`: 1..64 `[price, value, fraction, color?]` rows; fraction 0..1, value nonnegative; side left/right. |
+| Text feed | `drawings[]`, kind `feed`; `draw.feed({ name, frame, anchor, offset, z })` | Frame `{ lines }`: 1..50 `[time, text, color?]` lines; time in epoch milliseconds, text 1..80 characters. |
+
+Panel `x` is time, index or category; `place` is below or side. Bars, line and table
+declare 1..8 `series`; other kinds omit it. Histogram and heatmap use category x.
+Bars/line rows carry a key followed by one value per series; table rows contain
+only cells. Time keys use epoch seconds. The general cap is 2000 rows; table has
+32 rows, pie and tiles 24. Styled table cells and tiles can carry 1..64-point sparks.
+
+### Insets and compact widgets
+
+`outputs[].plot: "inset"` plus `inset` is `out.inset(name, { dock, height_px, shape })`:
+a per-bar numeric output, written through `out_<name>` and `emitRow()` like any
+other output. Dock top/bottom, height 16..120 px, shape histogram/area/line.
+Insets work on every ABI. Ordinary lines use `output(name, line, overlay)`;
+`out.line` is not a declaration in this SDK.
+
+`draw.card(name, { title, rows, anchor, offset, z })` declares a `drawings[]` card:
+at most 8 cards, 12 rows each. A row's `spark: { output, window }` names a numeric
+output and takes its last 2..64 ready values, oldest first, independently of text.
+`draw.meter({ name, label, fraction: { output }, ramp, text, anchor, offset, z })`
+reads the last ready fraction output: emit 0..1, use 2..5 ramp colors; text is a
+literal or `{ slot }`. Cards and meters need no frame. All drawings share a
+64-declaration cap; the expanded render selection has a separate 2 MiB cap.
+
+### Anchored handles and watch series
+
+Declare `handles.line`, `handles.box`, `handles.label` or `handles.polyline` with
+an optional `anchor` default. These populate the sheet's `handles` map and require
+wrun-3 or later. Runtime objects come from `draw` in `./gen/draw`; after `set`,
+`.anchor(ANCHOR_TOP_LEFT)` places them in CSS pixels from that pane spot.
+The nine corner/centre spots change both axes; top/bottom change only y,
+left/right only x. Unanchored x is epoch seconds and y is price.
+Right/bottom offsets point inward; negative offsets are allowed, with no implicit
+inset. `ANCHOR_CHART` restores chart coordinates. Reuse object ids across bars:
+500 live per kind, 1500 total, 4096 draw calls per row, 256 points per polyline.
+
+Use a metadata-first workspace for `inputSources[name]` with `source: "series"`,
+`ref` equal to `watch/<slug>/<key>` or an installed `@scope/name`, and optional
+`missing: "carry"` (default) or `"nan"`. Series works on every ABI but is daemon-only,
+never the primary input, and takes no `field` or market pins. Read it through
+`in_<name>()`. Values bucket to the primary grid; the last reading wins and carry
+uses only an earlier or current bucket. There is no code-first series declaration;
+do not add one or patch a generated sheet. Chart hosts cannot supply this input,
+and a line-only `chart_indicator_preview` does not prove any frame or HUD rendered.
 
 <!-- AUTO: ARGUMENT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
