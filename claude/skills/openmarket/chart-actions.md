@@ -59,6 +59,7 @@ Quick routing — the common asks, each row a recipe (tool + the decisions to ma
 | "mark 21,350" (a named exact level) | `chart_drawing_add`, HorizontalLine at the named price — the explicit-anchor verb is for user-named levels only. |
 | "draw the fib / trendline for the swing" | `chart_drawing_auto` — anchors computed from candles; read the drawing detail file first. |
 | "plot my headlines / alert fires" | `chart_pins` — its own day workspace by default, no approval; a NAMED workspace or `here` needs the user's explicit yes. |
+| "plot / place @scope/name (or my watch) on a chart" as a layer | `chart_layers` when the home's `charts.layers` setting is on (the default): `refs` plus `here: true`, `workspace: <id>` or `market: EXCHANGE:SYMBOL`; a watch of the user's is shared privately first: the card says so and supplies `yes` (never set it yourself), and `dry_run: true` previews the share. `chart_pins` when the setting is off. |
 | "what's on my chart?" | `chart_refresh` with the workspace id omitted — never answered from `chart_list`. |
 | "plot watch readings" | `chart_series_push`; read §"Numeric series" or §"Chart targets" for a main plot. |
 | "show a table or comparison beside the chart" | `chart_panel_push`; read §"Panels". |
@@ -66,6 +67,8 @@ Quick routing — the common asks, each row a recipe (tool + the decisions to ma
 | "show this market scan" | `chart_scan_push`: complete snapshots for live viewers; read §"Scan". |
 
 **Events on charts are their own lane: `chart_pins`.** It plots event sources (news feeds, custom watches, price-alert fires) onto a chart's event lane as a live view; the call shape is §"Pins", and the defaults, predicates, depth and workspace consent live in §"Pins". Do not confuse it with `chart_events`, the session-edit stream: that verb READS the human's and peers' recent manual chart edits and plots nothing.
+
+**A shared watch on a chart is a layer: `chart_layers`.** "Plot X on a chart", "put @scope/name on my chart", "place this watch on NQ" map to `chart_layers` when the home's `charts.layers` setting is on (the default), and to `chart_pins` otherwise. A layer is the watch's stream (the same address and door `watch_share` and `watch_follow` use) placed on a chart workspace, read by the chart from the signed ledger under the viewer's own grant on any symbol and any interval; the daemon pushes nothing per chart. One call: `refs` (a watch of the user's by id, slug or label; an address they publish or follow; a topic id) plus the chart (`here: true` for the chart they are looking at, `workspace: <id>` for a chart they keep, or `market: EXCHANGE:SYMBOL` for a new chart named after the watch, reused the same day unless `fresh: true`). A watch of the user's that streams nowhere yet is shared first through the normal share with a private door, a private listing and every entry kept. That share needs the user's yes exactly as `watch_share` does: the call cards in every mode, the card shows the share and supplies `yes` and `approved_intent_sha256` (never set them yourself); without the yes the call refuses `confirmation_required` naming the watches it would share, and `dry_run: true` previews them (address, consent rows, digest) sharing and placing nothing. A folder watch or a watch that reads other watches refuses `share_composite_layer_refused`: share it from its own `watch_share` card first, then place the address. The registry's or the store's refusal (a name limit with its `next_at`, a scope that is not the username, the topic quota) is the answer, relayed verbatim (the upstream code rides `details`), and nothing is placed. A followed address places its topic; an installed copy is refused with the follow hint. `op: "remove"` takes a layer off the named chart; `op: "list"` (no refs, no chart) shows every layer the account publishes or follows with the charts it is on. Relay the result's `disclosures`. `layers_disabled` means the setting is off: use `chart_pins`.
 
 **Drawing tools have their own detail file → read [`chart-actions-tool-drawing.md`](chart-actions-tool-drawing.md).**
 It covers every Super Search tool (lines, shapes/ranges, fibonacci, arrows, markers, positions,
@@ -827,6 +830,8 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `clear` — default false
 - `chart_keep`
   - `workspace` — Default: the user's ACTIVE chart workspace (charts.workspace), which is where scratch canvases live.
+- `chart_layers`
+  - `op` — place (default): put each ref's topic on the target chart; remove: take it off; list: every layer this account publishes or follows with the charts it is placed on (no refs, no chart).
 - `chart_list`
   - `mine` — Never the answer to a question about the user's workspaces; omit it for those.
 - `chart_panel_push`
@@ -922,6 +927,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart indicator update` (action: `chart_indicator_update`) — Tune an existing indicator's settings.
 - `om chart interval` (action: `chart_interval`) — Change a chart pane's candle interval (1m, 5m, 15m, 1h, 4h, 1d, 1w, ...).
 - `om chart keep` (action: `chart_keep`) — Keep the current scratch chart under a name.
+- `om chart layers` (action: `chart_layers`) — put a shared watch's stream on a chart as a LAYER, in ONE call.
 - `om chart layout` (action: `chart_layout`) — Change the standard multi-chart layout, 1 to 4 panes.
 - `om chart list` (action: `chart_list`) — List every chart workspace the account owns (REST direct, so it works even when the daemon is down): the same list, names and ids, the user sees in the web app.
 - `om chart open` (action: `chart_open`) — Open a workspace's live chart view (openmarket.xyz/chart/<id>?live=true) in a browser on this machine, and optionally wait for a human viewer to join the session.
