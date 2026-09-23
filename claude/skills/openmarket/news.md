@@ -99,7 +99,7 @@ Never state a price from the agent catalog, offer an unattended purchase, or tre
 
 `backtest_news` answers "would trading this feed's fires have paid?" before any signal — the study lane is free, `--classify` spends (cached).
 
-`om backtest news <feed>` (action `backtest_news`) answers "would trading this feed's fires have made money?" with zero authoring: a free correlational study first (does price move after fires?), then a P&L replay of a synthesized hold-after-fire strategy. Run it before proposing any signal or strategy on a feed's fires; the printed breadcrumb at the end names the exact `om watch action add <feed> --ai <prompt> --output verdict` and strategy-step commands. The study lane and `--side` replays cost no LLM calls; `--classify` grades the feed's own ai verdict step over its fires, the producer a promoted watch runs: the step's model is asked once per fire the verdict memo cannot answer (`max_llm_calls` caps the model requests, and a turn that reads history is two; reruns ask nothing), and the step reads the feed's earlier fires as of each fire through `watch_history`. The asset defaults from the watch's single `related_markets` tag: tag first, backtest second.
+`om backtest news <feed>` (action `backtest_news`) answers "would trading this feed's fires have made money?" with zero authoring: a free correlational study first (does price move after fires?), then a P&L replay of a synthesized hold-after-fire strategy. Run it before proposing any signal or strategy on a feed's fires; the printed breadcrumb at the end names the exact `om watch action add <feed> --ai <prompt> --output verdict` and strategy-step commands. The study lane and `--side` replays cost no LLM calls; `--classify` grades the feed's own ai verdict step over its fires, the producer a promoted watch runs: the step's model is asked once per fire the verdict memo cannot answer (`max_llm_calls` caps the model requests, and a turn that reads history is two; reruns ask nothing), and the step reads the feed's earlier fires as of each fire through `watch_history`. The asset defaults from the watch's single `related_markets` tag: tag first, backtest second. The window is `--window` (a lookback ending at `--until`) or `--from`/`--until`; `--data-mode live|backfill` picks the corpus (`--history` still works); the cost knobs are `--fee-bps`, `--slippage-bps`, `--latency-bars`, as on every backtest door.
 
 ## The daily brief
 
@@ -195,6 +195,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `asset` — Optional when the feed's history carries exactly one market tag; it then defaults to that tag and the result discloses it.
   - `hold` — Default 4h.
   - `from` — Default: 30 days ago.
+  - `window` — Lookback as `<int><ms|s|m|h|d|w>` ending at `until` (default: now), e.g. '30d'; conflicts with an explicit `from`.
   - `side` — Fixed side to trade on every fire (default long).
   - `history` — live (default): rows the daemon observed in real time (quiet catch-up recovery rows are excluded; their observed_at is the catch-up moment, not live-actionable).
   - `fee_bps` — Default 0.

@@ -318,7 +318,11 @@ wrun-3 or later. Runtime objects come from `draw` in `./gen/draw`; after `set`,
 The nine corner/centre spots change both axes; top/bottom change only y,
 left/right only x. Unanchored x is epoch seconds and y is price.
 Right/bottom offsets point inward; negative offsets are allowed, with no implicit
-inset. `ANCHOR_CHART` restores chart coordinates. Reuse object ids across bars:
+inset. `ANCHOR_CHART` restores chart coordinates. A label handle also takes `align`
+(`left`, `center`, `right`): the text edge that sits on x, (x, y) staying the anchor
+point; `handles.label({ align: "left" })` is the default, `.align(ALIGN_RIGHT)` or
+`style.align(label, ALIGN_RIGHT)` changes a live label, `ALIGN_DEFAULT` restores
+centred text. Reuse object ids across bars:
 500 live per kind, 1500 total, 4096 draw calls per row, 256 points per polyline.
 
 Use a metadata-first workspace for `inputSources[name]` with `source: "series"`,
