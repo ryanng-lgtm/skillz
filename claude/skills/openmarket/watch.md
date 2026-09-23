@@ -614,6 +614,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `limit` — Defaults to 50, capped at 500.
 - `watch_install`
   - `model` — provider/model for every model run in the pack (a prompt a model answers on a cadence on the user's own AI account); default = the author's recommendation when this home holds that credential, else your chat model.
+  - `registry` — Omit for the configured registry.
   - `stop_following` — Stop your follow of this listing when installing the copy; default false keeps both.
 - `watch_journal_stats`
   - `window_days` — Stats window in days (default 7).

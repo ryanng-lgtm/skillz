@@ -117,13 +117,13 @@ The full built-in registry: every metric id with its params and unit — the Sto
 
 The parenthesized numbers are what a paramless call reads: omit `params`, or any single key of it, and they fill before validation, so a bare `rsi` is RSI(14) and its value comes back carrying `period: 14`. Send params when the ask means something else. Rows naming a bare param with no number (`volume_sma`, `rolling_high`, `rolling_low`) have no conventional value — take it from the ask ("20-bar rolling high"); when the ask is silent, choose a sensible window, say which, and send it. Those three are the rows a missing param fails: `invalid_query` before any fetch, with the metric and the offending key named. The delta rows' `bars` is optional (default 1), and the four params-less rows (`price`, `volume`, `funding_rate`, `open_interest`) need no params object at all.
 
-Installed WRUN packages add their own `wrun/@scope/name/output` ids per machine — `metric_list` is the discovery surface for those; they never appear in this table.
+Installed Indicator packages add their own `wrun/@scope/name/output` ids per machine — `metric_list` is the discovery surface for those; they never appear in this table.
 
 ## Series
 
 One metric's per-bar history with metric_series: the trend/context sibling of metric_get, when to reach for it, and how to read the pairs.
 
-`metric_series` takes ONE `metric` (+ `params`, `sourceBindings` for bindable WRUN odds inputs), the same `selector` as `metric_get`, and `bars` (how many most-recent bars, 1 to 500, default 30). It answers "how has it moved", where `metric_get` answers "what is it now": "RSI over the last day", "is funding trending up", "how close has RSI been to 70". Same registry, same validators, same data path, so every point equals what `metric_get` would have answered at that bar's live read.
+`metric_series` takes ONE `metric` (+ `params`, `sourceBindings` for bindable Indicator odds inputs), the same `selector` as `metric_get`, and `bars` (how many most-recent bars, 1 to 500, default 30). It answers "how has it moved", where `metric_get` answers "what is it now": "RSI over the last day", "is funding trending up", "how close has RSI been to 70". Same registry, same validators, same data path, so every point equals what `metric_get` would have answered at that bar's live read.
 
 Result shape: `{ asOf, selector, metric, params, series }` where `series` is `[barOpenSec, value]` pairs (epoch seconds), oldest first. Warm-up and not-ready bars are omitted, so the array can be shorter than `bars`; the newest pair reads the still-forming bar and moves until that bar closes. Timestamps let you speak in time ("since 14:00 UTC"); never paste raw epoch seconds to the user.
 

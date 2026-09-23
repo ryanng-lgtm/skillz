@@ -86,7 +86,7 @@ Same `om` binary as alerts. The daemon (`om run` foreground or `om service start
 - **call the daemon but fall back to direct gateway REST when it is down** (`symbol`, `interval`, `drawing add`, `drawing remove` — the persistent quartet: the change lands in the workspace document either way; daemon-down you lose only session extras like playback and blackboard reads), or
 - **call the upstream collab gateway REST directly** (`list` — works even when the daemon is down).
 
-Durability when relaying results: the workspace DOCUMENT (symbols, intervals, drawings, indicators, persistent backtest fill markers) is relay-stored, and the OM payload lanes (Strategy Tester panels, `chart pins` event pins, WRUN previews) are stored server-side by the platform's relay payload store — a share link renders all of it to any signed-in viewer with the user's daemon off. The store write-behind is best-effort: a running daemon re-pushes anything it missed, plus live updates, so routine URL hand-offs need no daemon-down warning.
+Durability when relaying results: the workspace DOCUMENT (symbols, intervals, drawings, indicators, persistent backtest fill markers) is relay-stored, and the OM payload lanes (Strategy Tester panels, `chart pins` event pins, Indicator previews) are stored server-side by the platform's relay payload store — a share link renders all of it to any signed-in viewer with the user's daemon off. The store write-behind is best-effort: a running daemon re-pushes anything it missed, plus live updates, so routine URL hand-offs need no daemon-down warning.
 
 Configuration is handled by `om init`:
 
@@ -475,7 +475,7 @@ action).
 
 ## Indicators
 
-Add, remove (by `indicatorType` or `everyIndicator`), update, list; RSI/MACD/EMA and every registry native, WRUN ids, single-instance `409 NO_CHANGE`, `VALIDATION`, defaults.
+Add, remove (by `indicatorType` or `everyIndicator`), update, list; RSI/MACD/EMA, every registry native, Indicator ids (`wrun/`), `409 NO_CHANGE`, `VALIDATION`, defaults.
 
 Several indicators = ONE `chart_indicator_remove` call with `ids` on one pane (`om chart indicator remove --id a --id b`): one card lists every member (type, pane), an overlay the daemon reports already gone is an unchanged row, and a member that fails never voids the others.
 
@@ -515,7 +515,7 @@ guess. It needs no daemon.
 
 For Plus-gated types on a non-Plus account, the server returns `403 TIER_FEATURE_LOCKED` — surface verbatim, do not retry. The user must upgrade or stick to free-tier types.
 
-**WRUN packages with cross-symbol pinned input sources stay off charts for now.** A `wrun/@scope/name/output` add whose package pins a NON-odds feed source to a fixed `symbol`+`exchange` (a cross-symbol reference leg) is UNVERIFIED on the hosted chart lane (the chart backend computes with its own data path); when you KNOW a package carries such a pin (you authored it this session, or its listing says so), decline the add, say why, and offer the metric via alerts/`metric get` instead. Odds-pinned packages (conditionId markets) chart as they always have, and a package you cannot inspect is not grounds for refusal.
+**Indicator packages with cross-symbol pinned input sources stay off charts for now.** A `wrun/@scope/name/output` add whose package pins a NON-odds feed source to a fixed `symbol`+`exchange` (a cross-symbol reference leg) is UNVERIFIED on the hosted chart lane (the chart backend computes with its own data path); when you KNOW a package carries such a pin (you authored it this session, or its listing says so), decline the add, say why, and offer the metric via alerts/`metric get` instead. Odds-pinned packages (conditionId markets) chart as they always have, and a package you cannot inspect is not grounds for refusal.
 
 Typical `settings`:
 
@@ -920,9 +920,9 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart delete` (action: `chart_delete`) — PERMANENTLY delete chart workspaces (REST direct through the collab gateway).
 - `om chart events` (action: `chart_events`) — Recent edits on the live session, oldest first, split by author.
 - `om chart grid` (action: `chart_grid`) — Open a monitor grid of up to 16 charts (4x4) and set each cell's market, in ONE call.
-- `om chart indicator add` (action: `chart_indicator_add`) — Add a technical indicator, WRUN marketplace indicator, or registry kScript indicator (RSI, MACD, EMA, LIQUIDATIONS, wrun/@scope/name/output, @scope/name, ...) to a chart pane.
+- `om chart indicator add` (action: `chart_indicator_add`) — Add a technical indicator, an Indicator package, or a registry kScript (legacy) indicator (RSI, MACD, EMA, LIQUIDATIONS, wrun/@scope/name/output, @scope/name, ...) to a chart pane.
 - `om chart indicator list` (action: `chart_indicator_list`) — List every indicator type addable via `chart_indicator_add`: canonical keys, friendly aliases, chart placement, and single-instance rules.
-- `om chart indicator preview` (action: `chart_indicator_preview`) — Draw a LOCALLY COMPUTED WRUN output on a chart pane as a PREVIEW line (draft lane: works for unpublished packages installed via `om wrun install`).
+- `om chart indicator preview` (action: `chart_indicator_preview`) — Draw a LOCALLY COMPUTED Indicator output on a chart pane as a PREVIEW line (draft lane: works for unpublished packages installed via `om indicator install`).
 - `om chart indicator remove` (action: `chart_indicator_remove`) — Remove indicator overlays from a chart pane.
 - `om chart indicator update` (action: `chart_indicator_update`) — Tune an existing indicator's settings.
 - `om chart interval` (action: `chart_interval`) — Change a chart pane's candle interval (1m, 5m, 15m, 1h, 4h, 1d, 1w, ...).
