@@ -1,0 +1,6 @@
+interface:
+  display_name: "World Todo"
+  short_description: "Plan, review, and register OM World work"
+  default_prompt: "Use $world-todo to plan this OM World task and update the shared knowledge base."
+policy:
+  allow_implicit_invocation: true
