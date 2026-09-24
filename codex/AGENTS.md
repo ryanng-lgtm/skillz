@@ -43,8 +43,21 @@ Raw `rg`/`find` is still fine for trivial single-file lookups where a graph quer
 
 `~/.codex/plans` is symlinked to the Obsidian vault (`~/Library/Mobile Documents/com~apple~CloudDocs/Obsidian/Claude Plans`, iCloud-synced) — the same folder `~/.claude/plans` points at, so Claude and Codex plans land side by side. There is also a nested `Obsidian/Obsidian/` vault registered in Obsidian's own config — it is NOT where plans go; trust the symlink, not `obsidian.json`. Placement rule:
 
-- A plan file always goes under a subdirectory named for today's date, `YYYY-MM-DD` (e.g. `~/.codex/plans/2026-08-05/my-plan.md`). Create the dir if it doesn't exist; if it exists, just place the file in it. Never write plan files at the plans root.
-- Any plan, spec, or design doc you author — including one drafted in Codex plan mode — is written to today's dated dir as a markdown file before execution starts, so it survives the session and shows up in the vault.
+- Create a plan file only when the work needs a durable implementation plan,
+  spec, design, or execution handoff, or when Ryan explicitly asks for one.
+  Routine fixes, installs, publishes, and short task checklists do not need a
+  plan file just because execution has steps. Keep those steps in the session.
+- Reuse the existing plan for an ongoing task, including across sessions and
+  dates. Update it in place rather than creating a new plan for every follow-up
+  or phase. Create a separate document only for a distinct scope or deliverable.
+- Keep dated directories focused on plans and evidence directories. Save
+  durable supporting material (validation reports, review findings, receipts,
+  logs, scripts, and bundles) under a task's `<task>-evidence/` directory, and
+  link it from the plan when one exists. Reuse existing evidence directories;
+  evidence does not require creating a plan. Keep disposable scratch work in a
+  temporary directory outside the vault.
+- A new plan file always goes under a subdirectory named for today's date, `YYYY-MM-DD` (e.g. `~/.codex/plans/2026-08-05/my-plan.md`). Create the dir if it doesn't exist; if it exists, just place the file in it. Never write plan files at the plans root.
+- When a new plan, spec, or design doc is warranted — including one drafted in Codex plan mode — save it as markdown in today's dated dir before execution starts. This is a persistence rule, not a requirement to author a plan for every task.
 - **Never commit plan/spec documents.** Session-authored plans, specs, and design docs live in the plans vault only — never `git add` or commit them into a project repo, and exclude them from any staging sweep (`git add -A` included). If one is needed in a repo temporarily, it stays untracked.
 
 ## Commits — all projects
