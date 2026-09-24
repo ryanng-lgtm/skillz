@@ -54,13 +54,15 @@ Raw Grep/Glob is still fine for trivial single-file lookups where a graph query 
   link it from the plan when one exists. Reuse existing evidence directories;
   evidence does not require creating a plan. Keep disposable scratch work in a
   temporary directory outside the vault.
-- Save retained JSON in a capitalized `JSON/` directory, never loose beside
-  plan files. For `<date>/<plan>.md`, use `<date>/<plan>/JSON/`, with the plan's
-  filename stem as the directory name. JSON unrelated to a plan goes under
-  `<date>/JSON/`. Reuse the plan's original directory across sessions and dates,
-  and link JSON artifacts from the plan when relevant. This JSON-specific rule
-  takes precedence over the general evidence location; preserve existing
-  evidence directories and their contents.
+- A plan with retained JSON gets its own directory: the plan lives at
+  `<date>/<plan>/<plan>.md` and its JSON at `<date>/<plan>/JSON/`. Use the plan's
+  filename stem as the directory name and capitalized `JSON/`. When adding
+  JSON to a previously standalone plan, move the plan into that directory and
+  update affected links. JSON unrelated to a plan goes under `<date>/JSON/`.
+  Reuse the plan's original date and directory across sessions, and link JSON
+  artifacts from the plan when relevant. This JSON-specific rule takes
+  precedence over the general evidence location; preserve existing evidence
+  directories and their contents.
 - A new plan file always goes under a subdirectory named for today's date, `YYYY-MM-DD` (e.g. `~/.claude/plans/2026-08-05/my-plan.md`). Create the dir if it doesn't exist; if it exists, just place the file in it. Never write plan files at the plans root.
 - Plan mode pins its plan file at the plans root (harness-assigned path, not editable during planning): keep working with the pinned path while plan mode is active, then move the file into today's dated dir as the first action after plan mode ends.
 - **Never commit plan/spec documents.** Session-authored plans, specs, and design docs live in the plans vault only — never `git add` or commit them into a project repo, and exclude them from any staging sweep (`git add -A` included). If one is needed in a repo temporarily, it stays untracked.
