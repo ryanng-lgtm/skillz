@@ -50,12 +50,19 @@ Raw `rg`/`find` is still fine for trivial single-file lookups where a graph quer
 - Reuse the existing plan for an ongoing task, including across sessions and
   dates. Update it in place rather than creating a new plan for every follow-up
   or phase. Create a separate document only for a distinct scope or deliverable.
-- Keep dated directories focused on plans and evidence directories. Save
-  durable supporting material (validation reports, review findings, receipts,
+- Keep dated directories focused on plans and artifact directories. Save
+  non-JSON supporting material (validation reports, review findings, receipts,
   logs, scripts, and bundles) under a task's `<task>-evidence/` directory, and
   link it from the plan when one exists. Reuse existing evidence directories;
   evidence does not require creating a plan. Keep disposable scratch work in a
   temporary directory outside the vault.
+- Save retained JSON in a capitalized `JSON/` directory, never loose beside
+  plan files. For `<date>/<plan>.md`, use `<date>/<plan>/JSON/`, with the plan's
+  filename stem as the directory name. JSON unrelated to a plan goes under
+  `<date>/JSON/`. Reuse the plan's original directory across sessions and dates,
+  and link JSON artifacts from the plan when relevant. This JSON-specific rule
+  takes precedence over the general evidence location; preserve existing
+  evidence directories and their contents.
 - A new plan file always goes under a subdirectory named for today's date, `YYYY-MM-DD` (e.g. `~/.codex/plans/2026-08-05/my-plan.md`). Create the dir if it doesn't exist; if it exists, just place the file in it. Never write plan files at the plans root.
 - When a new plan, spec, or design doc is warranted — including one drafted in Codex plan mode — save it as markdown in today's dated dir before execution starts. This is a persistence rule, not a requirement to author a plan for every task.
 - **Never commit plan/spec documents.** Session-authored plans, specs, and design docs live in the plans vault only — never `git add` or commit them into a project repo, and exclude them from any staging sweep (`git add -A` included). If one is needed in a repo temporarily, it stays untracked.
