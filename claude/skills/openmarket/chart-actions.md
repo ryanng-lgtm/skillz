@@ -10,7 +10,7 @@ allowed-tools:
 
 # om chart
 
-The Collab Service Bridge is a long-lived WebSocket from the local `om` daemon to a remote collab gateway. At boot it joins one workspace, receives a `STATE_SYNC` snapshot, caches it in-process, and stays open. The agent queries that cache (or submits mutations through the bridge) via the chart tools — `chart_status`, `chart_refresh`, `chart_symbol`, … (`om chart …` on the CLI).
+The Collab Service Bridge is a long-lived WebSocket from the local `om` daemon to a remote collab gateway. At boot it joins one workspace, receives a `STATE_SYNC` snapshot, caches it in-process, and stays open for the edits that follow; a mutation is an intent the daemon posts to the gateway over REST. The agent reads that cache and submits intents via the chart tools — `chart_status`, `chart_refresh`, `chart_symbol`, … (`om chart …` on the CLI).
 
 Commands are grouped by **resource**, not by action verb — same pattern as `kubectl get pods`, `docker container run`, `git remote add`. Picking the right group is the agent's first job; the verbs under each group are small and consistent.
 
@@ -68,7 +68,7 @@ Quick routing — the common asks, each row a recipe (tool + the decisions to ma
 
 **Events on charts are their own lane: `chart_pins`.** It plots event sources (news feeds, custom watches, price-alert fires) onto a chart's event lane as a live view; the call shape is §"Pins", and the defaults, predicates, depth and workspace consent live in §"Pins". Do not confuse it with `chart_events`, the session-edit stream: that verb READS the human's and peers' recent manual chart edits and plots nothing.
 
-**A shared watch on a chart is a layer: `chart_layers`.** "Plot X on a chart", "put @scope/name on my chart", "place this watch on NQ" map to `chart_layers` when the home's `charts.layers` setting is on (the default), and to `chart_pins` otherwise. A layer is the watch's stream (the same address and door `watch_share` and `watch_follow` use) placed on a chart workspace, read by the chart from the signed ledger under the viewer's own grant on any symbol and any interval; the daemon pushes nothing per chart. One call: `refs` (a watch of the user's by id, slug or label; an address they publish or follow; a topic id) plus the chart (`here: true` for the chart they are looking at, `workspace: <id>` for a chart they keep, or `market: EXCHANGE:SYMBOL` for a new chart named after the watch, reused the same day unless `fresh: true`). A watch of the user's that streams nowhere yet is shared first through the normal share with a private door, a private listing and every entry kept. That share needs the user's yes exactly as `watch_share` does: the call cards in every mode, the card shows the share and supplies `yes` and `approved_intent_sha256` (never set them yourself); without the yes the call refuses `confirmation_required` naming the watches it would share, and `dry_run: true` previews them (address, consent rows, digest) sharing and placing nothing. A folder watch or a watch that reads other watches refuses `share_composite_layer_refused`: share it from its own `watch_share` card first, then place the address. The registry's or the store's refusal (a name limit with its `next_at`, a scope that is not the username, the topic quota) is the answer, relayed verbatim (the upstream code rides `details`), and nothing is placed. A followed address places its topic; an installed copy is refused with the follow hint. `op: "remove"` takes a layer off the named chart; `op: "list"` (no refs, no chart) shows every layer the account publishes or follows with the charts it is on. Relay the result's `disclosures`. `layers_disabled` means the setting is off: use `chart_pins`.
+**A shared watch on a chart is a layer: `chart_layers`.** "Plot X on a chart", "put @scope/name on my chart", "place this watch on NQ" map to `chart_layers` when the home's `charts.layers` setting is on (the default), and to `chart_pins` otherwise. A layer is the watch's stream (the same address and door `watch_share` and `watch_follow` use) placed on a chart workspace, read by the chart from the signed ledger under the viewer's own grant on any symbol and any interval; the daemon pushes nothing per chart. One call: `refs` (a watch of the user's by id, slug or label; an address they publish or follow; a topic id) plus the chart (`here: true` for the chart they are looking at, `workspace: <id>` for a chart they keep, or `market: EXCHANGE:SYMBOL` for a new chart named after the watch, reused the same day unless `fresh: true`). A watch of the user's that streams nowhere yet is shared first through the normal share with a private door, a private listing and every entry kept. That share needs the user's yes exactly as `watch_share` does: the call cards in every mode, the card shows the share and supplies `yes` and `approved_intent_sha256` (never set them yourself); without the yes the call refuses `confirmation_required` naming the watches it would share, and `dry_run: true` previews them (address, consent rows, digest) sharing and placing nothing. A folder watch or a watch that reads other watches refuses `share_composite_layer_refused`: share it from its own `watch_share` card first, then place the address. The registry's or the store's refusal (a name limit with its `next_at`, a scope that is not the username, the topic quota) is the answer, relayed verbatim (the upstream code rides `details`), and nothing is placed. A followed address places its topic; an installed copy is refused with the follow hint. `op: "remove"` takes a layer off the named chart; `op: "list"` (no refs, no chart) shows every layer the account publishes or follows with the charts it is on. `op: "adopt_pins"` (no refs, no chart; `om chart layers --adopt-pins`) is the one-time move off the old per-chart pins: every chart the user plotted through `chart_pins` gets the watches it was plotted from placed on it as layers when they already stream, and the watches not shared yet come back under `needs_share` with nothing shared: place each on its charts, which shares it first on the user's yes. The user sees where a watch is placed without asking you: the `/watches` list has a CHARTS tab while a watch is on a chart (one row per watch on a chart: the watch, the chart, `live` / `STALE` / `ended`, when it was placed; `enter` opens the watch, `x` takes the layer off after one confirm line) and a `⇢ <chart> · <door> · placed <when>` line under each placed watch, the `/follows` FOLLOWING tab has an ON CHARTS column, and `om chat` raises one NEEDS YOU line while a chart plotted the old way still has a watch with no layer. "Which charts is my watch on" and "what am I streaming to a chart" are `op: "list"`. Relay the result's `disclosures`. `layers_disabled` means the setting is off: use `chart_pins`.
 
 **Drawing tools have their own detail file → read [`chart-actions-tool-drawing.md`](chart-actions-tool-drawing.md).**
 It covers every Super Search tool (lines, shapes/ranges, fibonacci, arrows, markers, positions,
@@ -326,7 +326,7 @@ Symbol, interval (`1m` minutes vs `1M` months), plot type, view zoom/pan; layout
 | `chart_interval` (`om chart interval`) | `update_interval` | persisting | falls back to gateway REST when down |
 | `chart_plot_type` (`om chart plot-type`) | `update_plot_type` | persisting | yes |
 | `chart_layout` (`om chart layout`) | `update_layout` | persisting | yes |
-| `chart_grid` (`om chart grid`) | `update_grid` | persisting (the monitor grid's own documents) | falls back to gateway REST when down |
+| `chart_grid` (`om chart grid`) | `update_grid` | persisting (saved on the workspace) | falls back to gateway REST when down |
 | `chart_sync` (`om chart sync`) | `update_sync` | persisting | yes |
 
 All seven verbs are wired. The per-pane verbs (`chart_view`, `chart_symbol`, `chart_interval`, `chart_plot_type`) take a REQUIRED 0-based `chartIndex` — chart 0 is the primary pane, chart 1+ are the multichart sub-cells (read them from `multiCharts.workspaces[N-1]` in the refreshed workspace snapshot). There is no default: identify the pane from a fresh read. `chart_layout`, `chart_grid` and `chart_sync` are workspace-global and take no `chartIndex`.
@@ -368,15 +368,15 @@ The `plotType` enum on the tool is the authoritative domain — 18 values, wider
 
 `mode` values are strings — `"1"` and `"4"` included, despite looking numeric.
 
-Standard layout tops out at **4 panes (2x2)**. A bigger grid (`3x3`, `4x4`, anything > 4 panes) is the **monitor grid**: use `chart_grid`, below. Never tell the user to set it by hand.
+`chart_layout` tops out at **4 panes (2x2)**. A grid above 4 panes (`3x3`, `4x4`) is set with `chart_grid`, below, and a grid is reshaped by sending `chart_grid` again with the new shape. Never tell the user to set it by hand.
 
-Workspace-global — no `chartIndex`. Growing the grid appends new panes that inherit chart 0's symbol/exchange/interval (1:1 with a manual layout change); shrinking keeps the extra panes persisted and paints only the mode's count. On a monitor-grid (multimode) workspace the frontend exits monitor mode first, then applies the standard layout. Free tier caps at 2 panes; 3+ requires Plus.
+Workspace-global, no `chartIndex`. Growing the grid appends new panes that inherit chart 0's symbol/exchange/interval (1:1 with a manual layout change); shrinking keeps the extra panes persisted and paints only the mode's count. On a workspace the current app has not opened yet, `chart_layout` changes the standard panes and leaves the grid in place. Free tier caps at 2 panes; 3+ requires Plus.
 
 **Set the layout BEFORE per-pane symbols.** If the user wants a multi-pane layout AND specific symbols per pane (e.g. "3x1 with BTC, XRP, SOL"), the layout change must land first — the new panes don't exist until then, so a `chart_symbol` at `chartIndex` 2 issued before the grid grows fails with `chartIndex 2 out of range`. See the workflow under "User asks for a grid layout (with or without per-pane symbols)" below.
 
-### `chart_grid` (`om chart grid`) — the monitor grid, up to 16 charts
+### `chart_grid` (`om chart grid`): a grid of up to 16 charts
 
-The monitor grid is a different surface from the standard layouts: up to **4x4 (16 cells)**, every cell its own chart, one shared interval. `chart_grid` states the WHOLE grid in one call: `cols` x `rows` is the shape, and `symbols` names the market in each cell **row-major** (left to right, then down).
+`chart_grid` sets a grid of up to **4x4 (16 cells)** in the workspace's layout, every cell its own chart, and states the WHOLE grid in one call: `cols` x `rows` is the shape, and `symbols` names the market in each cell **row-major** (left to right, then down).
 
 ```jsonc
 chart_grid { "cols": 4, "rows": 4,
@@ -386,19 +386,19 @@ chart_grid { "cols": 4, "rows": 4,
 ```
 
 - **Declarative, not incremental.** The call says what the grid IS. To change one cell, re-send the grid with that one market changed; only that cell is written. An identical call succeeds with `changed: false`: the grid was already in place, which is NOT an error and is never retried (this verb has no `NO_CHANGE` refusal). One exception rides the same flag: `superseded: true` means this exact call had landed earlier and someone has changed the grid since, so `changed: false` there does NOT mean the grid shows what was asked. Report its current shape from `grid` and ask before re-sending.
-- **An unknown outcome (a dropped or timed-out call) is recovered by sending the same call again.** No chart read shows the monitor grid, so `chart_refresh` cannot tell you whether it landed; the verb is idempotent by value, so repeating it is safe.
+- **An unknown outcome (a dropped or timed-out call) is recovered by sending the same call again.** A chart read may not show the grid yet, so do not check with `chart_refresh`; the verb is idempotent by value, so repeating it is safe.
 - `symbols` may be shorter than the grid. Cells it does not name keep what they show; brand-new cells copy the first cell's market. Each entry is `symbol` + `exchange` exactly as for `chart_symbol` (data-plane exchange ids; a CME root frames as its continuous contract).
 - A cell whose market changes **keeps its indicators**, the same as a symbol change made by hand.
-- **Shrinking never deletes.** A `4x4` taken down to `2x2` keeps the first four cells in place and hides the other twelve; growing back restores them where they were.
-- It is saved on the workspace, server-side: it lands even when no tab is open, and shows in every open tab of that workspace.
-- Workspace-global, no `chartIndex`. **Do not follow it with per-cell `chart_symbol` calls**: on a monitor-grid workspace that verb addresses the hidden standard panes, not the grid cells.
+- **Shrinking never deletes.** Send `chart_grid` again with the new shape: a `4x4` taken down to `2x2` keeps the first four cells in place and hides the other twelve; growing back restores them where they were.
+- It is saved on the workspace, server-side: it lands even when no tab is open.
+- Workspace-global, no `chartIndex`. **Do not follow it with per-cell `chart_symbol` calls**: name each cell's market in `symbols`; until the grid shows in a chart read, `chart_symbol` addresses other panes, not the grid cells.
 - A grid larger than one cell needs a paid plan: `TIER_LIMIT_EXCEEDED` names the limit. `CONFLICT` means a person was editing the same grid while the write ran; send it again once.
 
 ### `chart_sync` (`om chart sync`) — toggle multi-chart sync (symbol / interval / crosshair)
 
 Workspace-global — no `chartIndex`; the sync master is the primary pane (chart 0). Enabling `symbol` or `interval` sync makes every pane follow chart 0 (the server propagates chart 0's symbol/interval onto the other panes). One key per call — to toggle two settings, make two calls.
 
-**Sync awareness.** Before changing a per-pane symbol or interval, check `multiCharts.syncStatus` in the refreshed workspace snapshot. If `syncStatus.symbol` is `true`, every pane shows ONE symbol — a per-pane `chart_symbol` won't give panes different symbols; it changes the symbol for all of them. If the user asks for different symbols per pane while symbol sync is on, tell them sync is on and ask whether to turn it off first (`chart_sync` with `key: symbol`, `enabled: false`) or pick one symbol for all panes. Same for `syncStatus.interval`. On a monitor-grid (multimode) workspace only `crosshair` sync is togglable via the agent; symbol/interval sync is fixed by the grid.
+**Sync awareness.** Before changing a per-pane symbol or interval, check `multiCharts.syncStatus` in the refreshed workspace snapshot. If `syncStatus.symbol` is `true`, every pane shows ONE symbol: a per-pane `chart_symbol` won't give panes different symbols; it changes the symbol for all of them. If the user asks for different symbols per pane while symbol sync is on, tell them sync is on and ask whether to turn it off first (`chart_sync` with `key: symbol`, `enabled: false`) or pick one symbol for all panes. Same for `syncStatus.interval`. While a grid does not show in a chart read yet, only `crosshair` sync is togglable via the agent; symbol/interval sync is fixed by that grid.
 
 ### NO_CHANGE response (the persisting verbs)
 
@@ -417,7 +417,7 @@ Index semantics:
 
 Triggers: any grid dimension (`3x1`, `1x3`, `2x2`, `2x1`, `1x2`) or layout phrasing ("three across", "split into two", "stacked", "quad", "2 by 2").
 
-**Pick the verb first.** More than 4 charts is ONE `chart_grid` call (shape plus row-major `symbols`): no ordering, no per-pane follow-ups. The steps below are the `chart_layout` path, for the standard 1 to 4 pane layouts: see the grid→mode table above.
+**Pick the verb first.** More than 4 charts is ONE `chart_grid` call (shape plus row-major `symbols`): no ordering, no per-pane follow-ups. Reshaping a grid set with `chart_grid` is `chart_grid` again, at any size. The steps below are the `chart_layout` path, for the standard 1 to 4 pane layouts: see the grid→mode table above.
 
 **Order matters — layout first, then symbols.** A combined request like *"change to 3x1 with BTC, XRP, SOL"* is ONE layout change plus per-pane symbol sets, in this exact order:
 
@@ -517,19 +517,9 @@ For Plus-gated types on a non-Plus account, the server returns `403 TIER_FEATURE
 
 **Indicator packages with cross-symbol pinned input sources stay off charts for now.** A `wrun/@scope/name/output` add whose package pins a NON-odds feed source to a fixed `symbol`+`exchange` (a cross-symbol reference leg) is UNVERIFIED on the hosted chart lane (the chart backend computes with its own data path); when you KNOW a package carries such a pin (you authored it this session, or its listing says so), decline the add, say why, and offer the metric via alerts/`metric get` instead. Odds-pinned packages (conditionId markets) chart as they always have, and a package you cannot inspect is not grounds for refusal.
 
-Typical `settings`:
+**Parameter names come from the catalogue, not from memory.** `chart_indicator_list` lists every Indicator package output this machine carries in `packages[]` (`id`, `params`, `placement`), the same rows `metric_list` gives under the indicator names. A package installed from the registry goes on a chart by that id with those keys (`indicatorType: "wrun/@acme/momentum/fast"` with `{"period": 14}`). The pack embedded in the binary is not published to the registry yet, so the hosted chart cannot compute it: an add by a stock id (`wrun/@om-core/rsi/rsi`) is refused as unpublished, and a stock indicator (RSI, MACD, EMA, SMA, Bollinger Bands, Stochastic, …) goes on by the chart's own script subtype (`RSI`, `MACD`, `EMA`, `BB`, …) with the keys the chart's script declares, not the sheet's: RSI(14) is `indicatorType: "RSI"` with `{"period": 14}`; a key the script does not take is dropped server-side and echoed in `warnings`. A name in a watch rule (`rsi`) is the pack's output, not the chart's script, so a chart script beside a rule may differ in rounding or defaults; say so when the user asks the chart to mirror a rule.
 
-| `indicatorType` | Typical `settings` |
-| --- | --- |
-| `RSI` | `{"period": 14}` |
-| `MACD` | `{"fast": 12, "slow": 26, "signal": 9}` |
-| `EMA` / `SMA` | `{"length": 50}` |
-| `BB` | `{"length": 20, "stddev": 2}` |
-| `ATR` | `{"period": 14}` |
-| `Stochastic` | `{"period": 14, "smoothing": 3}` |
-| `Liquidations` | `{}` |
-
-**Every registry native is addable.** The table above covers common shorthands only; ALL ~80 registry types (`chart_indicator_list`) work as `indicatorType` values — exact keys win over aliases, any casing accepted. A handful of interaction-only overlay types are excluded from the agent path and rejected with a clear error. If the user names an indicator not in the list output, submit anyway — an unsupported type is rejected either way: the normalizer throws before the call goes out, and the server returns a `VALIDATION` error. Do not silently substitute.
+**Every registry native is addable.** The script subtypes above cover the stock indicators only; ALL ~80 registry types (`chart_indicator_list`) work as `indicatorType` values — exact keys win over aliases, any casing accepted. A handful of interaction-only overlay types are excluded from the agent path and rejected with a clear error. If the user names an indicator not in the list output, submit anyway — an unsupported type is rejected either way: the normalizer throws before the call goes out, and the server returns a `VALIDATION` error. Do not silently substitute.
 
 **Minimal params contract.** Send only the settings the user explicitly asked to change (period, funding interval, value area, ...). The chart fills every other default client-side — theme colors, widths, market identity from chart context. Do NOT invent colors or cosmetic settings unless asked. Setting keys outside the shared whitelist are dropped server-side and echoed back in the response `warnings` field — if a key you sent shows up there, it was ignored, not applied; tell the user rather than retrying blindly.
 
@@ -563,9 +553,9 @@ Five-step flow:
 
 3. **If the chart pane isn't named, pass `chartIndex: 0`** — the field is required, so pane 0 is a deliberate policy default here, not a schema one; the user can correct in a follow-up.
 
-4. **If params aren't named, use the textbook default** (RSI 14, MACD 12/26/9, EMA 20, BB 20/2) and name it in the outcome line. Param choice is not one of the persona's allowed questions; the user's next message changes it.
+4. **If params aren't named, use the catalogue's defaults** (the `metric_list` row's values: RSI 14, MACD 12/26/9, EMA 20, BB 20/2) and name them in the outcome line. Param choice is not one of the persona's allowed questions; the user's next message changes it.
 
-5. **Execute** `chart_indicator_add` — no preview, no confirmation; chart mutations on the agent's own canvas dispatch immediately. Worked call for RSI(14) on the active chart:
+5. **Execute** `chart_indicator_add` — no preview, no confirmation; chart mutations on the agent's own canvas dispatch immediately. Worked call for RSI(14) on the active chart, by the chart's script subtype:
 
 ```jsonc
 chart_indicator_add { "chartIndex": 0, "indicatorType": "RSI", "settings": { "period": 14 } }
@@ -726,7 +716,7 @@ Recovery rules:
 - `invalid_workspace_id` → the id wasn't a workspace short id or share-link URL (a friendly name like "btc desk" is not an id — resolve it via `chart_list` first).
 - `workspace_select_failed` → the live repoint failed; the persisted default was rolled back, not clobbered. Relay the remedy hint; do not claim the switch happened.
 - `request_failed` → a direct gateway REST call failed without a typed upstream code (network/HTTP-level). Report it as unreachable; one attempt, no retry loop.
-- `TIER_LIMIT_EXCEEDED` → the account's plan does not include what was asked (a monitor grid past one cell, a pane count past the tier cap). Say so plainly with the limit and the requested size from the detail; never retry, and never quietly fall back to a smaller layout the user did not ask for.
+- `TIER_LIMIT_EXCEEDED` → the account's plan does not include what was asked (a grid past one cell, a pane count past the tier cap). Say so plainly with the limit and the requested size from the detail; never retry, and never quietly fall back to a smaller layout the user did not ask for.
 - `CONFLICT` → the write lost a race with a live edit (a person editing the same grid) and did NOT land. Send the same call again once; if it conflicts again, say the grid is being edited rather than looping.
 - `CLIENT_VALIDATION` → a drawing call refused BEFORE any network submit (bad roles/anchor count/direction/`text` on geometry). It returns as a normal result with `ok: false` — read the envelope, not just an error flag. Fix the named field once; never claim drawn. One detail is not a malformed call: `unsupported action: <verb>` is an om daemon older than the CLI refusing a verb it does not know (seen with `chart_grid`); the fix is `om service restart`, not a rewrite.
 - `TRANSPORT` → the bridge socket dropped with the intent in flight — the outcome is UNKNOWN: the change may have applied before the drop. Re-read the chart first (`chart_refresh` — `chart_status` only answers bridge connectivity, not chart content) and retry ONLY if the change is absent from the fresh read — a blind retry double-draws on `chart_drawing_add` (idempotent setters merely degrade to `NO_CHANGE`). If `chart_status` stays `reconnecting`, report the bridge down and stop.
@@ -831,7 +821,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 - `chart_keep`
   - `workspace` — Default: the user's ACTIVE chart workspace (charts.workspace), which is where scratch canvases live.
 - `chart_layers`
-  - `op` — place (default): put each ref's topic on the target chart; remove: take it off; list: every layer this account publishes or follows with the charts it is placed on (no refs, no chart).
+  - `op` — place (default): put each ref's topic on the target chart; remove: take it off; list: every layer of this account, with its charts; adopt_pins: the charts plotted the old way get their watches placed as layers.
 - `chart_list`
   - `mine` — Never the answer to a question about the user's workspaces; omit it for those.
 - `chart_panel_push`
@@ -862,11 +852,11 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 What a reply must carry from each result-bearing action here; the per-branch guidance itself rides on the tool result.
 
 - `chart_grid`
-  - on `CLIENT_VALIDATION` — CLIENT_VALIDATION naming an unsupported action means the running om daemon predates the monitor grid and refused the call locally, so nothing was sent: say it needs `om service restart` after the upgrade, and do not fall back to another layout unasked. Otherwise fix the named field and resend once.
+  - on `CLIENT_VALIDATION` — CLIENT_VALIDATION naming an unsupported action means the running om daemon predates this verb and refused the call locally, so nothing was sent: say it needs `om service restart` after the upgrade, and do not fall back to another layout unasked. Otherwise fix the named field and resend once.
   - on `CONFLICT` — CONFLICT means the grid was being edited while this write ran and it did not land: it is safe to send the same call again once, and if it conflicts again say the grid is being edited rather than retrying in a loop.
-  - on `TIER_LIMIT_EXCEEDED` — TIER_LIMIT_EXCEEDED means this account's plan does not include a monitor grid of that size: say so plainly, name the limit and requested size from the detail, and do not retry or fall back to another layout unasked.
-  - on `TIMEOUT` — The call dropped or timed out, so the outcome is UNKNOWN and the grid may already be up. Do not check with a chart read, which never shows the monitor grid: send the SAME call once more. It is safe to repeat, and `changed: false` then means it had already landed.
-  - on `TRANSPORT` — The call dropped or timed out, so the outcome is UNKNOWN and the grid may already be up. Do not check with a chart read, which never shows the monitor grid: send the SAME call once more. It is safe to repeat, and `changed: false` then means it had already landed.
+  - on `TIER_LIMIT_EXCEEDED` — TIER_LIMIT_EXCEEDED means this account's plan does not include a layout of that size: say so plainly, name the limit and requested size from the detail, and do not retry or fall back to another layout unasked.
+  - on `TIMEOUT` — The call dropped or timed out, so the outcome is UNKNOWN and the grid may already be up. Do not check with a chart read, which may not show it yet: send the SAME call once more. It is safe to repeat, and `changed: false` then means it had already landed.
+  - on `TRANSPORT` — The call dropped or timed out, so the outcome is UNKNOWN and the grid may already be up. Do not check with a chart read, which may not show it yet: send the SAME call once more. It is safe to repeat, and `changed: false` then means it had already landed.
 - `chart_indicator_add`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
   - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
@@ -919,9 +909,9 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart create` (action: `chart_create`) — Create a chart workspace with a clean template and no inherited indicators.
 - `om chart delete` (action: `chart_delete`) — PERMANENTLY delete chart workspaces (REST direct through the collab gateway).
 - `om chart events` (action: `chart_events`) — Recent edits on the live session, oldest first, split by author.
-- `om chart grid` (action: `chart_grid`) — Open a monitor grid of up to 16 charts (4x4) and set each cell's market, in ONE call.
+- `om chart grid` (action: `chart_grid`) — Open or reshape a grid of up to 16 charts (4x4) in the workspace's layout and set each cell's market, in ONE call.
 - `om chart indicator add` (action: `chart_indicator_add`) — Add a technical indicator, an Indicator package, or a registry kScript (legacy) indicator (RSI, MACD, EMA, LIQUIDATIONS, wrun/@scope/name/output, @scope/name, ...) to a chart pane.
-- `om chart indicator list` (action: `chart_indicator_list`) — List every indicator type addable via `chart_indicator_add`: canonical keys, friendly aliases, chart placement, and single-instance rules.
+- `om chart indicator list` (action: `chart_indicator_list`) — List every indicator type addable via `chart_indicator_add`: native types, script subtypes, and in `packages` the Indicator package outputs this machine carries by metric id.
 - `om chart indicator preview` (action: `chart_indicator_preview`) — Draw a LOCALLY COMPUTED Indicator output on a chart pane as a PREVIEW line (draft lane: works for unpublished packages installed via `om indicator install`).
 - `om chart indicator remove` (action: `chart_indicator_remove`) — Remove indicator overlays from a chart pane.
 - `om chart indicator update` (action: `chart_indicator_update`) — Tune an existing indicator's settings.

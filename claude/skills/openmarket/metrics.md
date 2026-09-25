@@ -1,6 +1,6 @@
 ---
 name: openmarket-metrics
-description: Compute named scalar metric values ad-hoc via `om metric get`, scan a universe of symbols via `om metric screen`, and discover the registry via `om metric list`. Covers the registered indicators (RSI, EMA, SMA, MACD, Bollinger Bands, ATR, Stochastic) plus the alert-engine schema-parity metrics (price, delta_pct, delta_abs, volume, funding_rate, open_interest). Chart-only indicators (CCI, MFI, OBV, VWAP, ADL, ADX, PSAR, Ichimoku) are NOT computable here — they exist only as chart overlays via `om chart indicator add`. NOT for raw-price chat questions — "what's the price of X" / "what's BTC at" / 24h-change queries route to the `markets` tool (lastPrice, priceChange24h) and price history to `points`, never to `metric_get`. Use this skill when the user asks for a named indicator value ("what's RSI on BTC?", "give me MACD for ETH 4h"), wants to find symbols matching a condition ("find oversold majors", "scan top 50 by volume for high RSI"), wants to verify an alert threshold against the live value, or needs to discover what metrics exist. Always shell to `om metric`; never recompute math locally.
+description: Compute named scalar metric values ad-hoc via `om metric get`, scan a universe of symbols via `om metric screen`, and discover the registry via `om metric list`. Covers the registered indicators (Relative Strength Index, Simple Moving Average, Exponential Moving Average, Average True Range, Volume Moving Average, Rolling High and Low, Stochastic Oscillator, MACD, Bollinger Bands, Weighted Moving Average, Z-Score) plus the alert-engine schema-parity metrics (price, delta_pct, delta_abs, volume, funding_rate, open_interest, open_interest_delta_pct). The stock pack's chart-first sheets (ADX, CCI, MFI, OBV, ADL, PSAR, Ichimoku) compute by their output ids (`wrun/@om-core/adx/adx`; `metric_list` lists them; Ichimoku's displaced spans and lagging line are refused, its `conversion` and `base` lines read); VWAP is chart-only, via `om chart indicator add`. NOT for raw-price chat questions — "what's the price of X" / "what's BTC at" / 24h-change queries route to the `markets` tool (lastPrice, priceChange24h) and price history to `points`, never to `metric_get`. Use this skill when the user asks for a named indicator value ("what's RSI on BTC?", "give me MACD for ETH 4h"), wants to find symbols matching a condition ("find oversold majors", "scan top 50 by volume for high RSI"), wants to verify an alert threshold against the live value, or needs to discover what metrics exist. Always shell to `om metric`; never recompute math locally.
 user-invocable: false
 allowed-tools:
   - Bash(om *)
@@ -20,7 +20,7 @@ Four tools: `metric_get` (one symbol, one or many metrics — §"Compute"), `met
 
 Always read values through these tools; never recompute indicator math locally — you have no candle series in context, so local math would be invented.
 
-Chart-only indicators (CCI, MFI, OBV, VWAP, ADL, ADX, PSAR, Ichimoku) are not computable here — they exist only as chart overlays via `chart_indicator_add`.
+The pack's chart-first sheets (ADX, CCI, MFI, OBV, ADL, PSAR, Ichimoku) compute by output id, listed by `metric_list` (Ichimoku's displaced spans and lagging line are refused); VWAP is chart-only.
 
 Never present one venue's numbers as another's: when the requested venue can't serve a metric, refuse with the venue named, or state the substitution explicitly.
 
@@ -95,29 +95,41 @@ Result shape: `{ asOf, selector, values: [{ metric, params, value, ok, data_age_
 
 The full built-in registry: every metric id with its params and unit — the Stochastic, Bollinger and MACD ids, rolling highs and lows, and the funding fraction unit.
 
+<!-- AUTO: INDICATOR CATALOGUE — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
+
 | id | params | unit | answers |
 | --- | --- | --- | --- |
-| `price` | — | price | alert-spec sanity checks ONLY — price chat routes to `markets` |
-| `delta_pct` | bars (optional, default 1) | percent points | % change over the last N bars |
-| `delta_abs` | bars (optional, default 1) | price | absolute change over the last N bars |
-| `volume` | — | quote-dependent | last-bar volume |
-| `funding_rate` | — | **fraction** (0.01% = `0.0001`) | perp funding |
-| `open_interest` | — | quote-dependent | open interest |
-| `open_interest_delta_pct` | bars (optional, default 1) | percent points | OI change over N bars |
-| `rsi` | period (14) | score 0–100 | overbought / oversold |
-| `sma` | period (20) | price | simple moving average |
-| `ema` | period (20) | price | exponential moving average |
-| `atr` | period (14) | price | volatility range |
-| `volume_sma` | period | quote-dependent | volume vs its average (the prior `period` bars, current bar excluded), with `volume` |
-| `rolling_high` | bars | price | breakout level (high of the prior N bars) |
-| `rolling_low` | bars | price | breakdown level (low of the prior N bars) |
-| `macd` / `macd_signal` / `macd_histogram` | fast, slow, signal (12/26/9) | price | the MACD family — send all three ids for "MACD"; slow must exceed fast |
-| `bb_upper` / `bb_middle` / `bb_lower` / `bb_width` | period, stddev (20/2) | price | the Bollinger family — no metric is named `bollinger`; `bb_middle` takes both params and computes from `period` alone |
-| `stoch_k` / `stoch_d` | period, smoothing (14/3) | score 0–100 | the Stochastic pair — no metric is named `stochastic` |
+| `price` | — | price | Raw last-bar close price for level checks; price cross alerts use the current bar high/low so mid-candle crosses are not missed. |
+| `delta_pct` | bars (optional) | percent points | Percent change of close over the last `bars` closed bars (optional `bars` param, default 1 = previous bar to current), in percent points (e.g. 1.2 means +1.2%, -0.25 means -0.25%). |
+| `delta_abs` | bars (optional) | price | Absolute change in price units of close over the last `bars` closed bars (optional `bars` param, default 1 = previous bar to current). |
+| `volume` | — | quote-dependent | Latest bar volume, USD notional by DEFAULT — the selector's `quote` defaults to USD and volume is quote-normalized. |
+| `funding_rate` | — | fraction | Latest funding rate (dimensionless, e.g. 0.0001 = 0.01% per funding interval). |
+| `open_interest` | — | quote-dependent | Latest open interest, USD notional by DEFAULT — the selector's `quote` defaults to USD and OI is converted from contract count. |
+| `open_interest_delta_pct` | bars (optional) | percent points | Percent change of open interest over the last `bars` closed bars (optional `bars`, default 1), in percent points (5 means OI grew 5%). |
+| `rsi` | period (14) | score 0-100 | Relative Strength Index, a 0-100 momentum oscillator (Wilder's RSI). |
+| `sma` | period (20) | price | Simple Moving Average of close over `period` bars. |
+| `ema` | period (20) | price | Exponential Moving Average of close over `period` bars. |
+| `atr` | period (14) | price | Average True Range: volatility measure in price units. |
+| `volume_sma` | period | quote-dependent | Simple Moving Average of bar volume over the `period` bars BEFORE the current one (required `period`; the forming/decision bar is excluded so a spiking bar can't lift its own baseline). |
+| `rolling_high` | bars | price | Highest high of the `bars` bars BEFORE the current one (required `bars`; the forming/decision bar is excluded so a breakout can't raise its own ceiling). |
+| `rolling_low` | bars | price | Lowest low of the `bars` bars BEFORE the current one (required `bars`; the forming/decision bar is excluded). |
+| `stoch_k` | period (14), smoothing (3) | score 0-100 | Stochastic oscillator %K, a 0-100 momentum measure. |
+| `stoch_d` | period (14), smoothing (3) | score 0-100 | Stochastic oscillator %D: SMA of %K over `smoothing` bars. |
+| `macd` | fast (12), slow (26), signal (9) | price | MACD line: EMA(`fast`) minus EMA(`slow`) of close. |
+| `macd_signal` | fast (12), slow (26), signal (9) | price | MACD signal line: EMA of the MACD line over `signal` bars. |
+| `macd_histogram` | fast (12), slow (26), signal (9) | price | MACD histogram: MACD line minus signal line. |
+| `bb_upper` | period (20), stddev (2) | price | Bollinger Band upper: SMA(`period`) + `stddev` * rolling standard deviation. |
+| `bb_middle` | period (20), stddev (2) | price | Bollinger Band middle: SMA(`period`). |
+| `bb_lower` | period (20), stddev (2) | price | Bollinger Band lower: SMA(`period`) - `stddev` * rolling standard deviation. |
+| `bb_width` | period (20), stddev (2) | price | Bollinger Band width: upper minus lower. |
+| `wma` | period (20) | price | Weighted Moving Average of close over `period` bars, the newest bar weighing `period` and the oldest 1. |
+| `zscore` | period (20) | standard deviations | Z-score of close over `period` bars: how many population standard deviations the newest close sits from the window mean; 0 when the window is flat. |
 
-The parenthesized numbers are what a paramless call reads: omit `params`, or any single key of it, and they fill before validation, so a bare `rsi` is RSI(14) and its value comes back carrying `period: 14`. Send params when the ask means something else. Rows naming a bare param with no number (`volume_sma`, `rolling_high`, `rolling_low`) have no conventional value — take it from the ask ("20-bar rolling high"); when the ask is silent, choose a sensible window, say which, and send it. Those three are the rows a missing param fails: `invalid_query` before any fetch, with the metric and the offending key named. The delta rows' `bars` is optional (default 1), and the four params-less rows (`price`, `volume`, `funding_rate`, `open_interest`) need no params object at all.
+<!-- AUTO: END INDICATOR CATALOGUE -->
 
-Installed Indicator packages add their own `wrun/@scope/name/output` ids per machine — `metric_list` is the discovery surface for those; they never appear in this table.
+The parenthesized numbers are what a paramless call reads: omit `params`, or any single key of it, and they fill before validation, so a bare `rsi` is RSI(14) and its value comes back carrying `period: 14`. Send params when the ask means something else. Rows naming a bare param with no number (`volume_sma`, `rolling_high`, `rolling_low`) have no conventional value — take it from the ask ("20-bar rolling high"); when the ask is silent, choose a sensible window, say which, and send it. Those three are the rows a missing param fails: `invalid_query` before any fetch, with the metric and the offending key named. A param marked optional (the delta rows' `bars`) defaults inside the metric (1 bar), and the four params-less rows (`price`, `volume`, `funding_rate`, `open_interest`) need no params object at all. A family is several ids, one per row: "MACD" is `macd` (the line alone), `macd_signal` and `macd_histogram`, sent together in one call, and `slow` must exceed `fast`; "Bollinger Bands" is the four `bb_*` ids (`bb_middle` takes both params and computes from `period` alone), and "Stochastic" the `stoch_*` pair; no id is named `bollinger` or `stochastic`. `funding_rate` is a fraction: 0.01% is `0.0001`. There is no `roc` id: a rate of change over N bars is `delta_pct` with `bars: N`. `zscore` is in standard deviations (`2` is two deviations above the window mean), in the population form (the squares over `period`). In that form |z| cannot exceed the square root of `period − 1`, so a short window caps the reachable threshold: `zscore > 2` needs a `period` above 5.
+
+Every indicator row above (the rows under the seven price-class rows) is a stock pack output under its indicator name (`rsi` is `wrun/@om-core/rsi/rsi`; either spelling reads the same value). The pack's chart-first sheets (ADX, CCI, MFI, OBV, ADL, PSAR, Ichimoku, whose displaced spans and lagging line are refused) and installed Indicator packages add their own `wrun/@scope/name/output` ids — `metric_list` is the discovery surface for those; they never appear in this table.
 
 ## Series
 

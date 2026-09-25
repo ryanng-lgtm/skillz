@@ -22,10 +22,10 @@ The news store discovers text feeds and manages vendor links, subscriptions, pre
 
 ### Routing
 
-A moment to detect is a Fast alert; a subject to follow is a curated Topic; a ready-made stream comes from the catalog. Topics are never described as alerts, triggers or urgent events.
+A moment to detect is an OpenFeed on a watch; a subject to follow is a curated Topic; a ready-made stream comes from the catalog. Topics are never described as alerts, triggers or urgent events.
 
 - Discover or inspect a vendor feed: §"Providers and ids". Acquire it through the `/news` store.
-- Author a Fast alert: preview its complete trigger with `news_preview`, then watch.md §"Sources" for `watch_create` with a listener source.
+- Watch for a moment: watch.md §"Sources" for `watch_create` with one OpenFeed listener. Author a Fast alert only when the person asks for one: preview its complete trigger with `news_preview`, then the same section.
 - Read a feed's saved watch: watch.md §"Read a watch". Change its trigger, name or delivery: watch.md §"Edit a watch". Replay history, pause or remove it: watch.md §"Lifecycle".
 - Share, follow or fork an OpenMarket watch: watch.md §"Doors". Plot its rows: chart-actions.md §"Pins".
 - Watch a person, organization or subject: watch.md §"Watch a subject". A source the user owns or names lives in `connect-source.md`.
@@ -69,7 +69,7 @@ A one-off news read earns at most ONE entitlement-aware offer (from `news_billin
 "What's happening with X?" answered from news or web data is a one-off read; a watch is the standing version of the same question. The conversion is offered, never pushed. The offer is always a CONVERSION (arm a watch, follow a feed, a paid backfill): never offer a read you can run yourself, and the live read (`web_research`) is no offer either: for any question about what someone posted or said it runs in the same turn, the journal beside it; journal search, journal get, and the odds/market read run in the same turn, unasked, per the injected fence's depth doctrine:
 
 - **A question about what someone posted or said always gets the live read.** `web_research` runs in the same turn, unasked, whatever the journal holds; the journal read runs beside it as context (what your watches already caught, with dates). An empty journal is not "nothing happened", it is "no watch covers this", and a full one is not a reason to skip the live world. Only an ask about the journal itself ("what did my watches catch this week") stays journal-only. Without any Grok credential a named @handle is read through the public FxTwitter mirror (real dated posts) and the reply ends with the Grok how-to line `web_research` returns; a broad X search without Grok is coverage, labeled as coverage, with the same last line.
-- **No covering watch: answer, then append ONE entitlement-aware offer line.** One line at the end of the answer, at most one offer per subject per session. Entitlement-aware means the line names a lane this account can take today: read it from `news_billing` (`can_author` for an authored Fast alert, `can_follow` for another publisher's, and the free follow of a curated feed or a Topic otherwise) rather than guessing, and never state a price. The offer is part of the answer, never a precondition for it.
+- **No covering watch: answer, then append ONE entitlement-aware offer line.** One line at the end of the answer, at most one offer per subject per session. Entitlement-aware means the line names a lane this account can take today: a moment to catch is a watch with an OpenFeed; for a subject, read it from `news_billing` (`can_follow` for another publisher's Fast alert, the free follow of a curated feed or a Topic otherwise, and an authored Fast alert only when the person asks for one) rather than guessing, and never state a price. The offer is part of the answer, never a precondition for it.
 - **A covered subject is cited, never offered.** When an existing watch or feed already covers the subject, point at it and what it caught ("your Iran watch caught this 2h ago", read from `watch_history`) instead of offering a duplicate. A second watch on a covered subject is next week's duplicate-pings complaint.
 - **A decline is remembered.** When the user declines the offer (or waves it off), save it with `memory_save` keyed to the subject (search first with `memory_search`), and never re-offer that subject unprompted, this session or later ones. A remembered decline is lifted only by the user's own ask.
 - **Repetition earns receipts, once.** The same subject asked again within a week is the one escalation: offer once more WITH receipts ("third time this week; a watch would have caught 6 events"), taking the count from a real read (`om news preview` for a would-have-fired count, or the covering journal), never invented. Declined again, the subject returns to remembered silence.
@@ -99,7 +99,7 @@ Never state a price from the agent catalog, offer an unattended purchase, or tre
 
 `backtest_news` answers "would trading this feed's fires have paid?" before any signal — the study lane is free, `--classify` spends (cached).
 
-`om backtest news <feed>` (action `backtest_news`) answers "would trading this feed's fires have made money?" with zero authoring: a free correlational study first (does price move after fires?), then a P&L replay of a synthesized hold-after-fire strategy. Run it before proposing any signal or strategy on a feed's fires; the printed breadcrumb at the end names the exact `om watch action add <feed> --ai <prompt> --output verdict` and strategy-step commands. The study lane and `--side` replays cost no LLM calls; `--classify` grades the feed's own ai verdict step over its fires, the producer a promoted watch runs: the step's model is asked once per fire the verdict memo cannot answer (`max_llm_calls` caps the model requests, and a turn that reads history is two; reruns ask nothing), and the step reads the feed's earlier fires as of each fire through `watch_history`. The asset defaults from the watch's single `related_markets` tag: tag first, backtest second. The window is `--window` (a lookback ending at `--until`) or `--from`/`--until`; `--data-mode live|backfill` picks the corpus (`--history` still works); the cost knobs are `--fee-bps`, `--slippage-bps`, `--latency-bars`, as on every backtest door.
+`om backtest news <feed>` (action `backtest_news`) answers "would trading this feed's fires have made money?" with zero authoring: a free correlational study first (does price move after fires?), then a P&L replay of a synthesized hold-after-fire strategy. Run it before proposing any signal or strategy on a feed's fires; the printed breadcrumb at the end names the exact `om watch action add <feed> --ai <prompt> --output verdict` and strategy-step commands. It answers the same envelope every backtest door does — `choices` (what the run resolved: asset, window, hold, costs), `study`, `report` for the replay half, and ONE `warnings` list carrying the lane's disclosures and the replay's together — so read a disclosure off `warnings`, never out of `report`, and quote `choices` when saying what was actually replayed. A study-only run has no replay and saves no report; a replayed one names its file, which `backtest_report` reads back a section at a time. The study lane and `--side` replays cost no LLM calls; `--classify` grades the feed's own ai verdict step over its fires, the producer a promoted watch runs: the step's model is asked once per fire the verdict memo cannot answer (`max_llm_calls` caps the model requests, and a turn that reads history is two; reruns ask nothing), and the step reads the feed's earlier fires as of each fire through `watch_history`. The asset defaults from the watch's single `related_markets` tag: tag first, backtest second. The window is `--window` (a lookback ending at `--until`) or `--from`/`--until`; `--data-mode live|backfill` picks the corpus (`--history` still works); the cost knobs are `--fee-bps`, `--slippage-bps`, `--latency-bars`, as on every backtest door.
 
 ## The daily brief
 
@@ -193,14 +193,14 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `provider` — Vendor: 'attention' (default) = FAST, alerts that fire the moment a named condition happens
 - `backtest_news`
   - `asset` — Optional when the feed's history carries exactly one market tag; it then defaults to that tag and the result discloses it.
-  - `hold` — Default 4h.
-  - `from` — Default: 30 days ago.
+  - `hold` — Default 24h.
+  - `from` — Default: 90 days before `until`.
   - `window` — Lookback as `<int><ms|s|m|h|d|w>` ending at `until` (default: now), e.g. '30d'; conflicts with an explicit `from`.
   - `side` — Fixed side to trade on every fire (default long).
-  - `history` — live (default): rows the daemon observed in real time (quiet catch-up recovery rows are excluded; their observed_at is the catch-up moment, not live-actionable).
-  - `fee_bps` — Default 0.
-  - `slippage_bps` — Default 0.
-  - `latency_bars` — Default 0.
+  - `data_mode` — live (default): rows the daemon observed in real time (quiet catch-up recovery rows are excluded; their observed_at is the catch-up moment, not live-actionable).
+  - `fee_bps` — Default: the traded venue's taker fee.
+  - `slippage_bps` — Default: the traded venue's slippage floor.
+  - `latency_bars` — Default 1.
   - `max_llm_calls` — Default: 400, two per fire the run reads by default — a classify run always carries a ceiling, and reaching it refuses with the spend so far, every verdict already answered kept in the memo.
 - `backtest_news` · `chart_pins`
   - `until` — Default: now.
@@ -234,7 +234,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 What a reply must carry from each result-bearing action here; the per-branch guidance itself rides on the tool result.
 
 - `backtest_news`
-  - discloses `disclosures[]` — The run's honesty notes: asset defaulting, the classify lane's ai step, sparse-corpus warnings.
+  - discloses `warnings[]` — The one honesty channel: every warning the run raised, the report's and the tool's.
 - `news_brief`
   - discloses `brief.body_md` — The briefing markdown: story-grouped items deduplicated across feeds, major developments first, with a quiet note for feeds with nothing new. Relay it to the user as-is; do not re-summarize away detail. When generator=fallback it is a labeled raw per-feed fire list instead, whose '(raw rollup: ...)' first line states what THAT run did and carries no setup advice — what to do about it depends on what is configured now, so read llm_error and the user's current state before advising anything. The body's relative ages are frozen at body_ages_at (created_at on older briefs): never repeat one as though it were measured now.
   - on `not_found` — No stored brief matched: follow the error's own hint (list or re-select a stored one, or mode 'generate' when none exists); if nothing exists at all, the events live in watch_history / event_journal_search — and in alert_events on a home whose watches all shadow alerts.
