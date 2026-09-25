@@ -32,10 +32,10 @@ The user pastes an issue. Immediately:
 When the investigator returns:
 
 1. Write its findings into that issue's section (Investigation + Fix plan). Set `**Status:** in review`.
-2. Run codex in the background:
+2. Run codex in the background. The `-m` value is the `model =` line of `~/.codex/config.toml`; check it before writing the command, since a stale pin here silently outlives a config change:
 
 ```bash
-codex exec -C <repo1> --add-dir <repo2> -m gpt-5.6-sol \
+codex exec -C <repo1> --add-dir <repo2> -m gpt-6-astra \
   -c model_reasoning_effort="high" --sandbox read-only \
   -o <scratch>/ivtg-issue-<N>-review.md - <<'PROMPT'
 Review this fix plan against the actual code in the repos you can read.
@@ -104,7 +104,7 @@ Repos:
 
 ### Investigation
 ### Fix plan
-### Codex review (gpt-5.6-sol, high)
+### Codex review (gpt-6-astra, high)
 ```
 
 ## Rules

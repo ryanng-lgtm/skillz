@@ -13,7 +13,16 @@ Placeholders: `$WORKTREE`, `$APP_URL`, `$PORT`,
 ```sh
 RUN_DIR=~/.claude/plans/<YYYY-MM-DD>/<name>-run-evidence   # NOT /tmp
 FINDINGS="$RUN_DIR/findings.md"
+CODEX_MODEL=gpt-6-astra   # the `model =` line of ~/.codex/config.toml, read at brief-writing time
 ```
+
+`CODEX_MODEL` is the one place a codex model is named. Every invocation below passes
+`-m "$CODEX_MODEL"`; none spells a model out. Read the value from `~/.codex/config.toml`
+while writing the brief and write the literal into the brief's helper block — a brief must
+stand alone, and a config bump is then one edit here rather than a hunt through every
+section. The codex side is the bug-discovery and rendering model; the Claude session that
+writes the brief and the specs is the other side. Who audits what: `../SKILL.md`, "Two
+models".
 
 `$RUN_DIR` sits beside the brief in the plans vault, not in a temp directory a reboot
 clears. Sweep verdicts, screenshots, and console logs are the only proof the night's work
@@ -191,7 +200,7 @@ command gate instead.
 
 ## 4. Agent configuration — effort, and prompt style
 
-Applies to every codex call in this file: sweep, fix, and diagnose.
+Applies to every codex call in this file: sweep, fix, diagnose, audit and review.
 
 **`~/.codex/config.toml` sets `model_reasoning_effort = "xhigh"` globally.** Every agent
 that does not override it runs at xhigh, including a sweep whose whole job is to click
@@ -211,6 +220,10 @@ effort_for() {   # effort_for <role> [attempt] — attempt defaults, so `effort_
     fix:3)    echo "effort_for: attempt 3 is the diagnose agent, not a third fix" >&2
               echo xhigh   ;;   # loud, not a silent fallthrough
     diagnose*) echo xhigh  ;;   # see below — matches with or without an attempt number
+    audit-spec*)  echo medium ;; # one spec, one question: does it assert what EXPECTED says?
+    review:1)     echo medium ;; # hunks against GAPS lines and the scope fence
+    review:*)     echo high   ;; # a second review of the same phase: the first fix missed
+    audit-brief*) echo high   ;; # once per brief; the one audit whose miss costs the night
     *)        echo medium  ;;
   esac
 }
@@ -222,7 +235,7 @@ Two adjustments on top of the ladder:
   clipping at 768px" is a judgement; "`[data-testid=save]` is enabled" is a lookup. Where
   a phase's rows are the former, start its sweeps at `medium`.
 - **Fixes touching shared state, async ordering, or three-plus files start at `high`.**
-  A one-string edit does not.
+  A one-string edit does not. The same rule moves a `review` of such a diff to `high`.
 
 **There is no `fix:3`** — attempt 3 calls the `diagnose` agent (section 7) instead, at
 `xhigh` and `--sandbox read-only`. It returns a root cause and a verdict on whether the
@@ -247,7 +260,7 @@ it did.
 ```sh
 with_timeout 900 codex exec \
   -C "$WORKTREE" \
-  -m gpt-5.6-sol \
+  -m "$CODEX_MODEL" \
   -c model_reasoning_effort="$(effort_for sweep "$ATTEMPT")" \
   -c sandbox_workspace_write.network_access=true \
   --sandbox workspace-write \
@@ -310,7 +323,7 @@ that exist nowhere else: the post's word ceiling will not carry them.
 ```sh
 with_timeout 1800 codex exec \
   -C "$WORKTREE" \
-  -m gpt-5.6-sol \
+  -m "$CODEX_MODEL" \
   -c model_reasoning_effort="$(effort_for fix "$ATTEMPT")" \
   --sandbox workspace-write \
   --output-last-message "$RUN_DIR/fix-p$N-a$ATTEMPT.md" \
@@ -356,7 +369,7 @@ On attempt 3, this becomes the diagnosis agent instead:
 ```sh
 with_timeout 1800 codex exec \
   -C "$WORKTREE" \
-  -m gpt-5.6-sol \
+  -m "$CODEX_MODEL" \
   -c model_reasoning_effort="$(effort_for diagnose)" \
   --sandbox read-only \
   --output-last-message "$RUN_DIR/diagnose-p$N.md" \
@@ -366,10 +379,11 @@ with_timeout 1800 codex exec \
 ## 8. Loop control and gate tiers
 
 ```
-spec commit (red, reason recorded)
+spec written → spec audit (section 11) → spec commit (red, reason recorded)
    ↓
 build → identity gate → spec + sweep → spec green, rows landed, no in-scope
-                                 │      regressions? → commit, next phase
+                                 │      regressions? → diff review (section 12)
+                                 │                     → commit, next phase
                                  ↓ no
                               fix agent (implementation only) → attempt += 1 → back to build
 ```
@@ -381,8 +395,9 @@ red, and move to the next phase that does not depend on it.
 spec itself looks wrong, that is a stop condition for Ryan, not a repair the run performs —
 a run that edits its own acceptance criteria has stopped verifying anything.
 
-One codex agent at a time — sweep or fix, never both, never two phases in parallel. Two
-`codex exec` runs plus a browser tree is where an unattended night turns into swap.
+One codex agent at a time — sweep, fix, audit or review, never two of them, never two
+phases in parallel. Two `codex exec` runs plus a browser tree is where an unattended night
+turns into swap.
 
 ### Which gate runs when
 
@@ -568,3 +583,116 @@ to something else before the run began and still does.
 **Never run a bare `pkill -f chrome` or `pkill -f node`** — that kills Ryan's own browser
 and unrelated work. The dedicated profile, the claimed port, and the PID ledger exist so
 teardown can be precise.
+
+## 11. Spec audit — between "spec written" and "spec committed red"
+
+The run writes the spec, so the run is not the one that says it encodes the requirement.
+A codex agent reads the spec and the requirement row it serves, and answers one question:
+does this assertion test what `EXPECTED` says, or what the code will do?
+
+```sh
+with_timeout 600 codex exec \
+  -C "$WORKTREE" \
+  -m "$CODEX_MODEL" \
+  -c model_reasoning_effort="$(effort_for audit-spec)" \
+  --sandbox read-only \
+  --add-dir "$RUN_DIR" \
+  --output-last-message "$RUN_DIR/audit-spec-p$N.md" \
+  "$(cat "$RUN_DIR/audit-spec-prompt-p$N.md")"
+```
+
+The prompt carries the style preamble (section 4), the requirement row verbatim
+(`CURRENT`, `EXPECTED`, its authority, the gate mode), the spec file path, and this
+contract, which is the whole response:
+
+```
+SPEC: <path>
+SUBJECT: matches | drifts — <what the assertion actually tests>
+VALUE: from-EXPECTED | from-implementation | tautology — <the literal it checks>
+MODE: <gate mode> validatable | not — <why>
+MECHANICS: ok | <missing import, bad selector, racy wait, misused harness API>
+VERDICT: commit | fix-mechanics | stop-semantic
+```
+
+`commit` → commit the spec and run `gate_spec_red`. `fix-mechanics` → the run corrects
+the named mechanics only, logs it, and audits once more. `stop-semantic` → the spec
+asserts something Ryan did not say: a runtime stop, never a rewrite. The block is appended
+to the findings log whichever way it lands.
+
+## 12. Diff review — before every commit, by the model that did not write the diff
+
+A glance at `git diff` is not a review. Every commit on the run's branch is preceded by a
+written verdict on its diff, and **the reviewer is never the author's model**:
+
+| Diff written by | Reviewed by |
+|---|---|
+| the run — a phase change, a spec, a mechanical spec fix | a codex `review` call, below |
+| a codex fix agent | the run itself, inline, against the same contract |
+
+```sh
+git diff > "$RUN_DIR/review-p$N-a$ATTEMPT.diff"
+with_timeout 900 codex exec \
+  -C "$WORKTREE" \
+  -m "$CODEX_MODEL" \
+  -c model_reasoning_effort="$(effort_for review "$ATTEMPT")" \
+  --sandbox read-only \
+  --add-dir "$RUN_DIR" \
+  --output-last-message "$RUN_DIR/review-p$N-a$ATTEMPT.md" \
+  "$(cat "$RUN_DIR/review-prompt-p$N-a$ATTEMPT.md")"
+```
+
+The prompt carries the style preamble, the diff path, what the diff is meant to do — the
+sweep's `GAPS` lines, or the phase's stated change for a first implementation — the scope
+fence, the protected spec list, and this contract:
+
+```
+HUNKS: <n> — each: <file:lines> → <the GAP line or phase change it serves> | unexplained
+SCOPE: inside | <file outside the fence>
+SPECS: untouched | <spec file modified>
+DEFECTS: <file:line — what breaks, and the command that shows it> | none
+VERDICT: commit | fix — <the one thing to change>
+```
+
+`commit` → `assert_specs_untouched`, stage, `/commit`. `fix` → the `DEFECTS` lines go to
+the fix agent as its `GAPS`, then back to build; it counts as the next attempt. An
+`unexplained` hunk is a `fix`: a change nobody asked for goes back, not in. A run-side
+review writes the same block to the findings log; a review that produced no block did not
+happen.
+
+## 13. Brief audit — at brief-writing time, before the paste line
+
+Not copied into the brief. The skill session runs this once the brief is written and
+before the paste line is printed, because the model that wrote the brief is not the one
+that clears it. The auditor is briefed to find the reason the run will fail or build the
+wrong thing, not to confirm the brief.
+
+```sh
+mkdir -p "$RUN_DIR"
+with_timeout 900 codex exec \
+  -C "$SOURCE_REPO" \
+  --add-dir "$(dirname "$BRIEF")" --add-dir "$(dirname "$SOURCE_PLAN")" \
+  -m "$CODEX_MODEL" \
+  -c model_reasoning_effort="$(effort_for audit-brief)" \
+  --sandbox read-only \
+  --output-last-message "$RUN_DIR/audit-brief.md" \
+  "$(cat "$RUN_DIR/audit-brief-prompt.md")"
+```
+
+The prompt carries the style preamble, the brief path, the source plan path, the
+instruction to argue against the brief, and this contract:
+
+```
+REQUIREMENTS: <n> rows — each: EXPECTED verbatim | paraphrased | inferred; authority named | missing
+MODES: every gate mode validatable | <row> not — <why>
+GROUND TRUTH: paths, branch, base, install, runner all exist | <what does not>
+PASTE LINE: standalone | <placeholder, ~ path, unresolved symlink, missing worktree clause>
+PREMISE: the plan addresses the report | <the gap between the fix and the complaint>
+UNKNOWNS: all carried | <one the plan flagged that the brief dropped>
+BLOCKERS: <what must change before this ships> | none
+VERDICT: ship | revise
+```
+
+`ship` → print the paste line. `revise` → fix the named blockers and audit once more. A
+second `revise` goes back to Ryan as questions through the interactive question tool, not
+into a third draft. The lenses are the brief's own blocker list: the audit exists because
+the author is the worst judge of whether they were cleared.

@@ -67,7 +67,7 @@ Everything between those is the run's job, commits on its own branch included. A
 5. **Harvest the traps.** Every "don't do X, it breaks Y" you know: package managers that 404, files that must be regenerated rather than hand-merged, test harnesses with sharp edges, suites that OOM. A trap costs one line here and an hour there.
 6. **Design the verify loop around the specs.** Pick the harness, resolve the surface (command, port, URL), and for each phase name its spec files plus the sentinel proving the build under test is this one. Do this while you still have the plan open. Where a requirement cannot be a unit spec — a visual, a layout, a live surface — its spec is a *scripted* assertion (a committed CDP script, or a command with an expected value), never sweep prose.
 
-   **Resolve the stack's adapters here, by name**, so the brief is not silently hard-coded to one ecosystem: `START`, `TEST_ONE`, `TEST_IMPACTED`, `TYPECHECK`, `BUILD`, `DIST_CHECK`. A repo without one of these omits that gate explicitly rather than inheriting a command from another project.
+   **Resolve the stack's adapters here, by name**, so the brief is not silently hard-coded to one ecosystem: `START`, `TEST_ONE`, `TEST_IMPACTED`, `TYPECHECK`, `BUILD`, `DIST_CHECK`. A repo without one of these omits that gate explicitly rather than inheriting a command from another project. Resolve `CODEX_MODEL` the same way: read the `model =` line of `~/.codex/config.toml` and write the literal into the brief's helper block. Every codex call in the brief passes `-m "$CODEX_MODEL"`; none names a model of its own.
 7. **Ask where it reports** — through the same interactive question tool, in the same batch as the spec questions where the batch has room. Do not infer the channel or topic from the plan's subject. Ask the user to paste the destination — channel, and topic if the work belongs to one — once per area if the plan splits across several. Resolve what they paste to a canonical resource string and write that into the brief.
 8. **Pick the trigger** (table below).
 9. **Write the brief to `~/.claude/plans/YYYY-MM-DD/<source-name>-run.md`** — resolve that symlink and say the real path in your report, so a wrong target is caught immediately. Never into a repo; plan files are not committed.
@@ -75,7 +75,8 @@ Everything between those is the run's job, commits on its own branch included. A
    **Vault trap:** an iCloud-nested duplicate of the plans vault can exist (`…/Obsidian/Obsidian/Claude Plans` beside the real `…/Obsidian/Claude Plans`), and the source plan may be handed to you as a path inside the *duplicate*. Do not infer the destination from where the source file sits, and do not infer it from the symlink alone. If both directories exist, name both and ask which is live before writing.
 
    **Quote every path.** The vault's real path contains spaces (`Mobile Documents`, `Claude Plans`), and so do some source directories. An unquoted path, or a `for f in $(cat list)`, silently shatters into fragments and the run reads past it. Quote in every command the brief contains, and never word-split a file list.
-10. **Report the path and the paste line.** That's the deliverable. Print the paste line in full, with every path already resolved and quoted — it has to work pasted into a fresh session by itself, so a placeholder left in it is a broken deliverable, not a detail.
+10. **Have the other model audit the brief before it ships.** Run the brief audit in `references/verify-loop.md`, section 13: a read-only codex agent, briefed to find the reason the run will fail or build the wrong thing, reads the brief, the source plan and the repo, and returns a fixed verdict block into the evidence directory. `revise` means fix the named blockers and audit once more; a second `revise` goes back to Ryan as questions through the interactive question tool, not into a third draft. A brief with no `audit-brief.md` beside it has no paste line yet.
+11. **Report the path and the paste line.** That's the deliverable. Print the paste line in full, with every path already resolved and quoted — it has to work pasted into a fresh session by itself, so a placeholder left in it is a broken deliverable, not a detail.
 
 ## Establishing expected results
 
@@ -109,7 +110,7 @@ Acceptance criteria are **files in the repo**, whose meaning is fixed from `EXPE
 
 ### The rules
 
-1. **Lock the meaning before reading the implementation; encode it afterwards.** What is frozen is the *acceptance semantics* — the assertion's subject and its expected value, taken from `EXPECTED` and the capture. The *mechanics* are not frozen: read the test harness, fixtures, helpers, public interfaces and the runner's conventions freely, because a spec written blind to them produces exactly the missing-import and bad-selector failures that rule 2 rejects. What you must never do is derive an expected value from the implementation, or write an assertion that restates what the code does. Review each spec for tautologies before committing it.
+1. **Lock the meaning before reading the implementation; encode it afterwards.** What is frozen is the *acceptance semantics* — the assertion's subject and its expected value, taken from `EXPECTED` and the capture. The *mechanics* are not frozen: read the test harness, fixtures, helpers, public interfaces and the runner's conventions freely, because a spec written blind to them produces exactly the missing-import and bad-selector failures that rule 2 rejects. What you must never do is derive an expected value from the implementation, or write an assertion that restates what the code does. Before it is committed, the spec is audited by the other model (`references/verify-loop.md`, section 11): the run wrote it, so the run does not get to say it encodes the requirement.
 2. **Validate the spec against its gate mode before implementing.** Not every requirement can or should fail red:
 
    | Mode | Pre-implementation validation | Use for |
@@ -149,6 +150,21 @@ The brief verifies itself. Manual confirmation is not a phase, not a gate, and n
 
 Commands, prompts, the sweep output contract, and the exact codex invocations live in `references/verify-loop.md`. **Copy the resolved commands into the brief** — a fresh session will not read that file.
 
+### Two models, and neither clears its own work
+
+The Claude session plans; codex verifies and audits. The split follows what each is good at — structure, documentation and restraint on one side, bug discovery and rendering verdicts on the other — and it only pays while the line holds:
+
+| Job | Who | Why |
+|---|---|---|
+| Brief, specs, orchestration, commits | the Claude session | structure, documentation, plans that stay small |
+| Sweep, fix, diagnose | codex, `$CODEX_MODEL` | bug discovery, visual and rendering verdicts |
+| Audit the brief, audit each spec, review a diff the run wrote | codex | the author is the worst judge of its own work |
+| Review a diff codex wrote | the Claude session | same rule, other direction |
+
+**The model that wrote an artifact never clears it alone.** Brief, spec and diff each get a verdict block from the other side before they ship, are committed, or land. Invocations and contracts: `references/verify-loop.md`, sections 11 to 13.
+
+Codex spends tokens faster. The effort ladder, the time boxes, the one-agent rule and the inline compression preamble exist for that, and the audits obey all four.
+
 ### Pick the harness
 
 | Target | Harness | Why |
@@ -173,12 +189,12 @@ Name a sentinel per phase while writing the brief: a new `data-testid`, a new ro
 ### The loop
 
 ```
-spec commit (red, for the stated reason)
+spec written → spec audit (other model) → spec commit (red, for the stated reason)
    │
    ▼
 build → identity gate → run this phase's spec + sweep → spec green, acceptance rows
                                   │                     landed, no in-scope regressions?
-                                  ├─ yes → review diff, commit, next phase
+                                  ├─ yes → diff review (other model), commit, next phase
                                   └─ no  → fix agent (implementation only, never the
                                            spec) → attempt += 1 → back to build
 ```
@@ -228,7 +244,7 @@ The most expensive failure mode here is a run that spends the night launching br
 - **A port that answers is not a working browser.** Before the first sweep and at every heartbeat, the browser must pass a functional smoke test: navigate, evaluate, and write a real screenshot file. Those are the three things every sweep depends on, and `/json/version` still answers from a Chrome whose renderer has died.
 - **Two launch attempts for the whole run, then stop.** A relaunch loop ends the night with forty headless Chromes and zero verification. The third failure is a stop condition, not a retry.
 - **One tab, not one per check.** `--new-tab` once at the start, then navigate that same tab. Each extra tab is another renderer process.
-- **One codex agent at a time** — sweep or fix, never both, never two phases in parallel.
+- **One codex agent at a time** — sweep, fix, audit or review, never two of them, never two phases in parallel.
 
 ### Process ledger, memory, teardown
 
@@ -290,7 +306,7 @@ An unattended run pays for every word it generates, and most of them are scaffol
 | Compressed | Left as normal prose |
 |---|---|
 | The run's reasoning, phase notes, todos, tool-call descriptions | The completion post — Ryan reads it |
-| Sweep and fix prompts sent to codex | The findings log — Ryan reads it the next morning |
+| Sweep, fix, audit and review prompts sent to codex | The findings log — Ryan reads it the next morning |
 | Messages between the run and its agents | Commit messages, MR descriptions, code, comments |
 | Verdict prose in the sweep output contract | Security warnings, and any irreversible-action confirmation |
 
@@ -353,8 +369,9 @@ their names, so a red suite isn't misread as a regression.
 ## Verification loop
 The harness and its exact commands: how the surface starts (command, claimed
 port, URL), how the browser starts and how it is reused, the smoke test, the
-two-part identity gate, the sweep and fix agent invocations, the `effort_for`
-helper, and the sweep output contract. Attempt cap: 3 sweeps per phase, the
+two-part identity gate, `CODEX_MODEL`, the sweep, fix, spec-audit and diff-review
+invocations with their output contracts, the `effort_for` helper, and the rule that
+a diff is reviewed by the model that did not write it. Attempt cap: 3 sweeps per phase, the
 third being diagnosis rather than a fix. The `with_timeout` helper, defined
 here and used on every long-running command.
 
@@ -368,14 +385,16 @@ and deletes nothing.
 The evidence directory's absolute path, beside this brief in the plans vault.
 The append block the run runs after every sweep, pass or fail. What each entry
 carries: phase and attempt, identity verdict, acceptance rows, regressions,
-in-scope gaps, out-of-scope findings, and the screenshot and console-log paths.
+in-scope gaps, out-of-scope findings, the spec-audit and diff-review verdict
+blocks, and the screenshot and console-log paths.
 
 ## Phases
 Numbered, one requirement each. Every phase carries: the requirement it
 satisfies, its spec file and that spec's recorded red failure, the change, the
 files, the sentinel that proves the build under test is this one, the
 acceptance rows the sweep must return a verdict on, the command gate, and what
-"done" looks like — which is always "this spec is green".
+"done" looks like — which is always "this spec is green and the diff review
+said commit".
 One requirement = one spec = one phase = one commit pair (spec red, then
 implementation green).
 
@@ -406,8 +425,9 @@ the ceiling — 100 words consolidated, 40 per wave. What it may not claim.
 Authorised without asking: commits on the run's own branch, the verify sweeps,
 the completion post. Needs explicit human OK: push, merge, cherry-pick into
 main, publish, release, migrations against real data, anything else
-outward-facing. Codex agents never commit — the run reviews the diff, stages,
-and commits via the `/commit` skill.
+outward-facing. Codex agents never commit. No commit lands without a diff-review
+verdict block from the model that did not write the diff; then the run stages and
+commits via the `/commit` skill.
 **Never authorised, at any attempt, for any reason: changing what a spec
 asserts, or its expected value, to make an implementation pass.** Weakening,
 skipping, loosening or deleting an assertion is the same move under another
@@ -449,6 +469,7 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 - **Every requirement arrives with Ryan's expected result attached**, verbatim, plus how it was established. No expected result, no phase.
 - **Every phase's done-condition is its spec going green**, and that spec was red first for a recorded reason.
 - **Every phase ends in a verification command**, not "check it works".
+- **The author never clears its own artifact.** Brief, spec and diff each carry the other model's verdict block before they ship, are committed, or land. A verdict that exists only as "looked fine" did not happen.
 - **State the baseline numbers.** "5,781 tests, 0 fail; lint 42 warnings, 0 errors" turns an ambiguous red run into an obvious regression.
 - **Name the known flakes.** Otherwise the run treats one as a real failure and starts patching.
 - **Decisions already made go in as decisions**, not options. A brief that reopens a settled question wastes the run.
@@ -490,6 +511,10 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 | Leaving publish/push/merge unqualified | An unattended run does something outward-facing |
 | Writing the brief into the repo | Plan docs get committed, against house rules |
 | A paste line naming a trigger this session doesn't have | The brief is dead on arrival; nothing runs at all |
+| Printing the paste line before the brief audit ran | The one reader who would have caught a wrong `EXPECTED` never saw it; the run builds it faithfully |
+| Committing a spec the other model never audited | A tautology or a paraphrased requirement becomes the night's acceptance oracle |
+| Committing on a glance at the diff, or the author reviewing its own hunks | An unexplained hunk lands with the fix, and nobody asked for it |
+| Naming a codex model in an invocation instead of `$CODEX_MODEL` | The pin outlives the config; every brief silently runs last quarter's model |
 | Sweeping without the build-identity gate | "Verified" against a stale bundle or a second server on the same port |
 | No attempt cap, or a third attempt that patches instead of diagnosing | Patches forever against a wrong model of the bug |
 | Fixing out-of-scope bugs the sweep surfaced | Unattended scope creep, in a diff nobody watched grow |
@@ -524,6 +549,8 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 - **A spec passed on the first run, before any implementation.** Do not bank it. Name which of the three reasons applies.
 - **The fix loop is on attempt 2 and the spec is starting to look wrong to you.** Decide honestly which kind of wrong: mechanical (fix it, log it, re-validate) or semantic (stop). "It's basically mechanical" at attempt 3 is how the scheme dies.
 - **A requirement has no row in the traceability matrix.** It has no gate, whatever the acceptance rows claim.
+- **You're about to print the paste line and no `audit-brief.md` exists in the evidence directory.** The brief has not been audited, so it is not finished.
+- **You're about to commit and the only review is your own reading of a diff you wrote.** Wrong model. Send it through the codex `review` call first.
 - You're about to write "as discussed" or "as above" — the fresh session has neither.
 - You can't name the branch. Stop and resolve it; don't write "the feature branch".
 - The brief has no stop conditions. Every unattended run needs an exit that isn't "finish anyway".
