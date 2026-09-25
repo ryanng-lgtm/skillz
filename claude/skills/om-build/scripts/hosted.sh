@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # @file om-hosted
-# @description Build and install the daemon GUI. GUI commands load the GUI root .env and isolate user npm configuration.
+# @description Build and install the daemon GUI, preserving the running account and verifying watch and bot continuity. GUI commands load the GUI root .env and isolate user npm configuration.
 # om-build --hosted, end to end. See ../SKILL.md for why each step exists.
 #
 #   hosted.sh            build + install if the gate says to
@@ -15,6 +15,7 @@ set -uo pipefail
 MONO=${OM_MONO:-$HOME/Documents/GitLab/openmarket-internal}
 GUI=${OM_GUI:-$HOME/Documents/GitLab/openmarket-chat}
 GUI_BUN="$(dirname "$(realpath "${BASH_SOURCE[0]}")")/gui-bun.sh"
+WATCH_CHECK="$(dirname "$(realpath "${BASH_SOURCE[0]}")")/watch-check.py"
 SLOT="$MONO/packages/cli/assets/rooms-gui"
 # $HOME, not ~ -- tilde does not expand inside ${VAR:-default}, so a literal '~'
 # path would silently fail the plist parse and fall through to the PATH lookup.
@@ -80,6 +81,9 @@ else
 fi
 [ -n "$TARGET" ] || { TARGET=$(realpath "$(command -v om)" 2>/dev/null); SRC=PATH; }
 [ -n "$TARGET" ] || die "cannot determine the daemon binary -- set OM_TARGET, or check $PLIST"
+ORIGINAL_TARGET=$(realpath "$TARGET") || die "cannot resolve the daemon binary"
+CLI_PATH=$(command -v om)
+CLI_TARGET=$(realpath "$CLI_PATH" 2>/dev/null)
 case "$TARGET" in *dist/om) MODE=repo ;; *) MODE=versioned ;; esac
 say "daemon target:         $TARGET  [$MODE, via $SRC]"
 case "$TARGET" in *"/Cellar/openmarket/"*) die "target is a Homebrew install -- see SKILL.md hard rules" ;; esac
@@ -218,12 +222,8 @@ if [ "$NO_GUI" = 0 ]; then
     [ -f "$GUI/$f" ] || die "GUI build incomplete: missing $f"
   done
 
-  # A rebuild that reproduces the live stamp is nothing to install. Common after
-  # a checkout that only moved mtimes, or a squash-merge of the branch you built.
-  if [ "$FORCE" = 0 ] && [ "rooms.js?v=$STAMP" = "$served" ] && [ "$src_ver" = "$run_ver" ] && [ -n "$pid" ]; then
-    say ""; say "NOTHING TO INSTALL -- rebuild reproduced the live stamp $STAMP"
-    exit 0
-  fi
+  # An unchanged GUI hash says nothing about daemon source changes. The gate
+  # above owns SKIP; once it requests a build, compile and install the daemon.
 
   say ""; say "== stage =="
   cp "$GUI/dist/assets/rooms.js"  "$SLOT/rooms.js"  || die "stage rooms.js"
@@ -239,12 +239,26 @@ fi
 
 # ---------------------------------------------------------------- compile
 say ""; say "== compile =="
+# Bind service commands to the live account and compare watch state afterwards.
+# A receipt is read-only evidence, not authority to re-arm or replay a watch.
+command -v python3 >/dev/null || die "python3 is required for watch continuity checks"
+RECEIPT_ROOT=${XDG_STATE_HOME:-$HOME/.local/state}/om-hosted
+mkdir -p "$RECEIPT_ROOT" || die "create watch receipt directory"
+WATCH_RECEIPT_DIR=$(mktemp -d "$RECEIPT_ROOT/rebuild.XXXXXXXX") || die "create private watch receipt"
+WATCH_BEFORE="$WATCH_RECEIPT_DIR/watches-before.json"
+python3 "$WATCH_CHECK" capture "$WATCH_BEFORE" --binary "$TARGET" --health "$HEALTH" \
+  || die "cannot record the running account's watches; installation has not started"
+WATCH_HOME=$(python3 "$WATCH_CHECK" home "$WATCH_BEFORE") || die "read watch account"
+WATCH_ACCOUNT=$(basename "$WATCH_HOME")
+WATCH_ROOT=$(dirname "$(dirname "$WATCH_HOME")")
+say "watch account:         $WATCH_HOME"
+say "watch receipt:         $WATCH_BEFORE"
 OUT="$MONO/packages/cli/dist/om"
 # In repo mode the compile output IS the running binary. bun would write over a
 # file launchd is executing, so stop the service first (mv-not-cp, same reason).
 STOPPED=0
 if [ "$MODE" = repo ] && [ -n "$pid" ]; then
-  om service stop >/dev/null 2>&1 && STOPPED=1
+  OM_HOME="$WATCH_ROOT" OM_ACCOUNT="$WATCH_ACCOUNT" "$TARGET" service stop >/dev/null 2>&1 && STOPPED=1
   sleep 3
   curl -s -o /dev/null -m 3 "$HEALTH" && die "service still answering after stop; refusing to overwrite a running binary"
 fi
@@ -264,10 +278,11 @@ if [ "$MODE" = repo ]; then
   say "in place at $OUT (launchd runs it directly)"
   # Keep the supervisor's stderr: launchd swallows the daemon's, and a bare
   # "FAIL: service restart" hides whether bootout, unload, or bootstrap failed.
-  if [ "$STOPPED" = 1 ]; then RS=$(om service start 2>&1) || die "service start: $RS"
-  else RS=$(om service restart 2>&1) || die "service restart: $RS"; fi
+  if [ "$STOPPED" = 1 ]; then RS=$(OM_HOME="$WATCH_ROOT" OM_ACCOUNT="$WATCH_ACCOUNT" "$OUT" service start 2>&1) || die "service start: $RS"
+  else RS=$(OM_HOME="$WATCH_ROOT" OM_ACCOUNT="$WATCH_ACCOUNT" "$OUT" service restart 2>&1) || die "service restart: $RS"; fi
+  INSTALLED="$OUT"
 else
-  DEST=~/.local/opt/openmarket/"$NEWVER"/bin/om
+  DEST=${OM_INSTALL_ROOT:-$HOME/.local/opt/openmarket}/"$NEWVER"/bin/om
   [ -e "$DEST" ] && say "NOTE: overwriting $NEWVER in place -- the outgoing binary is gone, rollback reverts the version"
   mkdir -p "$(dirname "$DEST")"
   mv "$OUT" "$DEST" || die "mv into $DEST"      # mv, never cp
@@ -280,8 +295,14 @@ else
     ln -sfn "$DEST" "$TARGET" || die "symlink repoint"
   fi
   [ -x "$(realpath "$TARGET" 2>/dev/null)" ] || die "$TARGET does not resolve to an executable after install"
+  # The shell and launchd may use different aliases to the outgoing binary.
+  # Repoint only a symlink proven to belong to this install.
+  if [ -L "$CLI_PATH" ] && [ "$CLI_TARGET" = "$ORIGINAL_TARGET" ] && [ "$CLI_PATH" != "$DEST" ]; then
+    ln -sfn "$DEST" "$CLI_PATH" || die "repoint CLI alias"
+  fi
   say "installed:             $DEST"
-  RS=$(om service restart 2>&1) || die "service restart: $RS"
+  RS=$(OM_HOME="$WATCH_ROOT" OM_ACCOUNT="$WATCH_ACCOUNT" "$DEST" service restart 2>&1) || die "service restart: $RS"
+  INSTALLED="$DEST"
 fi
 sleep 15
 
@@ -294,6 +315,16 @@ say ""; say "== verify =="
 h=$(curl -s --max-time 10 "$HEALTH")
 NPID=$(printf '%s' "$h" | sed -n 's/.*"pid":\([0-9]*\).*/\1/p')
 [ -n "$NPID" ] || die "daemon not answering after restart"
+watch_ok=0
+for attempt in 1 2 3 4; do
+  if python3 "$WATCH_CHECK" verify "$WATCH_BEFORE" --binary "$INSTALLED" \
+    --health "$HEALTH" --version "$NEWVER" --restarted; then
+    watch_ok=1
+    break
+  fi
+  [ "$attempt" = 4 ] || { say "Waiting for watch and bot connections ($attempt/4)"; sleep 15; }
+done
+[ "$watch_ok" = 1 ] || die "watch/bot continuity check failed; inspect $WATCH_BEFORE. No watches were re-armed or replayed"
 say "daemon:                $(printf '%s' "$h" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p') pid $NPID"
 if curl -s --max-time 10 "$ROOMS" | grep -q OM_ROOMS_GUI_DIR; then
   [ "$NO_GUI" = 1 ] && say "GUI:                   placeholder (--no-gui, expected)" \

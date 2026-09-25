@@ -63,3 +63,59 @@ printf 'arg=%s\n' "$@"
 exit "${TEST_HOSTED_EXIT:-0}"
 SHIM
 }
+
+# Full installer fixture: every process/service/network operation is local.
+:setup-hosted-install() {
+	:setup-gate
+	TEST_INSTALL_TMP=$(realpath "$(tests:get-tmp-dir)")
+	OM_INSTALL_ROOT="$TEST_INSTALL_TMP/install"
+	XDG_STATE_HOME="$TEST_INSTALL_TMP/state"
+	TEST_SERVICE_LOG="$TEST_INSTALL_TMP/service.log"
+	TEST_GUARD_LOG="$TEST_INSTALL_TMP/guard.log"
+	TEST_PYTHON=$(command -v python3)
+	export TEST_INSTALL_TMP OM_INSTALL_ROOT XDG_STATE_HOME TEST_SERVICE_LOG TEST_GUARD_LOG TEST_PYTHON
+	rm "$OM_TARGET"
+	printf '#!/usr/bin/env bash\necho old-cli\n' >"$TEST_INSTALL_TMP/old-om"
+	chmod +x "$TEST_INSTALL_TMP/old-om"
+	ln -s "$TEST_INSTALL_TMP/old-om" "$OM_TARGET"
+	ln -s "$TEST_INSTALL_TMP/old-om" "$TEST_INSTALL_TMP/bin/om"
+	# shellcheck disable=SC2329
+	uname() { echo Darwin; }
+	# shellcheck disable=SC2329
+	curl() {
+		case "$*" in
+		*healthz*) printf '{"pid":999,"version":"1.2.3"}\n' ;;
+		*rooms/*) echo OM_ROOMS_GUI_DIR ;;
+		*) return 0 ;;
+		esac
+	}
+	# shellcheck disable=SC2329
+	lsof() { return 0; }
+	# shellcheck disable=SC2329
+	sleep() { return 0; }
+	# shellcheck disable=SC2329
+	python3() {
+		if [[ $1 != */watch-check.py ]]; then
+			"$TEST_PYTHON" "$@"
+			return
+		fi
+		printf '%s\n' "$*" >>"$TEST_GUARD_LOG"
+		case "$2" in
+		capture) return "${TEST_CAPTURE_EXIT:-0}" ;;
+		home) printf '%s/accounts/ryan\n' "$TEST_INSTALL_TMP/root" ;;
+		verify) return "${TEST_VERIFY_EXIT:-0}" ;;
+		esac
+	}
+	# shellcheck disable=SC2329
+	bun() {
+		[[ $* == 'run build' ]] || return 0
+		mkdir -p "$OM_MONO/packages/cli/dist"
+		cat >"$OM_MONO/packages/cli/dist/om" <<'BINARY'
+#!/usr/bin/env bash
+if [ "$1" = --version ]; then echo 1.2.3; exit 0; fi
+printf 'binary=%s root=%s account=%s args=%s\n' "$0" "${OM_HOME:-}" "${OM_ACCOUNT:-}" "$*" >>"$TEST_SERVICE_LOG"
+BINARY
+		chmod +x "$OM_MONO/packages/cli/dist/om"
+	}
+	export -f uname curl lsof sleep python3 bun
+}
