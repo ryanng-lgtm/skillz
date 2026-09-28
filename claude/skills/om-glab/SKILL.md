@@ -1,6 +1,7 @@
 ---
 name: om-glab
-description: Build and install the local OM daemon with its /rooms GUI from the GitLab openmarket-chat checkout, linked to openmarket-internal. Alias of om-build hosted mode. Trigger: /om-glab or $om-glab.
+description: >-
+  Build and install the local OM daemon with its /rooms GUI from the GitLab openmarket-chat checkout, linked to openmarket-internal. Alias of om-build hosted mode. Trigger: /om-glab or $om-glab.
 ---
 
 # om-glab
@@ -18,7 +19,7 @@ om-glab --gate   # inspect without installing
 `~/.claude/skills/om-glab/scripts/hosted.sh`. The same skill is available as
 `$om-glab` in Codex and `/om-glab` in Claude.
 
-Defaults: `~/Documents/GitLab/openmarket-chat-gitlab` for the GUI and
+Defaults: `~/Documents/GitLab/om-chat-cloud` for the GitLab GUI and
 `~/Documents/GitLab/openmarket-internal` for the daemon. `OM_GUI` and `OM_MONO`
 override those paths. Resolve and report both source branches, commits and
 dirty state before building; the alias builds their checked-out content and

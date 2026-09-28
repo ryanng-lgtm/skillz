@@ -1,6 +1,6 @@
 :setup-glab
 tests:ensure env -u OM_GUI -u OM_MONO bash "$TEST_GLAB_FIXTURE" --gate
-tests:assert-stdout "GUI=$HOME/Documents/GitLab/openmarket-chat-gitlab"
+tests:assert-stdout "GUI=$HOME/Documents/GitLab/om-chat-cloud"
 tests:assert-stdout "MONO=$HOME/Documents/GitLab/openmarket-internal"
 tests:assert-stdout 'arg=--gate'
 

@@ -7,7 +7,7 @@ set -uo pipefail
 :main() {
 	local script_dir
 	script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")") || return 1
-	export OM_GUI="${OM_GUI:-$HOME/Documents/GitLab/openmarket-chat-gitlab}"
+	export OM_GUI="${OM_GUI:-$HOME/Documents/GitLab/om-chat-cloud}"
 	export OM_MONO="${OM_MONO:-$HOME/Documents/GitLab/openmarket-internal}"
 	exec bash "$script_dir/../../om-build/scripts/hosted.sh" "$@"
 }

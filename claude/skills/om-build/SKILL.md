@@ -1,6 +1,7 @@
 ---
 name: om-build
-description: Use when an OM Chat GUI has to be built from source and put in front of Ryan — the daemon-embedded `/rooms` GUI when `om upgrade` cannot fetch a release (openmarket-releases 404s) or a local change has to reach the running daemon, the hosted `/chat/` cloud fork when it has to be built, validated, and served locally, or the OpenFloor iOS app when the simulator must show exactly the branch checked out in the openmarket-chat-app main worktree. Covers all three targets and the swap onto the live install. Trigger: /om-build [--hosted|--cloud|--mobile] [--no-gui]
+description: >-
+  Use when an OM Chat GUI has to be built from source and put in front of Ryan — the daemon-embedded `/rooms` GUI when `om upgrade` cannot fetch a release (openmarket-releases 404s) or a local change has to reach the running daemon, the hosted `/chat/` cloud fork when it has to be built, validated, and served locally, or the OpenFloor iOS app when the simulator must show exactly the branch checked out in the openmarket-chat-app main worktree. Covers all three targets and the swap onto the live install. Trigger: /om-build [--hosted|--cloud|--mobile] [--no-gui]
 ---
 
 # om-build — build an OM Chat GUI from source
@@ -19,7 +20,7 @@ Ryan's names, which read backwards if you assume "hosted" means the SaaS:
 `/chat/` fork. No flag means `--hosted`.
 
 [`om-glab`](../om-glab/SKILL.md) runs the same hosted workflow with
-`openmarket-chat-gitlab` as its GUI source. `om-build` retains the GitHub
+`om-chat-cloud` as its GUI source. `om-build` retains the GitHub
 `openmarket-chat` default; `OM_GUI` and `OM_MONO` override either source path.
 Both commands install into the same local daemon, so the last successful
 install determines which GUI it serves.
