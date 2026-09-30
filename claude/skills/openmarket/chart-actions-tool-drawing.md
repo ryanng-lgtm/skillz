@@ -64,7 +64,7 @@ for you, so the order you pass them does not matter.
 
 ## `chart_drawing_add` — explicit, role-tagged anchors
 
-Role-tagged anchors, `anchors[].time` in epoch MILLISECONDS; sanity-check anchors in the loaded range, prices within ±10%; text on annotations only.
+Role-tagged anchors, `anchors[].time` in epoch MILLISECONDS; keep anchors in the loaded range, prices within ±10%; text on annotations and lines.
 
 Pass one role-tagged anchor per point the tool needs. Neither surface auto-resolves a live price —
 compute anchors from the current chart state first, and check `chart_drawing_schema` if you're
@@ -189,7 +189,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `metaId` — default "main"
 - `chart_drawing_auto`
   - `normalizedSymbol` — Supply ONE of the three symbol forms, or omit all to use the chart pane's current market.
-  - `lookback` — default "24h"
+  - `lookback` — Omit for 100 bars of the candle interval (at most 365d; 24h when no interval is set or derivable from the pane).
 - `chart_drawing_list`
   - `includeRemoved` — default false
 

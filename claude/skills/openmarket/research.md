@@ -31,11 +31,20 @@ The one-shot default backtest and how to present its results; come here first fo
 
 Research studies answer a narrow question: did accepted rows from one event watch line up with price movement in one chosen asset? Research backtests answer the paired simulation question: if a STRATEGY had traded through that history — its decision input deciding direction, its sizer the weight, its exit config the exits — after costs and latency, what would the account path have done?
 
-An ask that accumulates lots on a signal and takes profit above its cost ("buy $10 every time RSI dips under 25, sell everything 5% above my average") is a `backtest_spec` candidate whose sizer kind is `accumulate` (`cash_per_entry`, `max_lots`), a condition tree as its `source` with `on_true: long`, and `exit.bracket.tp` as the take-profit: it replays on the engine's broker (`fill_policy: engine_broker`), one lot per dip episode, every lot closing together at the take-profit over the average entry; it takes no Polymarket market and does not promote to a watch yet.
+An ask that accumulates lots on a signal and takes profit above its cost ("buy $10 every time RSI dips under 25, sell everything 5% above my average") is a `backtest_spec` candidate whose sizer kind is `accumulate` (`cash_per_entry`, `max_lots`), a condition tree as its `source` with `on_true: long`, and `exit.bracket.tp` as the take-profit: it replays on the engine's broker (`fill_policy: engine_broker`), one lot per dip episode, every lot closing together at the take-profit over the average entry; it takes no Polymarket market and does not promote to a watch yet. A candidate whose `sizer.kind` is absent is a `target` sizer, the one position re-targeted on every view, the kind a watch's strategy step carries.
 
 For "does this roughly make sense" questions, the one-shot verb is the right tool: `backtest_run` takes a saved watch or an installed strategy package, derives the window, interval, venue-realistic costs, and time basis from what is stored, auto-backfills sparse news history through the real classifier (budgeted, resumable), and reports every derived choice next to the result. It renders a benchmark comparison (buy-and-hold) so the user can eyeball the answer. Everything below — explicit windows, event filters, sweeps, cost models — is the full-control surface for when the user wants a SPECIFIC configuration, a parameter comparison, or a study rather than a simulation.
 
 A freshly created watch or strategy step is backtested when the user asks, never as a closing offer on the create and never unprompted on money-moving surfaces. When the result comes back, present the return against the buy-and-hold benchmark and the one honesty note that changes the reading, never the raw number alone; a `backtest_no_history` result carries its real next step (arm the watch, paper mode, deeper backfill) instead of invented data.
+
+**What a result owes, beside the return.**
+
+- The window replayed: `window` caps at 365 days ending at `until` (default now); omitted, a run looks back 90 days on an event-anchored replay, a year on HOUR and coarser bars, a month on finer ones. Beyond what the data plan serves, `backtest_run` narrows to what it serves and reports it as `window_clamped`; `backtest_spec` refuses.
+- The interval, and why: a condition candidate folds on its primary operand's own cadence (live parity); an event-anchored run takes the window's rung; an explicit interval that diverges warns `cadence_mismatch`, and none is ever coarser than an explicit hold.
+- The in-market share: `time_in_market_pct`, a fraction, beside the trade count; about two bars per trade is a sign the rule encoded a trigger, not a regime, whatever the return says.
+- No short margin on a watch-strategy replay: adverse shorts ride to the window edge un-liquidated (`short_margin_unmodeled` in `warnings`), and leverage above 1 refuses (§"Warnings and limits"); a package replay runs on the engine's broker, which on a perps package (`instrument: "perps"`) models the declared leverage and liquidation and warns when one fired, and on a spot package ignores leverage.
+
+The style an ask names, and the door it opens, is `strategy.md`'s menu; this file owns the form each door replays.
 
 **One result shape, from every door.** `backtest_run`, `backtest_spec`, `backtest_sweep` and `backtest_news` answer `{kind, choices, report, warnings, …}` — apart from the `backtest_no_history` arm above, which carries none of it: `kind` names the tool, `choices` is what the run RESOLVED for every knob it was not given (window, interval, costs, latency, cash; hold and time basis on the occurrence-anchored lanes) and is the handle for reproducing or re-running it, `report` is the replay itself (the sweep carries `variants[]` instead, news adds its `study`), and `warnings` is the ONE honesty channel — every disclosure the run raised, the report's and the tool's together. Never read `report.warnings`; it is not there. A run also names the file it saved itself to (`report_path`), and `backtest_report` reads that file back a section at a time (`summary`, `trades`, `fills`, `equity_curve`, `events`, a sweep's `variants`), which is where the per-bar curve and the trade rows live — the result you are handed is the compact summary.
 
@@ -159,6 +168,14 @@ om backtest spec \
 Backtest an unsaved candidate and promote a winner: the {strategy, source?, watch?, fixed_view?} file shape (exactly one decision input) and its mapping to watch sources and steps.
 
 A registry strategy template is the marketplace funnel's business: `backtest_run` — its default next step — backtests the tuned template candidate and mints its install token; bring one here only for manual replay knobs.
+
+| Strategy input | Shape, in one line | Replays on |
+| --- | --- | --- |
+| `fixed_view` | `{direction: 1, -1 or 0, conviction}` beside `strategy`; `--watch` anchors entries to a feed's accepted rows | occurrences |
+| `source` | the condition source `watch_create` authors, the strategy naming `on_true` / `on_false` for the sides its level maps to | the operands' own bar cadence, `eval: closed` |
+| a band `source` | `{long: {enter, exit}, short: {enter, exit}}`; it names its own sides, so no `on_true` / `on_false`, beside a sizer that can flatten | bars, as a tree source |
+| `watch` | `{source: <feed watch slug>, ai_step: {prompt, output: {type: "verdict"}}}`, the step `watch_action_add` authors | the feed's accepted rows (`--from` / `--until`, `--hold`) |
+| an installed package | `wrun_strategy: "@scope/name"` with `params` by declared name: the target on `backtest_run`, in place of a candidate on `backtest_spec` | the window's bars on the engine's broker |
 
 To simulate a hold-after-event strategy over the same occurrence set, use `om backtest spec` with a strategy source. There is no strategy-less lane: prescribe the trade-intent explicitly — an inline candidate carrying a `fixed_view` (direction 1, -1 or 0, conviction as the weight) reproduces the classic hold-after-event run without saving anything. Prefer compact JSON for agent summaries unless the user needs the full fill/equity artifact.
 

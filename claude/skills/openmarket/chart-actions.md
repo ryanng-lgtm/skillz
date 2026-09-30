@@ -52,7 +52,7 @@ Quick routing — the common asks, each row a recipe (tool + the decisions to ma
 | Ask | Recipe |
 | --- | --- |
 | "show me BTC" / "open a chart" | `chart_create` — scratch, no name; default the market like a price ask (BTC/ETH/SOL → Binance spot, 1h); say "temporary, 48h — say keep to make it permanent". |
-| "add RSI and the 200 EMA" | one `chart_indicator_add` per indicator on the active chart (omit the workspace id); defaults RSI 14, EMA 200 — state them. |
+| "add RSI and the 200 EMA" | one `chart_indicator_add` per indicator on the active chart (omit the workspace id), `rsi` then `ema` with `{"period": 200}`; each draws as om's own series in its sheet's pane; defaults RSI 14, EMA 20 — state them. |
 | "screenshot it" / "how does it look" | `chart_screenshot` on the active chart. |
 | "2x2 with BTC, ETH, SOL, DOGE" | `chart_layout` FIRST (2x2 = mode `4`), then one `chart_symbol` per pane whose target differs; `NO_CHANGE` = done, never re-issue. |
 | "show me the top 16 by volume" / "a 3x3 of the majors" (more than 4 charts) | ONE `chart_grid` (up to `4x4`), markets row-major in `symbols`. Never a `chart_layout` plus a run of `chart_symbol` calls. |
@@ -62,6 +62,7 @@ Quick routing — the common asks, each row a recipe (tool + the decisions to ma
 | "plot / place @scope/name (or my watch) on a chart" as a layer | `chart_layers` when the home's `charts.layers` setting is on (the default): `refs` plus `here: true`, `workspace: <id>` or `market: EXCHANGE:SYMBOL`; a watch of the user's is shared privately first: the card says so and supplies `yes` (never set it yourself), and `dry_run: true` previews the share. `chart_pins` when the setting is off. |
 | "what's on my chart?" | `chart_refresh` with the workspace id omitted — never answered from `chart_list`. |
 | "plot watch readings" | `chart_series_push`; read §"Numeric series" or §"Chart targets" for a main plot. |
+| "make a watchlist of …", "add SOL to my watchlist", "what's on my watchlist?" | The app's own watchlists: `watchlist_list` for the ids, `watchlist_create`, `watchlist_add_symbols` (refs `EXCHANGE:SYMBOL` off a `markets` row or `symbol_resolve`; an unknown ref is refused with candidates), `watchlist_get`. Never build a panel instead, and never call a panel a watchlist. |
 | "show a table or comparison beside the chart" | `chart_panel_push`; read §"Panels". |
 | "show a book, feed or timer" | `chart_widget_push`; read §"Widgets". |
 | "show this market scan" | `chart_scan_push`: complete snapshots for live viewers; read §"Scan". |
@@ -238,10 +239,11 @@ When `role` is `HOST`/`CO_HOST` (or absent — your own workspace), chart action
 
 ## Numeric series
 
-Use `chart_series_push` for numeric history, price levels or a compact inset; a watch source keeps the plot updated from committed readings.
+Use `chart_series_push` for numeric history, price levels or a compact inset; a watch source keeps the plot updated from committed readings, a metric source as each bar closes.
 
 `om chart series push` takes one source: `--watch <slug> --key <key>`, `--metric <metric>`, or `--times <json> --values <json>`.
 Use `--id` to replace the same plot and `--clear` to remove it. Watch publication needs the `series_watch_follow` effect in chat.
+A metric source reads the pane's market and interval unless `selector` is given, and the daemon follows it: a forming series is recomputed as each new bar of that interval opens and keeps reading the forming bar; `--bar closed` (action: `source.bar: "closed"`) makes the newest row the last closed bar, the value an alert rule reads, recomputed as each bar closes, which is what a stock indicator add uses.
 
 | Plot | Flags and input |
 | --- | --- |
@@ -475,7 +477,7 @@ action).
 
 ## Indicators
 
-Add, remove (by `indicatorType` or `everyIndicator`), update, list; RSI/MACD/EMA, every registry native, Indicator ids (`wrun/`), `409 NO_CHANGE`, `VALIDATION`, defaults.
+Add (a stock name draws as om's own series), remove, update, list; every registry native, Indicator ids, `NO_CHANGE`, `VALIDATION`, defaults, the alert round trip.
 
 Several indicators = ONE `chart_indicator_remove` call with `ids` on one pane (`om chart indicator remove --id a --id b`): one card lists every member (type, pane), an overlay the daemon reports already gone is an unchanged row, and a member that fails never voids the others.
 
@@ -494,11 +496,14 @@ type from the local registry — canonical key, display name, placement
 whenever the user names an indicator you cannot map to an `indicatorType`; do not
 guess. It needs no daemon.
 
-**Indicator type normalization.** On `chart_indicator_add`, the `indicatorType` you pass is normalized before it is sent (`chart_indicator_remove` forwards yours verbatim and the server matches). Both shorthand (`RSI`, `liquidations`, `funding`) and canonical (`TECHNICAL_SCRIPT`, `LIQUIDATIONS`, `AGGREGATED_FUNDING_RATE`) forms work:
+**A stock indicator is om's own series.** A stock indicator name (`rsi`, `ema`, `macd`, `bb_upper`, `stoch_k`, … the `metric_list` indicator rows, any case) or its output id (`wrun/@om-core/rsi/rsi`) does not mount a chart script: om computes the pack's output for the pane's market and interval and pushes it as a followed series (a `set_series` frame, one series per output, id `rsi` or `rsi-21` when the params leave the defaults, `adx-plusdi` for an output with no name of its own (`wrun/@om-core/adx/plusDi`), lowercase throughout, title `RSI(14)`) in the pane the sheet declares (`lower` for RSI, `overlay` for EMA). The newest row is the last CLOSED bar, the value an alert rule reads, and the daemon recomputes the tail as each bar of the pane's interval closes, so the line keeps moving after the add and the chart's RSI and an alert's RSI are one number. A sheet name that draws several outputs (`bb`, `stoch`, `ichimoku`, `adx`, `rolling`) is refused naming them: add one output per call. The series is not an overlay: `chart_indicator_remove` and `chart_indicator_update` never reach it; remove it with `chart_series_push` `clear: true` and its `series.id` (`om chart series push --id rsi --clear`), and a re-add with other params is a second series (`rsi-21`) beside the first unless you clear the first. A stock name whose sheet declares a bindable input (`zscore`, `wma`, `sma`, `ema`, each reading close unless bound) takes `sourceBindings` on the add: `{ "close": { "source": "oi", "field": "close" } }` (or `{ "close": { "metric": "open_interest" } }`, the feed's own name) draws the z-score of open interest as its own series (id `zscore-oi.close-<digest>`, title `Z-Score(20) of oi.close`; a later clear takes the id from the reply's `series.id`), `{ "close": { "metric": "rsi" } }` the z-score of RSI (`zscore-of-rsi-<digest>`); the reply's `series` block echoes the bindings, and an alert on that number carries the same `sourceBindings` on its operand. Bindings on any other indicator type are refused (the hosted overlay carries none), and the hosted chart endpoint takes no `sourceBindings` at all: it has no series lane, so a stock name there draws the chart's own script. The chart's own built-in script is reachable only by the explicit form, `indicatorType: "TECHNICAL_SCRIPT"` with `subType`; a bare script name that is not a stock name (`supertrend`) is refused before anything is sent.
+
+**Indicator type normalization.** On `chart_indicator_add`, the `indicatorType` you pass is normalized before it is sent (`chart_indicator_remove` forwards yours verbatim and the server matches). Both shorthand (`rsi`, `liquidations`, `funding`) and canonical (`TECHNICAL_SCRIPT`, `LIQUIDATIONS`, `AGGREGATED_FUNDING_RATE`) forms work:
 
 | User-friendly input | Normalized to | Notes |
 | --- | --- | --- |
-| `RSI`, `MACD`, `EMA`, `SMA`, `BB`, `ATR`, `ADX`, `CCI`, `Stoch`, `OBV`, `MFI`, `Ichimoku`, `Supertrend`, … (the registry lists 15; other standard script names pass through) | `TECHNICAL_SCRIPT` + `settings.subType: '<NAME>'` | Standard chart-engine script indicators. Free tier. |
+| `rsi`, `sma`, `ema`, `atr`, `volume_sma`, `rolling_high`, `rolling_low`, `stoch_k`, `stoch_d`, `macd`, `macd_signal`, `macd_histogram`, `bb_upper`, `bb_middle`, `bb_lower`, `bb_width`, `wma`, `zscore` (any case), or `wrun/@om-core/<sheet>/<output>` | om's own followed series (`set_series`), in the sheet's pane | The stock pack, computed by om; the reply's `series` block carries the alert operand. |
+| `TECHNICAL_SCRIPT` + `subType` (`RSI`, `EMA`, `SMA`, `BOLLINGER_BANDS`, `MACD`, `ICHI_CLOUD`, `STOCH`, `CCI`, `MFI`, `OBV`, `ADL`, `ADX`, `PSAR`, `VOLUME_BUBBLES`, `VOLUME_BAR`) | `TECHNICAL_SCRIPT` + `settings.subType: '<KEY>'` | The chart's own built-in script, explicit form only; its numbers are the chart's, not the alert engine's. |
 | `liquidations` / `Liquidations` | `LIQUIDATIONS` | Basic liquidations indicator — free tier, any exchange. |
 | `aggregated_liquidations` | `AGGREGATED_LIQUIDATIONS` | Aggregated across exchanges. |
 | `hyperliquid_liquidations` / `liquidation_heatmap` | `HYPERLIQUID_LIQUIDATION_HEATMAP` | **Plus tier only.** |
@@ -517,9 +522,9 @@ For Plus-gated types on a non-Plus account, the server returns `403 TIER_FEATURE
 
 **Indicator packages with cross-symbol pinned input sources stay off charts for now.** A `wrun/@scope/name/output` add whose package pins a NON-odds feed source to a fixed `symbol`+`exchange` (a cross-symbol reference leg) is UNVERIFIED on the hosted chart lane (the chart backend computes with its own data path); when you KNOW a package carries such a pin (you authored it this session, or its listing says so), decline the add, say why, and offer the metric via alerts/`metric get` instead. Odds-pinned packages (conditionId markets) chart as they always have, and a package you cannot inspect is not grounds for refusal.
 
-**Parameter names come from the catalogue, not from memory.** `chart_indicator_list` lists every Indicator package output this machine carries in `packages[]` (`id`, `params`, `placement`), the same rows `metric_list` gives under the indicator names. A package installed from the registry goes on a chart by that id with those keys (`indicatorType: "wrun/@acme/momentum/fast"` with `{"period": 14}`). The pack embedded in the binary is not published to the registry yet, so the hosted chart cannot compute it: an add by a stock id (`wrun/@om-core/rsi/rsi`) is refused as unpublished, and a stock indicator (RSI, MACD, EMA, SMA, Bollinger Bands, Stochastic, …) goes on by the chart's own script subtype (`RSI`, `MACD`, `EMA`, `BB`, …) with the keys the chart's script declares, not the sheet's: RSI(14) is `indicatorType: "RSI"` with `{"period": 14}`; a key the script does not take is dropped server-side and echoed in `warnings`. A name in a watch rule (`rsi`) is the pack's output, not the chart's script, so a chart script beside a rule may differ in rounding or defaults; say so when the user asks the chart to mirror a rule.
+**Parameter names come from the catalogue, not from memory.** `chart_indicator_list` lists every Indicator package output this machine carries in `packages[]` (`id`, `params`, `placement`), the same rows `metric_list` gives under the indicator names. A stock name takes exactly its `metric_list` row's keys (`rsi`: `period`; `macd`: `fast`, `slow`, `signal`; `stoch_k`: `period`, `smoothing`) with that row's defaults filled in, and any other key, or a non-numeric value, is refused by name before anything is sent, so RSI(14) is `indicatorType: "rsi"` with `{"period": 14}`. A package installed from the registry goes on a chart by that id with those keys (`indicatorType: "wrun/@acme/momentum/fast"` with `{"period": 14}`), mounted as the hosted overlay. On the hosted chart endpoint, which has no series lane, a stock name still mounts the chart's own script; its keys are the script's and a key it does not take is dropped server-side and echoed in `warnings`.
 
-**Every registry native is addable.** The script subtypes above cover the stock indicators only; ALL ~80 registry types (`chart_indicator_list`) work as `indicatorType` values — exact keys win over aliases, any casing accepted. A handful of interaction-only overlay types are excluded from the agent path and rejected with a clear error. If the user names an indicator not in the list output, submit anyway — an unsupported type is rejected either way: the normalizer throws before the call goes out, and the server returns a `VALIDATION` error. Do not silently substitute.
+**Every registry native is addable.** Beyond the stock names and the explicit script form, ALL ~80 registry types (`chart_indicator_list`) work as `indicatorType` values — exact keys win over aliases, any casing accepted. A handful of interaction-only overlay types are excluded from the agent path and rejected with a clear error. If the user names an indicator not in the list output, submit anyway — an unsupported type is rejected either way: the normalizer throws before the call goes out, and the server returns a `VALIDATION` error. Do not silently substitute.
 
 **Minimal params contract.** Send only the settings the user explicitly asked to change (period, funding interval, value area, ...). The chart fills every other default client-side — theme colors, widths, market identity from chart context. Do NOT invent colors or cosmetic settings unless asked. Setting keys outside the shared whitelist are dropped server-side and echoed back in the response `warnings` field — if a key you sent shows up there, it was ignored, not applied; tell the user rather than retrying blindly.
 
@@ -555,15 +560,30 @@ Five-step flow:
 
 4. **If params aren't named, use the catalogue's defaults** (the `metric_list` row's values: RSI 14, MACD 12/26/9, EMA 20, BB 20/2) and name them in the outcome line. Param choice is not one of the persona's allowed questions; the user's next message changes it.
 
-5. **Execute** `chart_indicator_add` — no preview, no confirmation; chart mutations on the agent's own canvas dispatch immediately. Worked call for RSI(14) on the active chart, by the chart's script subtype:
+5. **Execute** `chart_indicator_add` — no preview, no confirmation; chart mutations on the agent's own canvas dispatch immediately. Worked call for RSI(14) on the active chart:
 
 ```jsonc
-chart_indicator_add { "chartIndex": 0, "indicatorType": "RSI", "settings": { "period": 14 } }
+chart_indicator_add { "chartIndex": 0, "indicatorType": "rsi", "settings": { "period": 14 } }
 ```
 
-   - On `ok: true` → *"Added RSI(14) to chart 0 — version `<N>`."*
+   - On `ok: true` with a `series` block → *"Drew RSI(14) on chart 0 as om's own series in the lower pane — last closed bar `<series.last>`."* The block also carries `metric`, `params` and `selector` (the alert operand), `barOpenSec` and `barCloseSec` (the open and close instants of the bar the last value reads), and `note`.
+   - On `ok: true` without one (a native, a package, the explicit script form) → *"Added <type> to chart 0 — version `<N>`."*
+   - On `code: "indicator_param_unknown"` → relay the refusal; it names the keys the sheet takes. On `"indicator_param_invalid"` → relay it; it names the offending key and the rule it broke.
+   - On `code: "indicator_output_ambiguous"` → a sheet with several outputs; name them and add the one the user meant (or each, one call apiece).
    - On `code: "VALIDATION"` → surface the server detail verbatim; most often an unsupported `indicatorType`.
    - On `code: "FORBIDDEN"` → *"The API key doesn't own this workspace. Pick one from `chart_list`."*
+
+### User asks to alert on what is on the chart
+
+"Alert me when this RSI crosses 70" is one `watch_create` with a condition source: the add reply's `series.metric`, `series.params` and `series.selector` are the rule's metric leaf as is, and the source carries `eval: "closed"`, because the series draws the last closed bar while a condition left at its default reads the forming bar and would fire intrabar on a value the chart never shows. When the add's reply is not in the conversation, the params are the ones the series was added with, never the catalogue defaults: a series id or on-chart title the user or an earlier turn reports names them (`rsi` and `RSI(14)` are the defaults, `rsi-21` and `RSI(21)` are `period: 21`; the values follow the name's `metric_list` param order, so `macd-8-26-9` is `fast: 8, slow: 26, signal: 9`); when neither is known, ask which one rather than guess. The market and interval are the pane's (`chart_refresh`). `eval: "closed"` cannot pair with `latency_class: "fast"` or a `goal`; both are refused.
+
+```jsonc
+watch_create { "source": { "kind": "condition", "eval": "closed", "condition": { "metric": "rsi", "params": { "period": 14 }, "selector": { "symbol": "BTCUSDT", "exchange": "BINANCE_FUTURES", "interval": "HOUR" }, "op": "gt", "value": 70 } }, ... }
+```
+
+### User asks to chart a watch
+
+"Show me what this alert watches" is one `chart_indicator_add` per stock operand of the rule (its `metric`, `params`, `sourceBindings` when the operand carries them, and `selector`, the pane set to the selector's market and interval first), and one `chart_series_push` with a metric source and `bar: "closed"` for an operand that is not a stock name (a feed metric such as `funding_rate`, another package's output). Each lands as om's own followed series, so the chart shows exactly what the rule reads; the rule's readings themselves (its fires) are `chart_series_push` with a watch source, or `chart_pins`. A watch whose condition source is not `eval: "closed"` reads the forming bar, one bar ahead of the closed-bar series: say so, or set it to `closed` when the user wants the chart and the alert to agree.
 
 ## Drawings
 
@@ -857,6 +877,7 @@ What a reply must carry from each result-bearing action here; the per-branch gui
   - on `TIER_LIMIT_EXCEEDED` — TIER_LIMIT_EXCEEDED means this account's plan does not include a layout of that size: say so plainly, name the limit and requested size from the detail, and do not retry or fall back to another layout unasked.
   - on `TIMEOUT` — The call dropped or timed out, so the outcome is UNKNOWN and the grid may already be up. Do not check with a chart read, which may not show it yet: send the SAME call once more. It is safe to repeat, and `changed: false` then means it had already landed.
   - on `TRANSPORT` — The call dropped or timed out, so the outcome is UNKNOWN and the grid may already be up. Do not check with a chart read, which may not show it yet: send the SAME call once more. It is safe to repeat, and `changed: false` then means it had already landed.
+  - on `unknown_market` — The pair was refused before anything was sent: the exchange lists this asset under another symbol. Relay the candidates in `details.candidates` (each names the exact exchange and symbol to send) or resolve the asset's name with symbol_resolve; never retry the same pair.
 - `chart_indicator_add`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
   - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
@@ -876,12 +897,13 @@ What a reply must carry from each result-bearing action here; the per-branch gui
   - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
   - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_keep`
-  - discloses `disclosures[]` — Guard notes the keep proceeded under: market notes (the rename-in-place path discloses a pane-vs-pins mismatch or several recorded markets instead of refusing, and both paths disclose venue-spelling differences, stale or unreadable pane reads, and unparsable pin markets), a template note when a clone was seeded from defaults, and a warning when the name matches a workspace id only this machine's ledger still knows. Relay them.
+  - discloses `disclosures[]` — Guard notes the keep proceeded under: market notes (the rename-in-place path discloses a pane-vs-pins mismatch or several recorded markets instead of refusing, and both paths disclose venue-spelling differences, stale or unreadable pane reads, and unparsable pin markets), a template note when a clone was seeded from defaults, a warning when the name matches a workspace id only this machine's ledger still knows, and a note when the chart is kept but the relay could not apply the name. Relay them.
 - `chart_layout`
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
   - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
   - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_plot_type`
+  - on `MULTIMODE_UNSUPPORTED` — MULTIMODE_UNSUPPORTED: this workspace shows a monitor grid, where only crosshair sync applies and plot type and drawings are refused; nothing changed. chart_layout (a standard 1 to 4 pane shape) replaces the grid, after which the call can be resent; that removes the user's grid, so ask first.
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
   - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
   - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
@@ -889,7 +911,9 @@ What a reply must carry from each result-bearing action here; the per-branch gui
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
   - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
   - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `unknown_market` — The pair was refused before anything was sent: the exchange lists this asset under another symbol. Relay the candidates in `details.candidates` (each names the exact exchange and symbol to send) or resolve the asset's name with symbol_resolve; never retry the same pair.
 - `chart_sync`
+  - on `MULTIMODE_UNSUPPORTED` — MULTIMODE_UNSUPPORTED: this workspace shows a monitor grid, where only crosshair sync applies and plot type and drawings are refused; nothing changed. chart_layout (a standard 1 to 4 pane shape) replaces the grid, after which the call can be resent; that removes the user's grid, so ask first.
   - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
   - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
   - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
@@ -910,7 +934,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart delete` (action: `chart_delete`) — PERMANENTLY delete chart workspaces (REST direct through the collab gateway).
 - `om chart events` (action: `chart_events`) — Recent edits on the live session, oldest first, split by author.
 - `om chart grid` (action: `chart_grid`) — Open or reshape a grid of up to 16 charts (4x4) in the workspace's layout and set each cell's market, in ONE call.
-- `om chart indicator add` (action: `chart_indicator_add`) — Add a technical indicator, an Indicator package, or a registry kScript (legacy) indicator (RSI, MACD, EMA, LIQUIDATIONS, wrun/@scope/name/output, @scope/name, ...) to a chart pane.
+- `om chart indicator add` (action: `chart_indicator_add`) — Add an indicator to a chart pane; a stock indicator name (rsi, ema, macd, bb_upper, ...) draws as om's own series, the number an alert rule reads.
 - `om chart indicator list` (action: `chart_indicator_list`) — List every indicator type addable via `chart_indicator_add`: native types, script subtypes, and in `packages` the Indicator package outputs this machine carries by metric id.
 - `om chart indicator preview` (action: `chart_indicator_preview`) — Draw a LOCALLY COMPUTED Indicator output on a chart pane as a PREVIEW line (draft lane: works for unpublished packages installed via `om indicator install`).
 - `om chart indicator remove` (action: `chart_indicator_remove`) — Remove indicator overlays from a chart pane.
@@ -930,9 +954,9 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart screenshot` (action: `chart_screenshot`) — Render a PNG snapshot of a workspace by short id or share-link URL.
 - `om chart select` (action: `chart_workspace_select`) — Make a workspace the ACTIVE one: the live bridge repoints to it, it becomes the saved default, and every later chart action with `workspaceId` omitted lands on it (exactly what the TUI `/workspace` command does).
 - `om chart series push` (action: `chart_series_push`) — Plot numeric history from watch readings, installed series, metrics or supplied rows, plus custom labeled price levels with a bar height cap.
-- `om chart show` (action: `chart_show`) — Read a workspace's content (symbol, interval, indicators, drawings, layout) by its short id or share-link URL, WITHOUT joining a live session.
-- `om chart status` (action: `chart_status`) — Report the collab bridge's WS state, peerId, and pending intent counts for every active workspace.
-- `om chart symbol` (action: `chart_symbol`) — Change a chart pane's symbol (e.g. BTCUSDT on BINANCE_FUTURES → ETHUSDT on BINANCE_FUTURES).
+- `om chart show` (action: `chart_show`) — Read a workspace's content (symbol, interval, indicators, drawings, layout, and whether it shows a monitor grid) by its short id or share-link URL, WITHOUT joining a live session.
+- `om chart status` (action: `chart_status`) — Report the collab bridge's WS state, peerId, and pending intent counts for every active workspace, plus `panes`: what the human's tab last reported per pane (its market key `transformations` and `loadState` loaded / empty / error with `rowCount` and the held range), the way to tell whether a market on the chart actually has data.
+- `om chart symbol` (action: `chart_symbol`) — Change a chart pane's symbol (e.g. BTCUSDT on BINANCE_FUTURES → ETHUSDT on BINANCE_FUTURES, or AAPL/USD on POLYGON).
 - `om chart sync` (action: `chart_sync`) — Toggle a multi-chart sync setting: symbol / interval / crosshair.
 - `om chart view` (action: `chart_view`) — Set the visible time range on a chart pane (SET_VISIBLE_RANGE — ephemeral, no persist).
 - `om chart widget push` (action: `chart_widget_push`) — Show a card, orderbook ladder, event feed, progress meter or drawings (lines, boxes, labels, polylines and markers) on a chart.

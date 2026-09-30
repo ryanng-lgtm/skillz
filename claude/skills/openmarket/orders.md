@@ -464,6 +464,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `dex` — Omit it to read the canonical DEX and every HIP-3 DEX together — each account endpoint answers for one DEX alone, so an omitted scope is the only way to see HIP-3 state.
 - `market_resolve`
   - `venue` — Omit to search every execution venue.
+  - `include_closed` — default false — Off by default: a closed market is dropped unless the phrase names it exactly (condition id, slug or question), and every row says `closed`.
   - `limit` — Maximum candidates to return (default 8).
 - `order_batch_modify`
   - `dex` — Omit it to search the canonical DEX and every HIP-3 DEX; each entry is signed against the DEX its order rests on.
