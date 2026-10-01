@@ -25,6 +25,19 @@ Rule of thumb: compress the scaffolding, not the delivery.
 
 If you (or a subagent) produce **2 bugs of the same class** or take **more than 3 iterations** on one problem, **STOP. Do not apply a 4th patch.** The mental model or architecture is wrong — step back, re-derive the model from the actual code/behavior, and say so, instead of patching again.
 
+## Model, effort, and sessions — all projects
+
+Same guidance as the Claude setup, mapped to Codex models and commands.
+
+- Use medium reasoning effort for well-scoped daily work.
+- Give the model a way to check its work, and start changes that span files in plan mode.
+- When medium stalls, raise effort to high. If the provider or gateway would drop the cache on a change, make it at a break.
+- If xhigh hits the same problem twice, switch to the strongest available model. Switch back once it's solved.
+- Put search and log-reading subagents on a smaller, cheaper model. Keep code edits on the main model.
+- Keep a long session moving so its cache stays warm.
+- Start a fresh session between unrelated tasks, and `/compact` at a break with a note on what to keep.
+- The one that matters most: run one real task on each model and compare the reported token usage. My own numbers are the ones to trust.
+
 ## Subagent cap — all projects
 
 When a task fans out to subagents or parallel agents: **5 agents maximum per task, STRICTLY.** Count every agent the plan can spawn (loops and per-item fan-outs included) and design under the cap — prefer fewer, broader agents (one critic with multiple lenses, not one per lens). If a task seems to need more than 5, shrink the design or ask me first. If subagents are not available in this session, run the roles sequentially in the main thread instead of skipping them.

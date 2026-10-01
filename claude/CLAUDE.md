@@ -23,6 +23,17 @@ Rule of thumb: compress the scaffolding, not the delivery.
 
 If you (or a subagent) produce **2 bugs of the same class** or take **more than 3 iterations** on one problem, **STOP. Do not apply a 4th patch.** The mental model or architecture is wrong — step back, re-derive the model from the actual code/behavior, and say so, instead of patching again.
 
+## Model, effort, and sessions — all projects
+
+- Use medium effort for well-scoped daily work.
+- Give the model a way to check its work, and start changes that span files in plan mode.
+- When medium stalls, raise effort to high. With an API key or a subscription the change keeps the cache. On a cloud provider or gateway, change it at a break.
+- If xhigh hits the same problem twice, switch to Fable 5.1. Switch back to Opus 5.5 once it's solved.
+- Put search and log-reading subagents on Sonnet or Haiku. Keep code edits on Opus 5.5.
+- Keep a long session moving so its cache stays warm.
+- Use `/clear` between unrelated tasks, and `/compact` at a break with a note on what to keep.
+- The one that matters most: run one real task on each model and compare what `/usage` reports. My own numbers are the ones to trust.
+
 ## Workflow agent cap — all projects
 
 If the Workflow tool is used (including under ultracode): **5 agents maximum per workflow run, STRICTLY.** Count every `agent()` call the script can make (loops and per-item pipelines included) and design under the cap — prefer fewer, broader agents (one critic with multiple lenses, not one per lens). If a task seems to need more than 5, shrink the design or ask me first.
