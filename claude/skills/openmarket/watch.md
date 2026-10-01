@@ -754,7 +754,7 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 - `watch_import`
   - discloses `status` — The watch's status after this call, the sentence every surface prints: `working`, `paused`, or `<part> <state> · <why>` (for example `steps waiting for your OK · you changed them`).
 - `watch_pause`
-  - discloses `held_position` — The strategy step's position nothing manages, with the note to relay: on a pause, what it walks away from; on a resume, what a step still off with no auto-pause marker holds until its chain is armed. Null when flat, when the watch carries no strategy step, when the resume returns the step to operation, or when the still-off step keeps the daemon's marker (its managed exits still run).
+  - discloses `held_position` — The position step's position nothing manages, with the note to relay: on a pause, what it walks away from; on a resume, what a step still off with no auto-pause marker holds until its chain is armed. Null when flat, when the watch carries no position step, when the resume returns the step to operation, or when the still-off step keeps the daemon's marker (its managed exits still run).
   - discloses `held_position_error` — Null when the read succeeded; a string names why it failed, never nothing at risk.
 - `watch_repair`
   - discloses `status` — The watch's status after the repair, the sentence every surface prints: `working`, `paused`, or `<part> <state> · <why>`.
@@ -762,7 +762,7 @@ What a reply must carry from each result-bearing action here; the per-branch gui
   - discloses `refused` — Every file left byte for byte: a file a newer om wrote (fix: om upgrade), another copy's (fix: remove the watch), a watch file no lenient read can mend (fix: remove it).
 - `watch_resume`
   - discloses `status` — The watch's status after this call, the sentence every surface prints: `working`, `paused`, or `<part> <state> · <why>` (for example `steps waiting for your OK · you changed them`).
-  - discloses `held_position` — The strategy step's position nothing manages, with the note to relay: on a pause, what it walks away from; on a resume, what a step still off with no auto-pause marker holds until its chain is armed. Null when flat, when the watch carries no strategy step, when the resume returns the step to operation, or when the still-off step keeps the daemon's marker (its managed exits still run).
+  - discloses `held_position` — The position step's position nothing manages, with the note to relay: on a pause, what it walks away from; on a resume, what a step still off with no auto-pause marker holds until its chain is armed. Null when flat, when the watch carries no position step, when the resume returns the step to operation, or when the still-off step keeps the daemon's marker (its managed exits still run).
   - discloses `held_position_error` — Null when the read succeeded; a string names why it failed, never nothing at risk.
 - `watch_retry`
   - discloses `status` — The watch's status after the retry, the sentence every surface prints: `working`, `paused`, or `<part> <state> · <why>`.

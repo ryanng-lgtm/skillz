@@ -167,16 +167,23 @@ For replies and files, use the autonomous rung the operator authorized:
   service-side read refusal rather than fetching the attachment URL through
   another path.
 
-The first posting attempt, or the first `room_grant_request` that asks
-for `post`, `post_as_you`, or an arm window, may return `canary_pending`:
-retry that same call once, taking no local action. If posting reports
-auto-approved powers or filesystem hands, posting stays locked for this
-session (and a voice knock raises no consent card) unless the operator
-turns the badge's yolo dial (`om agent policy set <badge> --yolo
-draft|allow`); keep drafting instead. `session_grants` shows the doors
-before you act (`doors`: transport, harness sniff, canary, yolo dial). A
-`draft` dial answers a post with `{posted: false, degraded: "draft"}`: the
-text is in the operator's composer, never claim it was posted.
+`session_grants` shows the local transport and this badge's posting
+policy before you act. Every `room_post`, `room_post_as_operator`, and
+voice knock follows that policy after the stdio and grant checks:
+`block` refuses (and a voice knock raises no consent card), `draft`
+stages text in the operator's composer, and `allow` can post where a
+grant or arm permits. The operator changes it with `om agent policy set
+<badge> --posting-policy block|draft|allow`. A `draft` result has
+`{posted: false, degraded: "draft"}`; never claim it was posted. Reply
+targets cannot be preserved in staged drafts and receive a typed refusal;
+attachments are reported as omitted.
+
+After the person explicitly chooses **Share with agent** on an edited
+staged draft in the local `/rooms/` composer, call `room_draft_review_get`
+with its exact `draftId` to read the latest shared revision. Ordinary
+composer edits are private. A later edit stays private until the person
+shares again. Sending or dismissing the draft, losing its read grant, or
+badge revocation closes the review read.
 
 ## Conduct
 
