@@ -189,8 +189,9 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `metaId` — default "main"
 - `chart_drawing_auto`
   - `normalizedSymbol` — Supply ONE of the three symbol forms, or omit all to use the chart pane's current market.
-  - `lookback` — Omit for 100 bars of the candle interval (at most 365d; 24h when no interval is set or derivable from the pane).
+  - `lookback` — Omit for 100 bars of the candle interval (at most 364d; 24h when no interval is set or derivable from the pane).
 - `chart_drawing_list`
+  - `chartIndex` — Omit to list every pane.
   - `includeRemoved` — default false
 
 <!-- AUTO: END ARGUMENT CONTRACT -->
@@ -202,17 +203,14 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 What a reply must carry from each result-bearing action here; the per-branch guidance itself rides on the tool result.
 
 - `chart_drawing_add`
-  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
-  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
-  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TIMEOUT` — The connection to the chart service dropped or timed out with this change in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The connection to the chart service dropped or timed out with this change in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_drawing_auto`
-  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
-  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
-  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TIMEOUT` — The connection to the chart service dropped or timed out with this change in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The connection to the chart service dropped or timed out with this change in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 - `chart_drawing_remove`
-  - on `NO_CHANGE` — NO_CHANGE is a no-op, not a failure: the chart already shows what was asked (an unchanged market, an already-removed overlay). Report it as done and do not retry the call or reach for another tool.
-  - on `TIMEOUT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
-  - on `TRANSPORT` — The bridge dropped or timed out with this intent in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TIMEOUT` — The connection to the chart service dropped or timed out with this change in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The connection to the chart service dropped or timed out with this change in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 
 <!-- AUTO: END RESULT CONTRACT -->
 
@@ -224,7 +222,7 @@ Every `om` command this skill covers, one line each with its action name — che
 
 - `om chart drawing add` (action: `chart_drawing_add`) — Draw ANY chart tool at anchors you already know (the user named exact price/time levels, or you computed them).
 - `om chart drawing auto` (action: `chart_drawing_auto`) — Draw a chart tool (trend/ray/parallel lines, rectangle/ellipse, fibonacci retracement & trend, arrows like Momentum/Flow, markers, price/date ranges, long/short positions, and annotations) with trader-meaningful anchors computed from recent candles (swing highs/lows).
-- `om chart drawing list` (action: `chart_drawing_list`) — List the drawings on the live chart with their `drawingId` (the handle `chart_drawing_remove` needs), tool, anchors, and author (`self`, `peer` with its id, `human`, or `unknown` when this daemon never observed the add) plus the author's stated reason.
+- `om chart drawing list` (action: `chart_drawing_list`) — List the drawings on the live chart with their `drawingId` (the handle `chart_drawing_remove` needs), tool, anchors, and author (`self`, `peer` with its id, `human`, or `unknown` when OpenMarket never saw the add) plus the author's stated reason.
 - `om chart drawing remove` (action: `chart_drawing_remove`) — Remove drawing tools from a chart pane by id: `drawingId` for one, or `ids` for several on the same pane in ONE call, never a loop of single calls.
 - `om chart drawing schema` (action: `chart_drawing_schema`) — Show a drawing tool's anchor schema: the role names (in wire order), how many anchors it needs, whether the role repeats, and whether it takes author text.
 

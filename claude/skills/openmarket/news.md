@@ -99,7 +99,7 @@ Never state a price from the agent catalog, offer an unattended purchase, or tre
 
 `backtest_news` answers "would trading this feed's fires have paid?" before any signal — the study lane is free, `--classify` spends (cached).
 
-`om backtest news <feed>` (action `backtest_news`) answers "would trading this feed's fires have made money?" with zero authoring: a free correlational study first (does price move after fires?), then a P&L replay of a synthesized hold-after-fire strategy. Run it before proposing any signal or strategy on a feed's fires; the printed breadcrumb at the end names the exact `om watch action add <feed> --ai <prompt> --output verdict` and strategy-step commands. It answers the same envelope every backtest door does — `choices` (what the run resolved: asset, window, hold, costs), `study`, `report` for the replay half, and ONE `warnings` list carrying the lane's disclosures and the replay's together — so read a disclosure off `warnings`, never out of `report`, and quote `choices` when saying what was actually replayed. A study-only run has no replay and saves no report; a replayed one names its file, which `backtest_report` reads back a section at a time. The study lane and `--side` replays cost no LLM calls; `--classify` grades the feed's own ai verdict step over its fires, the producer a promoted watch runs: the step's model is asked once per fire the verdict memo cannot answer (`max_llm_calls` caps the model requests, and a turn that reads history is two; reruns ask nothing), and the step reads the feed's earlier fires as of each fire through `watch_history`. The asset defaults from the watch's single `related_markets` tag: tag first, backtest second. The window is `--window` (a lookback ending at `--until`) or `--from`/`--until`; `--data-mode live|backfill` picks the corpus (`--history` still works); the cost knobs are `--fee-bps`, `--slippage-bps`, `--latency-bars`, as on every backtest door.
+`om backtest news <feed>` (action `backtest_news`) answers "would trading this feed's fires have made money?" with zero authoring: a free correlational study first (does price move after fires?), then a P&L replay of a synthesized hold-after-fire strategy. Run it before proposing any signal or strategy on a feed's fires; the printed breadcrumb at the end names the exact `om watch action add <feed> --ai <prompt> --output verdict` and strategy-step commands. It answers the same envelope every backtest door does — `choices` (what the run resolved: asset, window, hold, costs), `study`, `report` for the replay half, and ONE `warnings` list carrying the lane's disclosures and the replay's together — so read a disclosure off `warnings`, never out of `report`, and quote `choices` when saying what was actually replayed. A study-only run has no replay and saves no report; a replayed one names its file, which `backtest_report` reads back a section at a time. The study lane and `--side` replays cost no LLM calls; `--classify` grades the feed's own ai verdict step over its fires, the producer a promoted watch runs: the step's model is asked once per fire the verdict memo cannot answer (`max_llm_calls` caps the model requests, and a turn that reads history is two; reruns ask nothing), and the step reads the feed's earlier fires as of each fire through `watch_history`. The asset defaults from the watch's single `related_markets` tag: tag first, backtest second. The window is `--window` (a lookback ending at `--until`) or `--since`/`--until`; `--data-mode live|backfill` picks the corpus (`--history` still works); the cost knobs are `--fee-bps`, `--slippage-bps`, `--latency-bars`, as on every backtest door.
 
 ## The daily brief
 
@@ -194,10 +194,10 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 - `backtest_news`
   - `asset` — Optional when the feed's history carries exactly one market tag; it then defaults to that tag and the result discloses it.
   - `hold` — Default 24h.
-  - `from` — Default: 90 days before `until`.
-  - `window` — Lookback as `<int><ms|s|m|h|d|w>` ending at `until` (default: now), e.g. '30d'; conflicts with an explicit `from`.
+  - `since` — Default: 90 days before `until`.
+  - `window` — Lookback as `<int><ms|s|m|h|d|w>` ending at `until` (default: now), e.g. '30d'; conflicts with an explicit `since`.
   - `side` — Fixed side to trade on every fire (default long).
-  - `data_mode` — live (default): rows the daemon observed in real time (quiet catch-up recovery rows are excluded; their observed_at is the catch-up moment, not live-actionable).
+  - `data_mode` — live (default): rows observed in real time (quiet catch-up recovery rows are excluded; their observed_at is the catch-up moment, not live-actionable).
   - `fee_bps` — Default: the traded venue's taker fee.
   - `slippage_bps` — Default: the traded venue's slippage floor.
   - `latency_bars` — Default 1.
@@ -236,7 +236,7 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 - `backtest_news`
   - discloses `warnings[]` — The one honesty channel: every warning the run raised, the report's and the tool's.
 - `news_brief`
-  - discloses `brief.body_md` — The briefing markdown: story-grouped items deduplicated across feeds, major developments first, with a quiet note for feeds with nothing new. Relay it to the user as-is; do not re-summarize away detail. When generator=fallback it is a labeled raw per-feed fire list instead, whose '(raw rollup: ...)' first line states what THAT run did and carries no setup advice — what to do about it depends on what is configured now, so read llm_error and the user's current state before advising anything. The body's relative ages are frozen at body_ages_at (created_at on older briefs): never repeat one as though it were measured now.
+  - discloses `brief.body_md` — The briefing markdown: story-grouped items deduplicated across feeds, major developments first, with a quiet note for feeds with nothing new. Give it to the user as it is; do not re-summarize away detail. When generator=fallback it is a labeled raw per-feed fire list instead, whose '(raw rollup: ...)' first line states what THAT run did and carries no setup advice — what to do about it depends on what is configured now, so read llm_error and the user's current state before advising anything. The body's relative ages are frozen at body_ages_at (created_at on older briefs): never repeat one as though it were measured now.
   - on `not_found` — No stored brief matched: follow the error's own hint (list or re-select a stored one, or mode 'generate' when none exists); if nothing exists at all, the events live in watch_history / event_journal_search — and in alert_events on a home whose watches all shadow alerts.
 
 <!-- AUTO: END RESULT CONTRACT -->
@@ -247,22 +247,22 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 
 Every `om` command this skill covers, one line each with its action name — check exact verbs and spellings here.
 
-- `om backtest news` (action: `backtest_news`) — one shot, zero authoring.
+- `om backtest news` (action: `backtest_news`) — One shot, zero authoring.
 
 - `om chart pins` (action: `chart_pins`) — plot ANY event sources on a chart in ONE call: news feeds, custom inbound watches, and price alerts (their fires), mixed freely.
 
 - `om news` (action: `news_overview`) — Show each news vendor's credential status and the user's own feeds across vendors (Fast alerts, Topics, Streams), each row with where its matches land.
 - `om news billing` (action: `news_billing`) — READ the user's Fast-alerts plan: plan name, slots used of the balance and how many are free, paused alerts, payment-failed state, a scheduled cancel or slot drop with its date, the renewal date, exempt status, and any Synoptic Streams held (billed separately).
-- `om news brief` (action: `news_brief`) — the daily brief.
+- `om news brief` (action: `news_brief`) — The daily brief.
 - `om news brief list` (action: `news_brief`) — List the stored daily briefs, newest first, without their bodies.
 - `om news brief show` (action: `news_brief`) — Replay one stored daily brief by id.
 - `om news catalog` (action: `news_catalog`) — Browse available Synoptic streams, Fast alerts and Topics.
 - `om news package` (action: `news_package_streams`) — List a Synoptic package's member streams.
 - `om news packages` (action: `news_packages`) — Browse curated Synoptic stream packages.
-- `om news preview` (action: `news_preview`) — inspect a held feed or test a new Fast trigger without creating anything.
+- `om news preview` (action: `news_preview`) — Inspect a held feed or test a new Fast trigger without creating anything.
 - `om news setup` — (bespoke; see narrative above)
 - `om news subscribe` — TERMINAL ONLY — buy Fast alerts slots (hosted Stripe checkout). No action exists and none will: name the command for the account owner to run, never offer to buy. Read the plan with `news_billing`.
 - `om news upgrade` — TERMINAL ONLY — add a pack of Fast alerts slots to what the account already holds (hosted Stripe confirm page). Same rule as `om news subscribe`: relay the command, never attempt the purchase.
-- `om news voice` (action: `news_voice`) — the user's news voice, controlling HOW news is written to them.
+- `om news voice` (action: `news_voice`) — The user's news voice, controlling HOW news is written to them.
 
 <!-- AUTO: END COMMAND REFERENCE -->

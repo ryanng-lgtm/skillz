@@ -102,7 +102,7 @@ om research study \
   --pre 1h \
   --time-basis source_event_time \
   --data-mode backfill \
-  --from 2026-01-01T00:00:00Z \
+  --since 2026-01-01T00:00:00Z \
   --until 2026-06-01T00:00:00Z \
   --format json
 ```
@@ -120,7 +120,7 @@ For an agent tool call, load and call `research_study` with the same fields:
 }
 ```
 
-Use `locate_only: true` when you only need the occurrences and provenance. Use `from` and `until` to bound occurrences on the chosen time basis.
+Use `locate_only: true` when you only need the occurrences and provenance. Use `since` and `until` to bound occurrences on the chosen time basis.
 
 **Time basis — load the full tool schema before deciding what is possible.** Both `research_study` and `backtest_spec` accept `time_basis: observed_at | source_event_time` and `data_mode: live | backfill`. Backfill rows have no `observed_at`, so for them you must pass `--time-basis source_event_time --data-mode backfill` — an `observed_at` study of backfill rows is misleading, and a default-basis study returns nothing. If your loaded tool schema appears to offer only `observed_at`, re-load the tool with `tool_search` rather than concluding the basis is unavailable.
 
@@ -150,13 +150,13 @@ Backtest a saved strategy by slug: flags per decision input, bar-mode rules, ide
 
 - **Ai verdict step (a saved watch whose strategy step reads its own ai step, or a `watch` candidate)** — occurrence-anchored over that watch's accepted rows: NO `--watch` (the watch is the step's own; naming a different one is refused). `--time-basis` picks the clock the rows replay on (`observed_at` by default; `source_event_time` when the source dates them). Verdicts come from the same memo a live step reads, so a rerun asks the model nothing (unless `--no-signal-cache`); `--max-llm-calls` caps fresh model requests and stops the run typed at the cap. `om backtest <watch>` derives these itself.
 
-- **Condition source (a `source` candidate, or a saved watch whose strategy step reads its own source)** — bar cadence: NO `--watch`; the source decides on every bar of the traded asset. Requires `--asset`; the decision window is `--from`/`--until` or `--window`, a lookback ending at `--until`, else a year at HOUR and coarser bars and a month below (align the bounds to bar boundaries — a partially-covered bar at either edge is excluded whole, since it would trade on data outside the window). `--hold`, `--time-basis`, and the event filters (`--outcome`, `--min-confidence`, `--source`, `--data-mode`, `--limit`) are rejected here — they shape event-watch occurrences, which a bar-cadence replay has none of. A rule over metric operands is authored as this source (a condition tree with the strategy's `on_true`/`on_false` as the sides, or a band, which names its own sides and takes neither). A condition carrying a **per-operand selector** (a cross-market operand naming its own market) replays natively: the prefetch fetches one series per (market, data type) across every operand — sweep variants included, unioned into one covering pass — and each foreign operand is sampled as-of the clock bar's close, exactly as live evaluation samples it. Sources on installed WRUN metrics (`wrun/@scope/name/output`) replay exactly like built-ins — the package must be installed, or the gate rejects with `wrun_metric_not_installed`. When the source's own decision acts on a bar, the decision owns that bar and the bracket is not evaluated there — so fast mean-reversion rules can close trades before their brackets ever stamp; bracket stamps under-count bracket-level breaches by design. A `bar_extremes_repaired` warning means some source bars under-reported their own open/close range and the trigger evaluation widened them — treat tp/sl fills on those bars as data-quality-limited. **Band-regime seeding:** a band source's regime is the source's, advanced per evaluation, live and replayed alike; its cold start seeds flat unvouched, so it bars that first entry and sits the regime out — see §"What a condition-source backtest does not reproduce". **Asset/market identity is enforced**: the strategy's venue and `--asset` must agree — a Polymarket strategy replays only against its OWN condition's series (`--asset POLYMARKET:<conditionId>`), a non-Polymarket strategy never against a Polymarket series (non-Polymarket proxy series stay allowed for non-Polymarket venues); mismatches refuse with `asset_market_mismatch`. Polymarket runs also resolve which side of the binary the series prices: when the strategy's `long_outcome` is the complement (second) outcome the series is complement-mapped before the replay and the report's `backtest.price_axis` says `"complement"`; an unresolvable outcome order (CLOB unreachable, non-binary market, unknown `long_outcome`) refuses with `long_outcome_axis_unresolved` rather than guessing an axis.
+- **Condition source (a `source` candidate, or a saved watch whose strategy step reads its own source)** — bar cadence: NO `--watch`; the source decides on every bar of the traded asset. Requires `--asset`; the decision window is `--since`/`--until` or `--window`, a lookback ending at `--until`, else a year at HOUR and coarser bars and a month below (align the bounds to bar boundaries — a partially-covered bar at either edge is excluded whole, since it would trade on data outside the window). `--hold`, `--time-basis`, and the event filters (`--outcome`, `--min-confidence`, `--source`, `--data-mode`, `--limit`) are rejected here — they shape event-watch occurrences, which a bar-cadence replay has none of. A rule over metric operands is authored as this source (a condition tree with the strategy's `on_true`/`on_false` as the sides, or a band, which names its own sides and takes neither). A condition carrying a **per-operand selector** (a cross-market operand naming its own market) replays natively: the prefetch fetches one series per (market, data type) across every operand — sweep variants included, unioned into one covering pass — and each foreign operand is sampled as-of the clock bar's close, exactly as live evaluation samples it. Sources on installed WRUN metrics (`wrun/@scope/name/output`) replay exactly like built-ins — the package must be installed, or the gate rejects with `wrun_metric_not_installed`. When the source's own decision acts on a bar, the decision owns that bar and the bracket is not evaluated there — so fast mean-reversion rules can close trades before their brackets ever stamp; bracket stamps under-count bracket-level breaches by design. A `bar_extremes_repaired` warning means some source bars under-reported their own open/close range and the trigger evaluation widened them — treat tp/sl fills on those bars as data-quality-limited. **Band-regime seeding:** a band source's regime is the source's, advanced per evaluation, live and replayed alike; its cold start seeds flat unvouched, so it bars that first entry and sits the regime out — see §"What a condition-source backtest does not reproduce". **Asset/market identity is enforced**: the strategy's venue and `--asset` must agree — a Polymarket strategy replays only against its OWN condition's series (`--asset POLYMARKET:<conditionId>`), a non-Polymarket strategy never against a Polymarket series (non-Polymarket proxy series stay allowed for non-Polymarket venues); mismatches refuse with `asset_market_mismatch`. Polymarket runs also resolve which side of the binary the series prices: when the strategy's `long_outcome` is the complement (second) outcome the series is complement-mapped before the replay and the report's `backtest.price_axis` says `"complement"`; an unresolvable outcome order (CLOB unreachable, non-binary market, unknown `long_outcome`) refuses with `long_outcome_axis_unresolved` rather than guessing an axis.
 
 ```bash
 om backtest spec \
   --strategy-slug <strategy-slug> \
   --asset BINANCE_FUTURES:BTCUSDT \
-  --from 2026-03-01T00:00:00Z \
+  --since 2026-03-01T00:00:00Z \
   --until 2026-04-01T00:00:00Z \
   --fee-bps 5 \
   --slippage-bps 10 \
@@ -174,7 +174,7 @@ A registry strategy template is the marketplace funnel's business: `backtest_run
 | `fixed_view` | `{direction: 1, -1 or 0, conviction}` beside `strategy`; `--watch` anchors entries to a feed's accepted rows | occurrences |
 | `source` | the condition source `watch_create` authors, the strategy naming `on_true` / `on_false` for the sides its level maps to | the operands' own bar cadence, `eval: closed` |
 | a band `source` | `{long: {enter, exit}, short: {enter, exit}}`; it names its own sides, so no `on_true` / `on_false`, beside a sizer that can flatten | bars, as a tree source |
-| `watch` | `{source: <feed watch slug>, ai_step: {prompt, output: {type: "verdict"}}}`, the step `watch_action_add` authors | the feed's accepted rows (`--from` / `--until`, `--hold`) |
+| `watch` | `{source: <feed watch slug>, ai_step: {prompt, output: {type: "verdict"}}}`, the step `watch_action_add` authors | the feed's accepted rows (`--since` / `--until`, `--hold`) |
 | an installed package | `wrun_strategy: "@scope/name"` with `params` by declared name: the target on `backtest_run`, in place of a candidate on `backtest_spec` | the window's bars on the engine's broker |
 
 To simulate a hold-after-event strategy over the same occurrence set, use `om backtest spec` with a strategy source. There is no strategy-less lane: prescribe the trade-intent explicitly — an inline candidate carrying a `fixed_view` (direction 1, -1 or 0, conviction as the weight) reproduces the classic hold-after-event run without saving anything. Prefer compact JSON for agent summaries unless the user needs the full fill/equity artifact.
@@ -211,7 +211,7 @@ with `hold-long.json` (a research candidate; promote its trade logic into a watc
 }
 ```
 
-`--candidate-file <path>` replays a strategy that exists nowhere on disk — a JSON file of shape `{strategy, source?, watch?, fixed_view?}` where `strategy` carries the backtest candidate fields (slug; optional label, market, sizer, exit, daemon). Exactly ONE decision input: carry `fixed_view: {direction, conviction}` for the side acted on at every fire; carry `source`, the same condition source `watch_create` authors, with the strategy naming `on_true`/`on_false` for the sides its level maps to (a band names its own side, so it takes neither); or carry `watch: {source: <saved feed watch slug>, ai_step: {prompt, output: {type: "verdict"}, ...}}`, the ai verdict step `watch_action_add` authors, replayed over that feed's accepted rows by the daemon's own step runner. A `source` replays on the bar cadence its own operands declare, folded by the daemon's evaluator, and needs `eval: closed`; a band candidate runs and promotes like a tree one, since the watch takes a strategy step beside a band under the rules the gate already applies (a sizer that can flatten, no level sides). A `watch` candidate replays on the feed's occurrences with `--from/--until` and `--hold`, asks the step's model once per row the verdict memo cannot answer (`max_llm_calls` caps the model requests, and a turn that reads history is two; a rerun asks nothing), reads the feed's earlier rows as of each event through `watch_history` and nothing else (the report names every other tool the step could call live, `ai_step_leash_withheld`), and writes nothing durable besides the memo (`no_signal_cache` keeps it in memory). Nothing is persisted, and the report's `backtest.query.candidate: true` marks its origin. On the agent lane the strategy fields, the source arm and the watch shape are deferred parts of `backtest_spec` and `backtest_sweep`: `schema_read {intent: "backtest_strategy"}` or `{intent: "condition_create"}` loads their full shape before the call.
+`--candidate-file <path>` replays a strategy that exists nowhere on disk — a JSON file of shape `{strategy, source?, watch?, fixed_view?}` where `strategy` carries the backtest candidate fields (slug; optional label, market, sizer, exit, daemon). Exactly ONE decision input: carry `fixed_view: {direction, conviction}` for the side acted on at every fire; carry `source`, the same condition source `watch_create` authors, with the strategy naming `on_true`/`on_false` for the sides its level maps to (a band names its own side, so it takes neither); or carry `watch: {source: <saved feed watch slug>, ai_step: {prompt, output: {type: "verdict"}, ...}}`, the ai verdict step `watch_action_add` authors, replayed over that feed's accepted rows by the daemon's own step runner. A `source` replays on the bar cadence its own operands declare, folded by the daemon's evaluator, and needs `eval: closed`; a band candidate runs and promotes like a tree one, since the watch takes a strategy step beside a band under the rules the gate already applies (a sizer that can flatten, no level sides). A `watch` candidate replays on the feed's occurrences with `--since/--until` and `--hold`, asks the step's model once per row the verdict memo cannot answer (`max_llm_calls` caps the model requests, and a turn that reads history is two; a rerun asks nothing), reads the feed's earlier rows as of each event through `watch_history` and nothing else (the report names every other tool the step could call live, `ai_step_leash_withheld`), and writes nothing durable besides the memo (`no_signal_cache` keeps it in memory). Nothing is persisted, and the report's `backtest.query.candidate: true` marks its origin. On the agent lane the strategy fields, the source arm and the watch shape are deferred parts of `backtest_spec` and `backtest_sweep`: `schema_read {intent: "backtest_strategy"}` or `{intent: "condition_create"}` loads their full shape before the call.
 
 **A candidate replays under its decision input's rules.** The worked example above is the occurrence-anchored fixed-view shape (`--watch` anchors entries to accepted rows); a candidate whose decision input is a `source` or a `watch` takes the same invocation flags and bar-mode rules as a saved strategy of that shape — before running one, read `skill_read("research", section = "Replaying a saved strategy")` for the flags per shape.
 
@@ -220,7 +220,7 @@ Promote a winner by mapping its trade logic onto a watch: the decision input bec
 **A candidate takes exactly one decision input.** A rule over metric operands is authored as `candidate.source` (`schema_read {intent: "backtest_strategy"}` attaches the arm beside the strategy fields) with the strategy's `on_true`/`on_false` as the sides; a model's read of event text as `candidate.watch`, the ai verdict step the strategy reads; a fixed side as `candidate.fixed_view`. A candidate carries no signal: a `signal` key is refused as unknown. Operators are word-form (`gt`/`lt`, never `>`), with no `compare` wrapper.
 
 To project a candidate's replay onto a chosen workspace, pass
-`--chart-workspace <id>` to `om backtest spec` (`--open-chart` on the one-shot; each door also takes the other's spelling).
+`--open-chart <id>` to `om backtest spec` or to the one-shot.
 The panel targets chart 0 and returns `chart.workspace_id`,
 `chart.mode: "strategy_panel"` and `chart.created: false` when it lands.
 
@@ -273,7 +273,7 @@ om backtest sweep \
   --strategy-slug <slug> \
   --sweep-file sweep.json \
   --asset BINANCE_FUTURES:BTCUSDT \
-  --from 2026-03-01T00:00:00Z --until 2026-04-01T00:00:00Z \
+  --since 2026-03-01T00:00:00Z --until 2026-04-01T00:00:00Z \
   --format json
 ```
 
@@ -372,7 +372,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 - `backtest_run`
   - `params` — Omitted params take the package's defaults.
   - `asset` — Derived when omitted: a Hyperliquid strategy's coin, else a condition source's first operand series.
-  - `from` — Default: `until` minus the derived window.
+  - `since` — Default: `until` minus the derived window.
   - `until` — Default: now.
   - `side` — Default long.
   - `thesis` — Default: derived from the watch's goal and the side.
@@ -380,7 +380,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `open_chart` — Omitted, the run lands on the strategy's OWN workspace; pass a workspace to target it (reruns are cheap: an ai step answers from its verdict memo).
   - `compact` — Defaults TRUE for tool callers: the result carries the compact report (metrics + benchmark headline + a bounded equity_spark), never the full per-bar artifact.
 - `backtest_run` · `backtest_sweep`
-  - `window` — Lookback as `<int><ms|s|m|h|d|w>` ending at `until` (default: now), max 365d — e.g. '30d', '52w', '365d'; no y/mo unit; conflicts with an explicit `from`.
+  - `window` — Lookback as `<int><ms|s|m|h|d|w>` ending at `until` (default: now), max 365d — e.g. '30d', '52w', '365d'; no y/mo unit; conflicts with an explicit `since`.
 - `backtest_run` · `backtest_spec` · `backtest_sweep`
   - `fee_bps` — Omit unless the user named it: the defaults are what users expect, and a value copied from an earlier call in this conversation may predate the user's ask.
   - `slippage_bps` — Omit unless the user named it: the defaults are what users expect, and a value copied from an earlier call in this conversation may predate the user's ask.
@@ -389,11 +389,11 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 - `backtest_run` · `backtest_spec`
   - `max_llm_calls` — Default 400.
 - `backtest_spec`
-  - `watch` — Omit for a condition-source backtest (a candidate `source` + --from/--until).
+  - `watch` — Omit for a condition-source backtest (a candidate `source` + --since/--until).
   - `params` — Package params for wrun_strategy, numbers by declared name; omitted params keep the package's defaults.
   - `hold` — Omitted, a time-stop strategy holds its time-stop plus one bar, so the managed exit fires first; a strategy with no time-stop (saved or inline candidate) derives 'none'.
   - `interval` — Defaults to the condition source's own cadence (its primary operand's interval) on bar-cadence runs — live parity — else to the window's: MINUTE up to 36h, FIVE_MINUTES to 7d, FIFTEEN_MINUTES to 21d, HOUR beyond.
-  - `window` — Omitted with `from`, a run looks back 90d on events, a year on HOUR and coarser bars, a month on finer ones.
+  - `window` — Omitted with `since`, a run looks back 90d on events, a year on HOUR and coarser bars, a month on finer ones.
   - `compact` — Defaults TRUE for tool callers: a compact report (backtest metadata, metrics, a bounded equity_spark) that omits trades, fills, the engine echo, and the per-bar curve.
 - `backtest_spec` · `research_study`
   - `outcomes` — Defaults to accepted outcomes.
@@ -401,7 +401,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `limit` — Defaults to 200, max 500.
 - `backtest_sweep`
   - `interval` — Defaults to the base's own cadence on bar-cadence sweeps, a condition source's first operand's interval (implicitly HOUR when omitted), else to the window's (MINUTE up to 36h, FIVE_MINUTES to 7d, FIFTEEN_MINUTES to 21d, HOUR beyond)
-  - `from` — Default: `until` minus 90d on event sweeps; minus a year (HOUR and coarser bars) or a month (finer) on bar-cadence sweeps.
+  - `since` — Default: `until` minus 90d on event sweeps; minus a year (HOUR and coarser bars) or a month (finer) on bar-cadence sweeps.
   - `max_llm_calls` — Default: 400, one solo run's cap for the whole sweep.
 - `make_image`
   - `size` — Omitted: the maker's default.
@@ -447,13 +447,13 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om backtest sweep` (action: `backtest_sweep`) — Replay N spec variants of one base strategy (saved slug or unsaved candidate) over ONE shared market-data pass.
 
 - `om research` — (bespoke; see narrative above)
-- `om research make-image` (action: `make_image`) — Make one image with the user's AI maker's image API on the sealed image lane (the maker, image model, size and quality the run's approval named; attended, the chat sign-in when it draws, else another stored sign-in that does, with its first image model), never the chat model.
+- `om research make-image` (action: `make_image`) — Make one image with the user's AI maker's image API on the sealed image model (the maker, image model, size and quality the run's approval named; attended, the chat sign-in when it draws, else another stored sign-in that does, with its first image model), never the chat model.
 - `om research page` (action: `page_read`) — Read one web page or document the user or a search result named, and return its readable text.
 - `om research page-grants` — (bespoke; see narrative above)
 - `om research page-grants clear` — Forget every page_read origin grant.
 - `om research page-grants list` — List the origins page_read may read again without an approval card, newest first.
 - `om research page-grants revoke` — Forget one origin's grant so the next page_read there raises a fresh approval card.
-- `om research search-files` (action: `search_files`) — Ask a question over documents the user uploaded to their AI maker (an OpenAI vector store id, a Google file search store name): one isolated model request on the user's own credential with the maker's file search tool enabled and no om tools attached.
+- `om research search-files` (action: `search_files`) — Ask a question over documents the user uploaded to their AI maker (an OpenAI vector store id, a Google file search store name): one isolated model request on the user's own credential with the maker's file search tool enabled and no OpenMarket tools attached.
 - `om research study` (action: `research_study`) — Run a strictly correlational event-anchored study over accepted event-watch rows and one asset's candles, or use locate_only to return just the event occurrences.
 
 <!-- AUTO: END COMMAND REFERENCE -->

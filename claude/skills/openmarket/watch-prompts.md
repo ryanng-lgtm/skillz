@@ -201,11 +201,12 @@ The menu as a person sees it (the form's checklist, the cards, `om watch tools`)
 
 | Row | Functions | When you want it | What comes back | Default |
 | --- | --- | --- | --- | --- |
-| Everything OpenMarket can read (the master row) | the six rows below | most prompts | numbers and rows with the time they were read | on |
+| Everything OpenMarket can read (the master row) | the seven rows below | most prompts | numbers and rows with the time they were read | on |
 | Prices, stats and history | `markets`, `points`, `polymarket_orderbook` | a price, a move, an order book, a candle history | live prices and 24h change, candles, funding, open interest and order books | on |
 | Indicators | `metric_get`, `metric_list`, `metric_rule`, `metric_series` | RSI, MACD, EMA, funding or open-interest reads, and a rule over them | the indicator's numbers, a series over time, or a long/short/flat decision | on |
 | Market lookups | `block_sizes`, `coins`, `enum`, `exchanges`, `hyperliquid_dexes`, `market_resolve`, `normalized_symbols`, `polymarket_market_lookup`, `symbol_resolve`, `symbols`, `tenors` | turning a name into the exact market | the venue, symbol, ids and lists a market goes by | on |
 | The news journal | `event_journal_get`, `event_journal_list`, `event_journal_search` | what this home already logged about a subject | journal text and matching past events | on |
+| The event calendar | `calendar_links`, `calendar_list`, `calendar_show` | what is scheduled, and which market or watch a release is linked to | known events with their times and status, their links and the polling windows they opened | on |
 | This watch's own past rows | `watch_history` | comparing with what this watch found before | this watch's earlier rows with their outcome and time | on |
 | Your positions and balances | `hyperliquid_*` and `polymarket_*` account reads, `execute_*`, `usage` | a prompt about your own book | balances, positions, resting orders, fills, funding, fee tier, receipts and API quota; the card warns that what it reads can end up in what the run searches for or sends | on |
 | Search the web (and X on Grok) | `web_research` | anything newer than the model's memory | headlines, snippets and links; one model request per call | on |
