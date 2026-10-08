@@ -51,7 +51,10 @@ change one, change the other.
 
 ## Skills
 
-Everything below is authored here. The `openmarket` and `om-chat` skills ship
+Everything below is authored here except `socratic-teacher`, adapted from
+[wooneusean/skills](https://github.com/wooneusean/skills/blob/main/learning/socratic-teacher.md)
+into a session toggle.
+The `openmarket` and `om-chat` skills ship
 with the `om` CLI and are only vendored into this repo so both agents get the
 same copy — they're synced by `skills: sync om-bundled docs from om <version>`
 commits, not edited by hand, and aren't listed.
@@ -70,6 +73,7 @@ commits, not edited by hand, and aren't listed.
 | `om-build` | `/om-build [--hosted\|--cloud]` | Builds an OM Chat GUI from source — the daemon-embedded `/rooms` GUI or the hosted `/chat/` cloud fork — including the swap onto the live install. |
 | `om-glab` | `/om-glab` | Runs the daemon build/install workflow with the GitLab chat GUI and openmarket-internal. `om-build` keeps its GitHub default. |
 | `prompt-ready` | `/prompt-ready` | Persistent mode that turns raw, natural-language requests into clean, self-contained, copy-paste-ready prompts for a different session. |
+| `socratic-teacher` | `/socratic-teacher [topic]` | Session toggle for teaching mode: one guiding question per turn with at least one reference, never the full solution; partial hints only after 3+ stuck attempts. Stays on until "stop socratic mode". |
 | `syncup` | `/syncup [repo ...]` | Refreshes main from origin, rebases the working branch onto it, resolves every conflict, and hands uncommitted work back intact. Never pushes. |
 | `testing-harness` | `/testing-harness` | Proves a change in the real running app rather than in tests. `--parity-check` diffs the cloud deployment against the local daemon visually; `--regression` (designed, not yet built) checks the running app against invariants and a baseline. |
 | `war-diary` | — | Turns a day of GitLab `.atom` activity plus the day's Claude Code sessions into Frontend War Diaries daily-log notes and matching Kanban cards. |
