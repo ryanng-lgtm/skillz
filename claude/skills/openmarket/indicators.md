@@ -81,6 +81,8 @@ A metadata name becomes its accessor by lowercasing and collapsing every run out
 
 The public reference is `docs/indicators/functions/` (text-formatting, time-and-sessions-kit, colors-kit, extra-indicators, order-flow-kit, levels-kit, market-structure-kit, options-kit), one worked sample per class.
 
+A kit class carries earlier bars, so a file holding one recomputes its whole history on every pan-back; math that needs nothing from earlier bars can stay per bar (values in `onBar()` locals, module values set only in `onStart()`), and once the compile proves it a pan-back computes only the new bars (the per-bar rule closes §"Source-declared indicators (code-first)").
+
 The loop:
 
 1. **`wrun_author`**: pick the closest `template`, then write the AssemblyScript `source` (and `metadata` if the inputs/outputs/params differ from the template). Write the file with `onBar()`: declarations at the top, no import lines (the build adds them), optional `function onStart(): void` (once before the first bar, params through `p_<param>()`), required `function onBar(): void` (once per bar: the chart's own candle through `bar.close()` and friends, declared feeds through `in_<input>()`, every value through `out_<output>(value)`, no `emitRow()`; an unwritten output is NaN and draws nothing). The four-function form (`export function init(): void`, `state(): i32` returning 1 when a row is ready, `finalize(): void` writing outputs then `emitRow()` LAST, `reset(): void`, with explicit import lines) is still accepted unchanged; ALL persistent state lives in module-level variables (`reset` clears them and calls `.reset()` on every TA object). WORKFLOW: call `wrun_author` once with just `name` + `template` and READ the returned `source`, then EDIT that shape rather than writing from memory. The tool lints submitted source at the write step and returns the deviations as `warnings`; fix every warning before building. This is local scratch work, no approval needed. Two failure modes to know by name:
@@ -90,7 +92,7 @@ The loop:
 3. **Preview**: straight after a green build, `metric_get` the new `wrun/...` metric on a symbol so the user sees a real value; `metric_series` (same selector, `bars` 1..500, default 30) when they want to see it MOVE, one `[barOpenSec, value]` pair per bar (CLI `om metric series` renders a sparkline; metrics.md §"Series"); and `chart_indicator_preview` draws the draft on their chart (no publish needed; `plot: "line"` outputs only, one output per preview).
 4. **Publish**: `package_publish` the same `packageDir` once the user approves. The human always approves publishing. Before publishing, AUTHOR UNDER A PUBLISHABLE SCOPE: `@local` is reserved and the registry rejects it; re-author the same source/metadata under the user's own scope (their account scope, e.g. `@om-core` if they own it) so the publish can succeed. Publish is also what unlocks hosted charting (bindable packages excepted, §"Bindable odds inputs"): `chart_indicator_add` mounts registry packages only (`marketplace.md §"Indicator packages"`); the local preview never needs it.
 
-Keep inputs to declared SDK sources; daemon-only `series` inputs read watch values or installed series snapshots (§"Snapshots, panels and pane placement"). The module has no network of its own. Every `inputSources` pin is fixed at authoring time and no pin is user-configurable after install (repointing a PINNED odds input is `om wrun source set` on the authoring workspace followed by a rebuild; a code-first workspace edits the `input(...)` declaration instead; the consumer-side write-up is `marketplace.md §"Indicator packages"`). Before publish, a wrong pin is fixed in the normal loop (re-author, rebuild, reinstall the preview); after publish it can only be fixed by publishing a bumped version.
+Keep inputs to declared SDK sources; `series` inputs read a published feed by its address (`series.value` with `ref`) and, on the daemon, watch values or installed series snapshots (§"Snapshots, panels and pane placement"). The module has no network of its own. Every `inputSources` pin is fixed at authoring time and no pin is user-configurable after install (repointing a PINNED odds input is `om wrun source set` on the authoring workspace followed by a rebuild; a code-first workspace edits the `input(...)` declaration instead; the consumer-side write-up is `marketplace.md §"Indicator packages"`). Before publish, a wrong pin is fixed in the normal loop (re-author, rebuild, reinstall the preview); after publish it can only be fixed by publishing a bumped version.
 
 
 <!-- AUTO: CODE-FIRST AUTHORING - do not edit by hand; source: docs/indicators-internal/code-first-grammar.md; regenerate with `bun packages/cli/scripts/gen-indicator-docs.ts` -->
@@ -100,7 +102,7 @@ Declarations in the source, sheet derived at build: the grammar, the refusals, a
 
 How this mode enters the agent loop, beside (never instead of) the metadata-first loop above:
 
-- Scaffold code-first with `template: "sma-codefirst"` on `wrun_author` (or `om wrun create @scope/name --template sma-codefirst`): a complete SMA in 13 non-blank source lines, sheet derived, same build and preview loop as any draft. For the wrun-3 surface (a celled volume-profile input, a string slot, a text renderer on the newest bar) scaffold `template: "vp-buy-share-codefirst"` instead and edit that shape. For a package that trades, scaffold `template: "strategy-ma-cross"` (a moving-average cross: `strategy({ ... })` declared beside the outputs, the order calls in `finalize()`) or `template: "strategy-risk-reversion"` (each entry sized so a trade stopped out loses `risk_pct` percent of the equity (`.qty(...)`, capped by the equity), an ATR-sized stop and target fixed when the order goes out, a `positionSize()` guard) and edit that shape (§"A package that trades"). For a complete chart Indicator, scaffold the cookbook template nearest the ask (`om wrun templates` lists them by picker group: On price, Order flow, HUDs, Beyond the time axis, Strategies) and edit that shape.
+- Scaffold code-first with `template: "sma-codefirst"` on `wrun_author` (or `om wrun create @scope/name --template sma-codefirst`): a complete SMA in 13 non-blank source lines, sheet derived, same build and preview loop as any draft. For a celled input (a volume-profile block read through its view and its cell count into one line, the wrun-2 surface) scaffold `template: "vp-buy-share-codefirst"` instead and edit that shape. For a package that trades, scaffold `template: "strategy-ma-cross"` (a moving-average cross: `strategy({ ... })` declared beside the outputs, the order calls in `finalize()`) or `template: "strategy-risk-reversion"` (each entry sized so a trade stopped out loses `risk_pct` percent of the equity (`.qty(...)`, capped by the equity), an ATR-sized stop and target fixed when the order goes out, a `positionSize()` guard) and edit that shape (§"A package that trades"). For a complete chart Indicator, scaffold the cookbook template nearest the ask (`om wrun templates` lists them by picker group: On price, Order flow, HUDs, Beyond the time axis, Strategies, Feeds) and edit that shape.
 - On a code-first workspace, `wrun_author`'s `metadata` argument is REFUSED with `wrun_metadata_generated`, and `wrun_source_set` (`om wrun source set` on the CLI) is refused with `wrun_source_set_generated`: the sheet is derived state, so pass updated `source` with edited declarations instead, and the build re-derives sheet + accessors together.
 - A string slot named `debug` prints in the chart editor's Console; off the chart (the daemon, `om metric`) it is an ordinary string slot with no special treatment.
 - The grammar below is the chart's (the public docs share it). Off the chart the daemon also serves: input options `binding` / `bindingClasses` (a market bound per use) and `token` (the `token_supply` source); `missing: "nan"` / `"zero"` on the first input densifying the request grid; celled `tape.cells` (`[offset_ms, price, size, side]`, 4; `min_size` REQUIRED, `history` "0" = live prints only), a `symbol` + `exchange` pin pair on celled inputs, and `block_size` / `max_depth` as the book fetch facets. Metric composition inputs have no declaration spelling and stay metadata-first (refused by name). A workspace with no declarations stays metadata-first: byte-identical to a hand-written sheet and the supported mode for languages without an extractor (Rust, Zig, a pre-built module); a sheet claiming generated provenance over a declaration-free source blocks the build naming both ways out (restore the declarations, or delete `generated_from` and `source_digest` to hand-edit). The chart's editor refuses a declaration-free source.
@@ -147,7 +149,10 @@ is static and literal-only:
   `"Page/Section"`), `row`, `hint`, `when` (the NAME of a `param.bool`),
   `hide` (with `when`), `slider` (needs `min` and `max`), `unit` (an
   array from `"price"`, `"ticks"`, `"%"`, `"atr"`), `unit_default`,
-  `confirm`, on `param.session` only `tz` (one of the 42 session
+  `confirm`, `visible_by` (`{ size_unit: [codes] }`, the size units
+  0 to 3 of the markets where the dialog shows the row, each once;
+  sheet-only, and an `output(...)` takes it too: no row mounts on any
+  other market), on `param.session` only `tz` (one of the 42 session
   zones, `UTC`, `America/New_York`, `Asia/Kolkata`, `Europe/Paris` and
   `Pacific/Auckland` among them; Sessions and
   units lists each with its offset and
@@ -177,10 +182,28 @@ is static and literal-only:
   forex, 4 metal, 5 index, 6 economic series, 0 unknown),
   `market.point_value()` (a futures multiplier, 1 per unit, 0 unknown),
   `market.zone()` (the exchange zone as its `SESSION_TZ_IDS` index, 0 UTC
-  and unknown, passed straight to `inSession`) and
+  and unknown, passed straight to `inSession`),
   `market.quote_is_usd()` (1 US dollars, 2 another currency or coin, 0
-  unknown). A `param.source` default may be any of its menu's words, the
-  blends `hl2`, `hlc3`, `ohlc4` and `hlcc4` included.
+  unknown) and `market.session_open()` (`p_market_session_open()`: the
+  minute the trade day opens on the market's clock, 1020 on CME, 0
+  midnight elsewhere; with the zone it feeds `sessionDayOpen`,
+  `sessionTradeDate`, `sessionWeekOpen` and `sessionGapBefore`).
+  `market.size_unit()` declares the kind, the point value and the zone for
+  `sizeUnit(kind, pointValue, zone)` (0 units, 1 coins, 2 shares, 3
+  contracts: a multiplier other than 1 or the Chicago zone first, then
+  the kind), `market.notional()` the point value and the zone for
+  `notional(qty, price, pointValue, zone)` (`qty * price * pointValue`;
+  `NaN` on the Chicago zone when the point value is 0 or 1, never a wrong
+  number; elsewhere a point value of 0 read as 1); neither adds a setting,
+  and a fact two words name is declared once. A row that exists on some
+  markets only takes `visible_by: { size_unit: [codes] }` on its
+  `param.<kind>` and its `output(...)` (the dialog and the chart leave it
+  out elsewhere; the module still writes it, `NaN` where it has no
+  number), and a `trades.*` or `volume_profile.cells` input takes
+  `currency: "Auto"` (contracts on futures, dollars elsewhere, never
+  beside a pin). A
+  `param.source` default may be any of its menu's words, the blends `hl2`,
+  `hlc3`, `ohlc4` and `hlcc4` included.
   A `range` counts as two sheet params, a `session` as three, a `list` as
   `max` + 1, a `unit` list as one more, and the sheet holds at most 128; a
   setting cannot take a name the chart keeps (`symbol`, `exchange`,
@@ -249,13 +272,16 @@ is static and literal-only:
   `publisher` and `series` (`economic`, both required), `asset`
   (`treasury_balance`: an upper-case ticker, the chart's coin when
   absent), `token` (`token_supply`, required: the token's display name),
-  `missing` (`"carry"`, `"nan"`, or `"zero"`), `description`. Sources are
+  `ref` (`series` only, required there: the published feed's address,
+  `@scope/name`), `missing` (`"carry"`, `"nan"`, or `"zero"`; a feed
+  takes `"carry"` or `"nan"`), `description`. Sources are
   bare member references to the feeds the chart serves: `ohlcv`,
   `trades`, `funding`, `oi`, `liquidations`, `long_short_ratio`,
   `implied_volatility`, `skew`, `volatility_index`, `options_oi`,
   `options_volume`, `etf_flow`, `etf_holdings`, `etf_premium`,
   `ethena_positions`, `bitfinex_funding`, `treasury_balance`,
-  `token_supply`, `economic`, `odds`, `time`. There is no
+  `token_supply`, `economic`, `odds`, `time`, and `series` (`series.value`:
+  a published feed read by its address, never the first input). There is no
   input that reads another indicator's outputs: each indicator on a chart
   computes on its own.
 - `output(name, plot?, panel?, options?)` with plots `line`, `bar`, `area`,
@@ -364,9 +390,21 @@ automatically (scalar-only declarations keep the first contract):
   multiplier, vega]`, 10: the chart market's option chain on the live row
   only) and `candles` (`[offset_ms, open, high, low, close, volume]`, 6:
   a timeframe's closed candles as a stream, the backlog on the first row
-  and each candle on the row it closes with).
-  The chart does not serve the live trade tape (`tape`), and a run that
-  declares it is refused by name.
+  and each candle on the row it closes with) and `tape` (`[offset_ms,
+  price, size, side]`, 4: the chart market's prints at or above
+  `min_size`, side `+1` buy and `-1` sell; history from the large-print
+  lane over the chart's window, then live prints).
+  `tape` takes `min_size` (REQUIRED: a numeric literal, or a param handle,
+  `const floor = param("min_size", 5); input("prints", tape.cells, {
+  max_cells: 20000, min_size: floor })`, the sheet recording the param's
+  name so the run reads the floor from the setting's current value) and
+  `history` (`"0"` by default, live only, or a duration of digits then
+  `s`, `m`, `h` or `d` up to `"30d"`). The large-print lane keeps prints
+  of $10,000 or more on markets quoted in USD or a dollar stablecoin and
+  the contracts floor on CME Group futures (10 ES, 5 NQ, 20 CL, 10 GC), so
+  a lower `min_size` reads history at that floor; a `1s` chart and a
+  calendar interval refuse a tape input by name; `om metric` and watches
+  serve live prints only and refuse any non-zero `history` by name.
   `max_cells` is REQUIRED, except on `candles`, where the build declares
   the larger of `bars` and 2 when it is left out; `block_size` (required
   on `book`) and `max_depth` are recorded in the sheet, while the chart
@@ -480,6 +518,73 @@ at Run ("a file with onBar() needs at least one output(...) statement:
 declare what the Indicator draws, e.g. output("value", line, overlay),
 and write it in onBar() with out_value(...)").
 
+**Per-bar by default.** On a pan-back the chart computes only the newly
+loaded bars when the compile proves that every bar's outputs come from
+that bar's own inputs and the settings (the derived sheet then carries
+`history_independent: true`). A file whose only memory is instances of
+finite-window kit classes (`Sma`, `Wma`, `Hma`, `Bb`, `Stoch`,
+`Highest`, `Donchian`, `Ichimoku` and the rest of the warm-up table),
+built at the top of the file, at most rebuilt from settings in
+`onStart()`, and updated once per bar in a top-level statement of
+`onBar()`, settles within W bars instead (the sheet carries
+`history_warmup`): the chart reruns only the new bars after a running
+start of W bars, the instances' windows summed. Any other file reruns
+the whole loaded history on every pan-back, an `Ema`, `Rsi` or `Atr`
+file included (a smoothing class remembers its start for good). When
+the asked-for math needs nothing from
+earlier bars (a reading of the bar's own candle, book, profile or trades),
+write it in the shape the proof accepts:
+
+- per-bar values are number or boolean `onBar()` locals, each declared
+  with a value; a module `let` holds a number or a boolean, starts from a
+  constant, is assigned only in `onStart()` (from settings, constants,
+  `Math`, the helpers below and arithmetic, never a module `let`; a
+  ternary, no `if`) and is only read in `onBar()`; a module `const` is a
+  number or a boolean from literals, arithmetic, earlier constants and the
+  kit helpers below (no `Math`); a module table of numbers is read only by
+  index and `.length`;
+- scratch is a `StaticArray` made inside `onBar()`; a module-level array,
+  any kit class (`Sma`, `Cvd`, `History`, ...) or a class of your own
+  carries bars (a finite-window kit class such as `Sma` gets the running
+  start above instead);
+- a celled input is read by index through a local
+  `const cells = in_<name>_view();`, bounded by `in_<name>_cells()`;
+  settings are read through `p_<name>()` and `pb_<name>()` on number and
+  boolean kinds (a list setting's reader and `pt_<name>()` refuse);
+- helpers take numbers (or a local array) and return a number or a
+  boolean; the calls the proof admits are `isNaN`, `isFinite`, the `Math`
+  functions `abs`, `floor`, `ceil`, `round`, `trunc`, `sqrt`, `pow`,
+  `min`, `max`, `log`, `log2`, `log10`, `exp`, `sign`, `hypot`, `sin`,
+  `cos`, `tan`, `asin`, `acos`, `atan` and `atan2` (no other `Math`
+  member), and the kit's `rgba`, `rgb`, `isThemeToken`, `alpha`, `mix`,
+  `fromGradient`, `lighten`, `darken`, `red`, `green`, `blue`, `opacity`,
+  `transparency`, `toPacked`, `fromPacked`, `multiHas`, `unitToPrice`,
+  `inSession`, `sessionDayOpen`, `sessionTradeDate`, `sessionWeekOpen`,
+  `sessionGapBefore`, `sizeUnit`, `notional`, `delta`, `deltaPct`,
+  `roundTo`, `roundToTick`,
+  `epochSec` and the `candles.*` tests (any other kit function, `fromHex`
+  included, refuses);
+- no `bar.isLast()` or `bar.count()`, no drawing handle or `draw.*`
+  declaration, no string slot or string, none of the renderers
+  `render.text`, `render.label`, `render.table`, `render.shape`,
+  `render.stats_row`, `render.bgcolor` and `render.barcolor`, no frame,
+  level, panel, alert, strategy or `displacement_bars`, no `switch`, arrow
+  function or `onReset()` body; outputs, `range`, boxes, segments, a
+  `render.legend` entry over an output, a `render.hud` card over outputs
+  and a heatmap over the bar's cells are fine;
+- a scalar feed other than the chart's own candles declares
+  `missing: "nan"` (or `"zero"`), since carrying is its default; an
+  `interval` or `view` leg, a `candles` or `intrabar` stream and a tape
+  `history` depend on where the run starts.
+
+When the math needs earlier bars (moving averages and the other kit
+classes, cumulative deltas, session profiles, swings, zones), keep the
+kit classes and the module state it needs: that file correctly recomputes
+its history on a pan-back, and bending it to win the proof is wrong. The
+proof never outranks the request either: keep an alert, a drawing or a
+note the user asked for, and the file simply recomputes on a pan-back
+(Per-bar scripts).
+
 <!-- AUTO: END CODE-FIRST AUTHORING -->
 
 ## Metadata dialect
@@ -498,11 +603,11 @@ The `metadata` skeleton — `params` array, `inputSources` keyed by input name, 
 - `params` is an ARRAY of `{name, default, min?, max?}` objects with unique names; each compute param is read in `init()` through its `p_<name>()` accessor (underneath, values reach the module positionally in declaration order and the accessor pins that slot; a style knob keeps its position zero-filled, so its neighbours never shift).
 - `inputSources` is keyed BY INPUT NAME and each input must have a matching entry: `inputs[i].name` == the key. Feed sources need `field`. `inputs[i].index` is the slot `in_<name>()` reads; index 0 is the PRIMARY input and sets the grid every other input aligns to.
 - Scalar `source` must be one of: `ohlcv`, `trades`, `funding`, `oi`, `liquidations`, `implied_volatility`, `skew`, `token_supply`, `odds`, `metric`, `time`, `series` (there is no "market"/"price" source; close prices are `ohlcv`+`close`), or a chart-only class: `etf_flow`, `etf_holdings`, `etf_premium`, `volatility_index`, `long_short_ratio`, `options_oi`, `options_volume`, `ethena_positions`, `economic`, `treasury_balance`, `bitfinex_funding`. The chart's browser lane serves those eleven; the daemon and the hosted alerts lane refuse each by name (`wrun_<class>_unsupported`) before any fetch, and §"Source-declared indicators (code-first)" spells their knobs. A `time` input carries a fact of the primary bar (field `bar_open_sec`, its open in epoch seconds, the default; `trade_date`, epoch seconds at 00:00 UTC of its exchange trade date; `session`, 1 regular, 2 pre-market, 3 after-hours, 0 closed; never the primary input); the daemon refuses `trade_date` and `session` by name (`wrun_time_facts_unsupported`) on CME-group and US-equity venues, which the chart serves. A `series` input has `ref` instead of `field`, is never primary, and needs the daemon (§"Snapshots, panels and pane placement").
-- Celled classes (`cellType: "array"` + `max_cells` on the input, the sheet at `abi_version: "wrun-2"`), seven, with their tuple widths: `volume_profile` (`[low, high, buy, sell]`, 4), `book` (`[price, size, side]`, 3, `block_size` required), `tape` (`[offset_ms, price, size, side]`, 4, `min_size` required, daemon live only), `intrabar` (`[offset_ms, open, high, low, close, volume]`, 6), `trade_volume_by_size` (`[bucket, buy_usd, sell_usd, buy_count, sell_count]`, 5, `bucket` 1..7 by the USD size of an order), `options_chain` (ten values per listed contract, the live row only) and `candles` (`[offset_ms, open, high, low, close, volume]`, 6); the chart serves the last four; the daemon serves `intrabar` and `candles` and refuses `trade_volume_by_size` and `options_chain` by their own names. kScript `ltf()` -> `intrabar.cells`: `input("m1", intrabar.cells, { interval: "1m", max_cells: 60 })`, the `interval` REQUIRED and a whole divisor of the chart's from the eight interval words (finer than the chart's: a coarser leg is `ohlcv` with an `interval` and a `view`), the selector's own market or a `symbol` + `exchange` pin (kScript `ltf(interval, type, symbol, exchange)`), ohlcv only, `max_cells` at least the finer bars per chart bar (a 1h bar holds 60 1m bars, `wrun_intrabar_ratio_over_cap` names both numbers); the tuple carries `offset_ms` (kScript's `c[0]` = `in_time_sec() * 1000 + offset_ms`) and CLOSED finer bars only (an Indicator is FRESHER than the browser kScript lane, which froze `ltf` cells after the fetch); a covered bar with no finer bars reads 0 cells, a bar the finer history does not reach reads -1, blocks are never truncated. `candles.cells` is a leg's CLOSED candles as a stream: `interval` REQUIRED (any of the eight words: finer than, equal to or coarser than the chart's), `bars` the depth, the selector's market or a `symbol` + `exchange` pin; the first delivered row carries the backlog, each later one the candles that closed since; `max_cells` may be left out (the build declares max(bars, 2)); never index 0, so a lean file keeps a scalar `input` line above it. v1 limits: the daemon clamps leg history to what the key's data plan serves (about 365 days; 167 hours on Free) and puts a note naming the served start on the run, while the chart reaches 15,000 candles per interval; backtests and screens refuse every celled package, `intrabar` and `candles` included; an intraday `candles` leg pinned to a 24/7 market over a session-market chart can carry more than `max_cells` on the first row after a weekend (raise `max_cells`, or read in-bar candles through `intrabar`).
+- Celled classes (`cellType: "array"` + `max_cells` on the input, the sheet at `abi_version: "wrun-2"`), seven, with their tuple widths: `volume_profile` (`[low, high, buy, sell]`, 4), `book` (`[price, size, side]`, 3, `block_size` required), `tape` (`[offset_ms, price, size, side]`, 4, `min_size` required: a number or a param handle the run reads the floor from; `history` `"0"` or up to `"30d"`: the chart seeds it from the large-print lane, the daemon serves live prints only and refuses a non-zero `history` by name), `intrabar` (`[offset_ms, open, high, low, close, volume]`, 6), `trade_volume_by_size` (`[bucket, buy_usd, sell_usd, buy_count, sell_count]`, 5, `bucket` 1..7 by the USD size of an order), `options_chain` (ten values per listed contract, the live row only) and `candles` (`[offset_ms, open, high, low, close, volume]`, 6); the chart serves every class; the daemon serves `intrabar`, `candles` and live `tape` and refuses `trade_volume_by_size` and `options_chain` by their own names. kScript `ltf()` -> `intrabar.cells`: `input("m1", intrabar.cells, { interval: "1m", max_cells: 60 })`, the `interval` REQUIRED and a whole divisor of the chart's from the eight interval words (finer than the chart's: a coarser leg is `ohlcv` with an `interval` and a `view`), the selector's own market or a `symbol` + `exchange` pin (kScript `ltf(interval, type, symbol, exchange)`), ohlcv only, `max_cells` at least the finer bars per chart bar (a 1h bar holds 60 1m bars, `wrun_intrabar_ratio_over_cap` names both numbers); the tuple carries `offset_ms` (kScript's `c[0]` = `in_time_sec() * 1000 + offset_ms`) and CLOSED finer bars only (an Indicator is FRESHER than the browser kScript lane, which froze `ltf` cells after the fetch); a covered bar with no finer bars reads 0 cells, a bar the finer history does not reach reads -1, blocks are never truncated. `candles.cells` is a leg's CLOSED candles as a stream: `interval` REQUIRED (any of the eight words: finer than, equal to or coarser than the chart's), `bars` the depth, the selector's market or a `symbol` + `exchange` pin; the first delivered row carries the backlog, each later one the candles that closed since; `max_cells` may be left out (the build declares max(bars, 2)); never index 0, so a lean file keeps a scalar `input` line above it. v1 limits: the daemon clamps leg history to what the key's data plan serves (about 365 days; 167 hours on Free) and puts a note naming the served start on the run, while the chart reaches 15,000 candles per interval; backtests and screens refuse every celled package, `intrabar` and `candles` included; an intraday `candles` leg pinned to a 24/7 market over a session-market chart can carry more than `max_cells` on the first row after a weekend (raise `max_cells`, or read in-bar candles through `intrabar`).
 - A `shape_where`/`color_by` gate must be a DIFFERENT output (usually `"plot": ""` data-only); an output cannot gate or color itself.
 
 ## Input pins
-Fixed-market pins (`symbol` + `exchange` together, primary follows the selector); `interval` pins are legal, on the as-of clock, with a `view`: confirmed, forming, is_new_period, offset; `bars` deepens a leg, and the `candles` class carries a leg's history.
+Fixed-market pins (`symbol` + `exchange` together; the primary follows the selector); `interval` pins are legal, as-of, with views; and leg depth.
 
 **Cross-symbol pins.** A non-odds, non-time FEED source may pin `symbol` and `exchange` TOGETHER so a secondary input reads a fixed reference market while the rest of the package follows the selector: `"btc_close": { "source": "ohlcv", "field": "close", "symbol": "BTCUSDT", "exchange": "BINANCE_FUTURES" }` gives any alt selector a BTC context input (ratios, cross-venue context). The pair rule is SCHEMA-ENFORCED: a lone `symbol` or a lone `exchange` is refused with the issue on the missing half (`feed sources pin a fixed market with symbol AND exchange together (never one alone: symbols are venue-native, so a lone symbol or a lone exchange names a market that does not exist on that venue); pin both, or omit both to follow the selector`). The rest is authoring policy the schema cannot check:
 - Pin `symbol` and `exchange` together, never one alone: symbols are venue-native strings (`BTCUSDT` on BINANCE_FUTURES is `BTC` on HYPERLIQUID).
@@ -623,14 +728,15 @@ centred text. Reuse object ids across bars:
 500 live per kind, 1500 total, 4096 draw calls per row, 100,000 points per polyline
 and 524,288 across the live ones.
 
-Use a metadata-first workspace for `inputSources[name]` with `source: "series"`,
-`ref` equal to `watch/<slug>/<key>` or an installed `@scope/name`, and optional
-`missing: "carry"` (default) or `"nan"`. Series works on every ABI but is daemon-only,
-never the primary input, and takes no `field` or market pins. Read it through
-`in_<name>()`. Values bucket to the primary grid; the last reading wins and carry
-uses only an earlier or current bucket. There is no code-first series declaration;
-do not add one or patch a generated sheet. Chart hosts cannot supply this input,
-and a line-only `chart_indicator_preview` does not prove any frame or HUD rendered.
+Declare a series input in code: `input("aqi", series.value, { ref: "@scope/name",
+missing: "carry" })`, `ref` a published feed's `@scope/name` or, on the daemon only,
+`watch/<slug>/<key>`, and `missing: "carry"` (default) or `"nan"`. The derived sheet
+entry is `{ source: "series", field: "value", ref, missing }`; a hand-written sheet
+may leave `field` out. Series works on every ABI, is never the primary input and
+takes no market pins. Read it through `in_<name>()`. Values bucket to the primary
+grid; the last reading wins and carry uses only an earlier or current bucket. Charts
+read `@scope/name` feeds on 1m to 1W bars behind `wrun-feed-v1`, and a line-only
+`chart_indicator_preview` does not prove any frame or HUD rendered.
 
 <!-- AUTO: ARGUMENT CONTRACT — do not edit by hand. Regenerate with `bun packages/cli/scripts/gen-skills.ts` -->
 
@@ -640,7 +746,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 
 - `wrun_create`
   - `dir` — Defaults to the package short name.
-  - `source_mode` — `open` (the default; the manifest carries no source block) ships the source entry beside the module, the registry serves it to readers; `compiled` ships the module alone and the source stays local; `hosted` ships the module alone to run on…
+  - `source_mode` — `open` (the default; the manifest carries no source block) ships the source entry beside the module, and the registry serves it to readers.
 
 <!-- AUTO: END ARGUMENT CONTRACT -->
 

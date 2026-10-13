@@ -238,6 +238,8 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
 - `series_create`
   - `cadence` — 1m, 5m, 15m, 30m, 1h, 4h, 1d or 1w; defaults to the watch schedule rounded up.
   - `scope` — Publisher scope; defaults to the signed-in account's username.
+- `series_publish`
+  - `registry` — Omit for the configured registry.
 - `wrun_source_set`
   - `sourceName` — Defaults to the package's only odds source.
 
@@ -294,7 +296,7 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 
 - `om series create` (action: `series_create`) — Author a live-series package from a watch's committed numeric history.
 - `om series list` (action: `series_list`) — List locally authored live series with their address, version, row count, publication time and cadence.
-- `om series publish` (action: `series_publish`) — Refresh and publish a live-series snapshot.
+- `om series publish` (action: `series_publish`) — Refresh and publish a live-series snapshot: declares the feed on the relay, pushes the snapshot's readings, then publishes the listing.
 - `om series show` (action: `series_show`) — Read an authored series or the newest installed snapshot, including its metadata and last five rows.
 
 - `om terms` — Print the marketplace terms and whether this account accepted the current version

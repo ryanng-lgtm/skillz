@@ -247,7 +247,7 @@ A metric source reads the pane's market and interval unless `selector` is given,
 
 | Plot | Flags and input |
 | --- | --- |
-| Ordinary series | `--kind line|area|histogram|step|markers`; `--pane lower|overlay`; `--scale shared|own` only on overlay |
+| Ordinary series | `--kind line|area|histogram|step|markers`; `--pane lower|overlay`; `--scale shared|own` only on overlay; `--group <id>` puts several lower series in one pane with one shared scale, up to 8 per group |
 | Price levels | `--kind levels --pane overlay --dock right|left`; `--prices` with `--values`, or `--rows '[[price,value,color?],...]'`; `--width-frac`, `--poc`, `--labels` |
 | Inset | `--kind inset --pane overlay --dock top|bottom`; `--height-px 16..120`, `--shape histogram|area|line`; times and values |
 | Main plot | `--pane main --kind line|area|step --cadence <interval>`; watch sources derive cadence when omitted |
@@ -256,7 +256,7 @@ Action inputs put level options in `levels`, inset options in `inset`, and main 
 Levels use strictly monotonic `prices`, matching `values` and optional hex `colors`, with no `times`.
 Main plots floor seconds to their cadence grid and keep the last reading per bucket.
 Supported grids are 1m, 5m, 15m, 30m, 1h, 4h, 1d and 1w.
-Limits: 2000 time rows, 512 levels, 16 series per chart, and 96 KiB for the whole intent.
+Limits: 2000 time rows, 512 levels, 16 series per chart, 8 per group, and 96 KiB for the whole intent.
 
 ## Panels
 
@@ -315,6 +315,7 @@ The stored source cadence rounds up to a supported main-plot interval; an unknow
 `symbol` and `exchange` are ignored for this create form. Named workspace reuse keeps the existing setup.
 An `@scope/name` address refuses with `series_ref_unsupported`; use `om series` for that address form.
 `chart_symbol` accepts `series:<id>` or `panel:<id>` with exchange `OM` and sets the matching `OM|<target>` transform.
+A series target's main plot IS its target id: a `pane: main` push under another id is plotted as `<id>` and the reply says so; a second series on that pane goes to `overlay` or `lower`.
 Targets are not market selectors. A metric series cannot replay onto a target pane; watch series, panels and widgets replay independently of market.
 
 ## Panes and layout
@@ -738,6 +739,7 @@ Recovery rules:
 - `request_failed` → a direct gateway REST call failed without a typed upstream code (network/HTTP-level). Report it as unreachable; one attempt, no retry loop.
 - `TIER_LIMIT_EXCEEDED` → the account's plan does not include what was asked (a grid past one cell, a pane count past the tier cap). Say so plainly with the limit and the requested size from the detail; never retry, and never quietly fall back to a smaller layout the user did not ask for.
 - `CONFLICT` → the write lost a race with a live edit (a person editing the same grid) and did NOT land. Send the same call again once; if it conflicts again, say the grid is being edited rather than looping.
+- `MULTIMODE_UNSUPPORTED` → the workspace shows a monitor grid, which refuses plot type and drawings; nothing changed. `chart_layout` swaps the grid for a standard pane shape, then resend once. That removes the user's grid, so ask first.
 - `CLIENT_VALIDATION` → a drawing call refused BEFORE any network submit (bad roles/anchor count/direction/`text` on geometry). It returns as a normal result with `ok: false` — read the envelope, not just an error flag. Fix the named field once; never claim drawn. One detail is not a malformed call: `unsupported action: <verb>` is an om daemon older than the CLI refusing a verb it does not know (seen with `chart_grid`); the fix is `om service restart`, not a rewrite.
 - `TRANSPORT` → the bridge socket dropped with the intent in flight — the outcome is UNKNOWN: the change may have applied before the drop. Re-read the chart first (`chart_refresh` — `chart_status` only answers bridge connectivity, not chart content) and retry ONLY if the change is absent from the fresh read — a blind retry double-draws on `chart_drawing_add` (idempotent setters merely degrade to `NO_CHANGE`). If `chart_status` stays `reconnecting`, report the bridge down and stop.
 - `TIMEOUT` → no ack within the bridge deadline — same outcome-unknown rule as `TRANSPORT`: re-read the chart first, retry only if the change is absent.
@@ -940,7 +942,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart plot-type` (action: `chart_plot_type`) — Change a chart pane's plot type to one of the 18 renderer enum names.
 - `om chart refresh` (action: `chart_refresh`) — Read the LIVE state of the chart workspace as it is right now.
 - `om chart scan clear` (action: `chart_scan_push`) — Replace the transient scan canvas and run HUD with a complete snapshot.
-- `om chart scan play` — Stream scan frames from a JSONL file or stdin as one run from one process: each line is a `chart scan push` frame, one in flight at a time, one JSON ack line per frame (see §"Scan").
+- `om chart scan play` — Stream scan frames from a JSONL file or stdin as one run from one process: each line is a `chart scan push` frame, one in flight at a time, one JSON ack line per frame (see chart-actions.md §"Scan").
 - `om chart scan push` (action: `chart_scan_push`) — Replace the transient scan canvas and run HUD with a complete snapshot.
 - `om chart screenshot` (action: `chart_screenshot`) — Render a PNG snapshot of a workspace by short id or share-link URL.
 - `om chart select` (action: `chart_workspace_select`) — Make a workspace the ACTIVE one: this connection's live session moves to it, it becomes the saved default, and every later chart action with `workspaceId` omitted lands on it.

@@ -34,7 +34,7 @@ Required environment:
 
 | Var | Purpose |
 | --- | --- |
-| `OM_API_KEY` | OpenMarket Data API auth. Captured interactively by `om init` (stored in `~/.openmarket/om.sqlite`) or exported as an env var. |
+| `OM_API_KEY` | OpenMarket Data API auth. Captured interactively by `om init` (stored in `~/.openmarket/om.sqlite`) or exported as an env var. A home signed in with `OM_LOGIN_LANE=session` holds no login key: candles and venue-scoped listings can ride the sign-in, and one API key is minted the first time other data needs it. |
 | `OM_BASE_URL` (optional) | Override the REST base URL; defaults to `https://api.openmarket.xyz`. |
 | `OM_BIND` (optional) | Daemon HTTP bind target; defaults to `127.0.0.1:31337`. Non-loopback binds require a token (auto-generated to `~/.openmarket/runner.token`). |
 
