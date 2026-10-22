@@ -41,6 +41,18 @@ esac; done
 
 say() { printf '%s\n' "$*"; }
 die() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
+# quiet DIR CMD...: run CMD in DIR with its output captured. Print the tail only
+# when it fails -- a bare "FAIL: monorepo compile" hid a Bun version-pin error.
+quiet() {
+  local dir=$1 log rc; shift
+  log=$(mktemp) || return 1
+  ( cd "$dir" && "$@" ) >"$log" 2>&1; rc=$?
+  if [ "$rc" != 0 ]; then
+    say ""; say "-- last 30 lines of: $* --"; tail -30 "$log"
+  fi
+  rm -f "$log"
+  return "$rc"
+}
 
 # Staged assets are a working-tree overwrite of committed stubs. Restore them on
 # EVERY exit path -- failure and Ctrl-C included, which is where they used to leak.
@@ -180,11 +192,11 @@ fi
 # ---------------------------------------------------------------- build
 if [ "$NO_GUI" = 0 ]; then
   say ""; say "== build =="
-  ( cd "$MONO" && bun install ) >/dev/null 2>&1 || die "monorepo bun install"
+  quiet "$MONO" bun install || die "monorepo bun install"
   if [ -z "$LINK" ]; then
     # gate [8] flagged a registry copy; link to the monorepo source (SKILL.md:
     # stay linked -- the published package's constants trail the daemon's era)
-    ( cd "$GUI" && OM_REPO="$MONO" bun run rooms-client:link ) >/dev/null 2>&1 || die "rooms-client:link"
+    quiet "$GUI" env OM_REPO="$MONO" bun run rooms-client:link || die "rooms-client:link"
     say "rooms-client:          linked to monorepo source"
   fi
   if [ -z "$LINK" ] || [ "${RC_STALE:-0}" != 0 ] || [ "${RC_CONST_STALE:-0}" != 0 ] || [ "$src_ver" != "$run_ver" ]; then
@@ -201,7 +213,7 @@ if [ "$NO_GUI" = 0 ]; then
   # rooms-client APIs newer than its pin otherwise builds against the old
   # package and dies on missing exports.
   if [ -z "$(link_status)" ]; then
-    ( cd "$GUI" && OM_REPO="$MONO" bun run rooms-client:link ) >/dev/null 2>&1 \
+    quiet "$GUI" env OM_REPO="$MONO" bun run rooms-client:link \
       || die "rooms-client:link (re-link after GUI bun install)"
     say "rooms-client:          re-linked after bun install"
   fi
@@ -230,7 +242,7 @@ if [ "$NO_GUI" = 0 ]; then
   cp "$GUI/dist/assets/rooms.css" "$SLOT/rooms.css" || die "stage rooms.css"
   cp "$GUI/dist/index.html"       "$SLOT/index.html.txt" || die "stage index.html"
   STAGED=1
-  ( cd "$MONO" && bun packages/cli/scripts/pack-rooms-gui-extra.ts "$GUI/dist" "$SLOT/extra.json.txt" ) >/dev/null 2>&1 \
+  quiet "$MONO" bun packages/cli/scripts/pack-rooms-gui-extra.ts "$GUI/dist" "$SLOT/extra.json.txt" \
     || die "pack-rooms-gui-extra"
   grep -l "__OM_ROOMS_GUI_STUB__" "$SLOT/rooms.js" "$SLOT/extra.json.txt" >/dev/null 2>&1 \
     && die "stub marker still present -- the embed would serve the placeholder"
@@ -262,7 +274,7 @@ if [ "$MODE" = repo ] && [ -n "$pid" ]; then
   sleep 3
   curl -s -o /dev/null -m 3 "$HEALTH" && die "service still answering after stop; refusing to overwrite a running binary"
 fi
-( cd "$MONO" && bun install && bun run build ) >/dev/null 2>&1 || die "monorepo compile"
+{ quiet "$MONO" bun install && quiet "$MONO" bun run build; } || die "monorepo compile"
 [ -x "$OUT" ] || die "no binary at $OUT"
 NEWVER=$("$OUT" --version) || die "compiled binary will not run"
 SIZE=$(ls -lh "$OUT" | awk '{print $5}')
