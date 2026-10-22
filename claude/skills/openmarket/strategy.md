@@ -155,7 +155,7 @@ Pausing the SOURCE watch auto-pauses a strategy step on another watch reading it
 
 The disclosures a replay result carries beside its return; read before presenting one.
 
-- The window. `window` is capped at 365 days ending at `until` (default now); with nothing asked, a run looks back a year on HOUR and coarser bars, a month on finer ones and 90 days on an event-anchored run (the verdict-step form). Beyond what the data plan serves, `backtest_run` narrows to what it serves and `backtest_spec` refuses. Say what was replayed.
+- The window. `window` is capped at 365 days ending at `until` (default now); with nothing asked, a run looks back a year on HOUR and coarser bars, a month on finer ones and 90 days on an event-anchored run (the verdict-step form). Beyond what the data plan serves, `backtest_run` narrows to what it serves and `backtest_spec` refuses. A sign-in's window past its chart bar cap (a month of 1m bars) is refused `session_depth_refused`, not narrowed. Say what was replayed.
 - The interval, and why: a condition candidate folds on its primary operand's own cadence.
 - The in-market share: `time_in_market_pct` (a fraction) beside the trade count. About two bars per trade is a sign the rule encoded a trigger, not a regime, whatever the return says.
 - No short margin on a watch-strategy replay: adverse shorts ride to the window edge un-liquidated (`short_margin_unmodeled` in `warnings`); a perps package replay models liquidation and warns when one fired, and a spot package has no margin or liquidation model.

@@ -39,7 +39,7 @@ A freshly created watch or strategy step is backtested when the user asks, never
 
 **What a result owes, beside the return.**
 
-- The window replayed: `window` caps at 365 days ending at `until` (default now); omitted, a run looks back 90 days on an event-anchored replay, a year on HOUR and coarser bars, a month on finer ones. Beyond what the data plan serves, `backtest_run` narrows to what it serves and reports it as `window_clamped`; `backtest_spec` refuses.
+- The window replayed: `window` caps at 365 days ending at `until` (default now); omitted, a run looks back 90 days on an event-anchored replay, a year on HOUR and coarser bars, a month on finer ones. Beyond what the data plan serves, `backtest_run` narrows to what it serves and reports it as `window_clamped`; `backtest_spec` refuses. A sign-in's window past its chart bar cap (a month of 1m bars) is refused `session_depth_refused`, not narrowed.
 - The interval, and why: a condition candidate folds on its primary operand's own cadence (live parity); an event-anchored run takes the window's rung; an explicit interval that diverges warns `cadence_mismatch`, and none is ever coarser than an explicit hold.
 - The in-market share: `time_in_market_pct`, a fraction, beside the trade count; about two bars per trade is a sign the rule encoded a trigger, not a regime, whatever the return says.
 - No short margin on a watch-strategy replay: adverse shorts ride to the window edge un-liquidated (`short_margin_unmodeled` in `warnings`), and leverage above 1 refuses (§"Warnings and limits"); a package replay runs on the engine's broker, which on a perps package (`instrument: "perps"`) models the declared leverage and liquidation and warns when one fired, and on a spot package ignores leverage.
@@ -162,6 +162,8 @@ om backtest spec \
   --slippage-bps 10 \
   --format json --compact
 ```
+
+**Two engines.** `--engine` picks what fills the replay: `venue` (the default) is the venue replay above; `package` resolves the strategy to a stock strategy package (`@om-core/target`, or `@om-core/accumulate` for an accumulate sizer), writes the replay's decisions (the fold's level, the ai step's verdicts, or the fixed view) as a series the package binds, and fills through the engine's broker. Costs and capital are then the package's sheet: `--fee-bps`, `--slippage-bps`, `--latency-bars` and `--initial-cash` are refused by name, and a hold or a time stop becomes the package's bar-count time stop (the earlier of the two). A package target already runs on the engine, so it refuses `--engine`.
 
 ## Candidates and promotion
 
@@ -386,6 +388,7 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `slippage_bps` — Omit unless the user named it: the defaults are what users expect, and a value copied from an earlier call in this conversation may predate the user's ask.
   - `latency_bars` — Omit unless the user named it: the defaults are what users expect, and a value copied from an earlier call in this conversation may predate the user's ask.
   - `initial_cash` — Omit unless the user named it: the defaults are what users expect, and a value copied from an earlier call in this conversation may predate the user's ask.
+  - `engine` — `venue` (default) or `package`: a stock strategy package trades the replay's decisions on the engine's broker, at its own costs.
 - `backtest_run` · `backtest_spec`
   - `max_llm_calls` — Default 400.
 - `backtest_spec`

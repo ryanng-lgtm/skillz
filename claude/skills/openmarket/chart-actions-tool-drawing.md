@@ -1,6 +1,6 @@
 ---
 name: openmarket-chart-actions-tool-drawing
-description: Draw, auto-draw, inspect, and remove chart drawing tools on a chart workspace via `om chart drawing ...`. Covers every Super Search drawing tool — trend/ray/parallel lines, rectangles/ellipses, fibonacci retracement & trend, arrows (Momentum/Flow/…), markers, price/date ranges, long/short positions, and text annotations. Read this when the user asks to draw / add / place a tool on a chart, mark a level, box a range, annotate, plot a fib, set up a long/short position, or remove a drawing. `drawing auto` computes trader-meaningful anchors from market data; `drawing add` takes caller-supplied role-tagged anchors; `drawing schema` lists a tool's anchor roles. Companion to `chart-actions.md` (the broader `om chart` bridge).
+description: Draw, auto-draw, restyle, inspect, and remove chart drawing tools on a chart workspace via `om chart drawing ...`. Covers every Super Search drawing tool — trend/ray/parallel lines, rectangles/ellipses, fibonacci retracement & trend, arrows (Momentum/Flow/…), markers, price/date ranges, long/short positions, and text annotations. Read this when the user asks to draw / add / place a tool on a chart, mark a level, box a range, annotate, plot a fib, set up a long/short position, or remove a drawing. `drawing auto` computes trader-meaningful anchors from market data; `drawing add` takes caller-supplied role-tagged anchors; `drawing schema` lists a tool's anchor roles. Companion to `chart-actions.md` (the broader `om chart` bridge).
 user-invocable: true
 allowed-tools:
   - Bash(om *)
@@ -14,7 +14,7 @@ Drawing-tool lifecycle for the Collab Service Bridge. These verbs add, auto-draw
 inspect, and remove chart drawings on a workspace. For bridge health, workspace
 state, chart symbol/interval/layout, and indicators, see `chart-actions.md`.
 
-`drawing add` and `drawing remove` call the daemon but fall back to direct gateway REST
+`drawing add`, `drawing update` and `drawing remove` call the daemon but fall back to direct gateway REST
 when it is down (`drawing auto` needs the running daemon; `drawing schema` is local).
 
 Every drawing tool in the chart's Super Search palette is on the wire — lines, shapes/ranges, fibonacci, arrows, markers, positions, and annotations. Use the tool name as it appears in Super Search (e.g. `TrendLine`, `FibonacciRetracement`, `Rectangle`). On the chart, both `auto` and `add` render the same way: a ghost cursor opens **Super Search**, types the tool name, arrows to the tool row, and draws at the anchors.
@@ -31,6 +31,7 @@ The mutating verbs target a pane via `workspaceId` plus `chartIndex` (chart 0 is
 | --- | --- | --- |
 | `chart_drawing_auto` (`om chart drawing auto`) | `add_drawing` | yes |
 | `chart_drawing_add` (`om chart drawing add`) | `add_drawing` | falls back to gateway REST when down |
+| `chart_drawing_update` (`om chart drawing update`) | `update_drawing` | falls back to gateway REST when down |
 | `chart_drawing_schema` (`om chart drawing schema`) | (local, read-only) | no |
 | `chart_drawing_remove` (`om chart drawing remove`) | `remove_drawing` | falls back to gateway REST when down |
 | `chart_drawing_list` (`om chart drawing list`) | (live session read) | yes |
@@ -89,6 +90,20 @@ Cross-field invariants the bridge enforces locally (mirrors the server-side chec
 - All anchors target the same `chartIndex`.
 - `tool` is in the supported set; the supplied roles match the tool and the anchor count matches.
 - Each anchor's `time`/`price` matches the input it came from (the bridge constructs both halves of the envelope from the same input — they cannot drift).
+
+## Style, and `chart_drawing_update`: restyle, move or relabel by id
+
+`style` on `chart_drawing_add` and `chart_drawing_auto` sets the tool's look (colors, widths, line styles, fills,
+levels). `chart_drawing_schema` with the tool named lists its style keys with kind, default, and range or options
+(without a tool, every tool with its key names only); an unknown key or an out-of-range value is a
+`CLIENT_VALIDATION` refusal naming the valid keys, before anything is sent. Colors are `#RRGGBB`, `#RRGGBBAA` (alpha
+last) or `rgb(...)`/`rgba(...)`; a level list carries every key of the default's levels.
+
+`chart_drawing_update` changes a drawing already on the chart by its `drawingId` (from `chart_drawing_list`, which
+also returns each drawing's current `style`): `style` merges only the keys passed, `anchors` replace every point (all
+the tool's roles, as for `chart_drawing_add`), `text` relabels. The tool type is read from the live chart.
+On the CLI, `--style` takes `k=v,k=v` (numbers and true/false are read as such) or a JSON object; use the JSON form
+for exact types, lists (`extendSides`, `stats`, levels) and `rgba(...)` colors.
 
 ## `chart_drawing_remove` — delete a drawing by id
 
@@ -165,6 +180,10 @@ om chart drawing add --workspace <workspaceId> --chart 0 --tool TrendLine \
 om chart drawing add --workspace <workspaceId> --chart 0 --tool FibonacciRetracement \
   --anchor from=$(date +%s):92000 --anchor to=$(($(date +%s) + 86400)):98000
 
+# Restyle a drawing by id (ids and current style from `om chart drawing list`).
+om chart drawing update --workspace <workspaceId> --chart 0 --id <drawingId> \
+  --style '{"color": "#FF000033", "lineWidth": 3, "lineStyle": "dashed"}'
+
 # Remove a drawing by id (ids from `om chart drawing list`).
 om chart drawing remove --workspace <workspaceId> --chart 0 --id <drawingId>
 
@@ -182,10 +201,12 @@ date -u -j -f '%Y-%m-%d %H:%M:%S' '2026-05-15 00:00:00' +%s
 
 What each tool here fills in when a field is omitted — the defaults and omit-rules its schema states on top-level fields and one object level down; prose never restates them.
 
-- `chart_drawing_add` · `chart_drawing_auto` · `chart_drawing_list` · `chart_drawing_remove`
+- `chart_drawing_add` · `chart_drawing_auto` · `chart_drawing_list` · `chart_drawing_remove` · `chart_drawing_update`
   - `workspaceId` — OMIT to act on the user's ACTIVE workspace (the daemon resolves it live); omitting is the default and the correct call for 'my chart' / 'this workspace'.
-- `chart_drawing_add` · `chart_drawing_auto`
+- `chart_drawing_add` · `chart_drawing_auto` · `chart_drawing_update`
   - `chartIndex` — default 0
+  - `style` — Style overrides keyed by the tool's style fields; `chart_drawing_schema` lists each tool's keys, kinds and defaults, and an unknown key is refused by name.
+- `chart_drawing_add` · `chart_drawing_auto`
   - `metaId` — default "main"
 - `chart_drawing_auto`
   - `normalizedSymbol` — Supply ONE of the three symbol forms, or omit all to use the chart pane's current market.
@@ -211,6 +232,9 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 - `chart_drawing_remove`
   - on `TIMEOUT` — The connection to the chart service dropped or timed out with this change in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
   - on `TRANSPORT` — The connection to the chart service dropped or timed out with this change in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+- `chart_drawing_update`
+  - on `TIMEOUT` — The connection to the chart service dropped or timed out with this change in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
+  - on `TRANSPORT` — The connection to the chart service dropped or timed out with this change in flight, so the outcome is UNKNOWN — the change may already have applied. Re-read the chart with chart_refresh and retry only if the change is absent from the fresh read; a blind retry can apply it twice.
 
 <!-- AUTO: END RESULT CONTRACT -->
 
@@ -222,8 +246,9 @@ Every `om` command this skill covers, one line each with its action name — che
 
 - `om chart drawing add` (action: `chart_drawing_add`) — Draw ANY chart tool at anchors you already know (the user named exact price/time levels, or you computed them).
 - `om chart drawing auto` (action: `chart_drawing_auto`) — Draw a chart tool (trend/ray/parallel lines, rectangle/ellipse, fibonacci retracement & trend, arrows like Momentum/Flow, markers, price/date ranges, long/short positions, and annotations) with trader-meaningful anchors computed from recent candles (swing highs/lows).
-- `om chart drawing list` (action: `chart_drawing_list`) — List the drawings on the live chart with their `drawingId` (the handle `chart_drawing_remove` needs), tool, anchors, and author (`self`, `peer` with its id, `human`, or `unknown` when OpenMarket never saw the add) plus the author's stated reason.
+- `om chart drawing list` (action: `chart_drawing_list`) — List the drawings on the live chart with their `drawingId` (the handle `chart_drawing_remove` and `chart_drawing_update` need), tool, anchors, `style`, and author (`self`, `peer` with its id, `human`, or `unknown` when OpenMarket never saw the add) plus the author's stated reason.
 - `om chart drawing remove` (action: `chart_drawing_remove`) — Remove drawing tools from a chart pane by id: `drawingId` for one, or `ids` for several on the same pane in ONE call, never a loop of single calls.
-- `om chart drawing schema` (action: `chart_drawing_schema`) — Show a drawing tool's anchor schema: the role names (in wire order), how many anchors it needs, whether the role repeats, and whether it takes author text.
+- `om chart drawing schema` (action: `chart_drawing_schema`) — Show a drawing tool's anchor schema: the role names (in wire order), how many anchors it needs, whether the role repeats, whether it takes author text, and its style fields (key, kind, default, range or options).
+- `om chart drawing update` (action: `chart_drawing_update`) — Change a drawing already on the chart, by its `drawingId` (from `chart_drawing_list` or `chart_drawing_add`): `style` restyles it (keys from `chart_drawing_schema`), `anchors` move it (one role-tagged anchor per point, as `chart_drawing_add` takes them, times in epoch milliseconds), `text` relabels it.
 
 <!-- AUTO: END COMMAND REFERENCE -->
