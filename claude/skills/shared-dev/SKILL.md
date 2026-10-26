@@ -206,8 +206,12 @@ the background (it can take hours). It refuses while other sessions are
 connected to `data`; find out who (`pg_stat_activity` application names,
 other Claude sessions) and ask Ryan rather than stopping them. A migration
 that fails with `function … does not exist` means the dev DB's
-`kiyotaka_toolkit` extension is older than prod's (main's `1791976706` needs
-32.x; the dev DB had 30.1.0 on 2026-10-26): that is Ryan's to upgrade.
+`kiyotaka_toolkit` extension is older than prod's. Check whether any later
+migration uses that migration's objects; if none does, `rebaseline plan/apply
+--skip <version>` marks it applied without running it and records it, and
+every run warns until it is applied by hand after the upgrade. On 2026-10-26
+`1791976706` (volume profile v4, needs kiyotaka_toolkit 32.0.0) was skipped
+this way; the dev DB has 30.1.0.
 
 ## Common mistakes
 
