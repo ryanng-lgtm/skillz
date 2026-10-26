@@ -117,11 +117,12 @@ built on stale refs.
    call, every question `multiSelect: true`:
    - **Detected:** the `state=sync` candidates from steps 2–3, sorted dirty-first, then by `behind`
      descending. Label is the repo name. Description is the reason and state, e.g.
-     `MR !2402 · 5 behind · 3 uncommitted` or `edited this session · 12 behind`. If there are more
-     than 4, spread them over extra questions, keeping one for stacks when it is asked. If there
-     are more than 12, print a numbered list instead and ask for numbers, names, or `all`, and say
-     how many were listed. If nothing was detected, say so, then ask only the stacks question in a
-     fresh session, or stop otherwise.
+     `MR !2402 · 5 behind · 3 uncommitted` or `edited this session · 12 behind`. With two or more
+     candidates, the first option is **All**, which selects every candidate; its description lists
+     the repo names. Spread candidates that do not fit over extra questions, keeping one for stacks
+     when it is asked. If they still do not fit, print a numbered list instead and ask for numbers,
+     names, or `all`, and say how many were listed. If nothing was detected, say so, then ask only
+     the stacks question in a fresh session, or stop otherwise.
    - **Stacks:** only when step 2 found no session repos. One option per stack. Description is its
      repo list. A session that has touched repos already says what to sync; leave the stacks out
      and mention that `/syncup <stack>` still works.
