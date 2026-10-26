@@ -75,7 +75,7 @@ commits, not edited by hand, and aren't listed.
 | `panos` | `/panos [MR ...]` | Once MRs have landed, reviews each one the way Panos would (codex `gpt-6.1-sol` on a brief distilled from Panos's real review threads), verifies every finding against the code, then fixes and pushes the real ones. Never comments on the MR. |
 | `prompt-ready` | `/prompt-ready` | Persistent mode that turns raw, natural-language requests into clean, self-contained, copy-paste-ready prompts for a different session. |
 | `socratic-teacher` | `/socratic-teacher [topic]` | Session toggle for teaching mode: one guiding question per turn with at least one reference, never the full solution; partial hints only after 3+ stuck attempts. Stays on until "stop socratic mode". |
-| `syncup` | `/syncup [repo ...]` | Refreshes main from origin, rebases the working branch onto it, resolves every conflict, and hands uncommitted work back intact. Never pushes. |
+| `syncup` | `/syncup [repo ...]` | Refreshes main from origin, rebases the working branch onto it and every behind MR onto its target branch, resolves every conflict, and hands uncommitted work back intact. Force-pushes the rebased MR branches, with a lease, and nothing else. |
 | `testing-harness` | `/testing-harness` | Proves a change in the real running app rather than in tests. `--parity-check` diffs the cloud deployment against the local daemon visually; `--regression` (designed, not yet built) checks the running app against invariants and a baseline. |
 | `war-diary` | — | Turns a day of GitLab `.atom` activity plus the day's Claude Code sessions into Frontend War Diaries daily-log notes and matching Kanban cards. |
 
