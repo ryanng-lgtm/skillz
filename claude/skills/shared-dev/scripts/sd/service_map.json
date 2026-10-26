@@ -1,0 +1,72 @@
+{
+  "order": [
+    "metadata-instrument",
+    "tsdb-registry",
+    "tsdb-read",
+    "tsdb-api",
+    "tsdb-write",
+    "stream-deduplicated",
+    "live-feed",
+    "streamd"
+  ],
+  "deps": {
+    "metadata-instrument": [],
+    "tsdb-registry": ["metadata-instrument"],
+    "tsdb-read": ["metadata-instrument"],
+    "tsdb-api": ["metadata-instrument"],
+    "tsdb-write": ["metadata-instrument"],
+    "stream-deduplicated": [],
+    "live-feed": ["metadata-instrument", "tsdb-read"],
+    "streamd": ["metadata-instrument"]
+  },
+  "binaries": {
+    "metadata-instrument": {"repo": "metadata-instrument", "pkg": "./cmd/metadata-instrument", "name": "metadata-instrument"},
+    "tsdb-registry": {"repo": "tsdb-gateway", "pkg": "./cmd/tsdb-gateway", "name": "tsdb-gateway"},
+    "tsdb-read": {"repo": "tsdb-gateway", "pkg": "./cmd/tsdb-gateway", "name": "tsdb-gateway"},
+    "tsdb-api": {"repo": "tsdb-gateway", "pkg": "./cmd/tsdb-gateway", "name": "tsdb-gateway"},
+    "tsdb-write": {"repo": "tsdb-gateway", "pkg": "./cmd/tsdb-gateway", "name": "tsdb-gateway"},
+    "stream-deduplicated": {"repo": "stream-deduplicated", "pkg": "./cmd/stream-deduplicated", "name": "stream-deduplicated"},
+    "live-feed": {"repo": "live-feed", "pkg": "./cmd/live-feed", "name": "live-feed"},
+    "streamd": {"repo": "streamd", "pkg": "./cmd/streamd", "name": "streamd"}
+  },
+  "libraries": {
+    "kiyotaka-go": "gitlab.com/openmarketxyz/go-backend/kiyotaka-go",
+    "replayer": "gitlab.com/openmarketxyz/go-backend/replayer"
+  },
+  "rules": {
+    "tsdb-gateway": [
+      {"globs": ["**/*_test.go", "**/testdata/**", "internal/testdb/**", "internal/testkit/**"], "skip": true},
+      {"globs": ["migrations/**", "cmd/tsdb-gateway/handle_migrate*.go"], "services": ["tsdb-read", "tsdb-api"], "data": ["clones"], "migrations": "tsdb"},
+      {"globs": ["schema*.yaml"], "services": ["tsdb-read", "tsdb-api"], "data": ["clones"], "migrations": "tsdb"},
+      {"globs": ["cmd/tsdb-gateway/handle_control*.go", "pkg/tsdb/cjobinserts/**", "internal/xlsx/**", "internal/gateway/hyperliquid/**"], "services": [], "data": ["clones"], "cjob": true},
+      {"globs": ["cmd/tsdb-gateway/handle_registry*.go", "internal/gateway/registrar/**", "pkg/tsdb/registry/**"], "services": ["tsdb-registry"], "data": ["api"]},
+      {"globs": ["cmd/tsdb-gateway/handle_write*.go", "cmd/tsdb-gateway/handle_book_builder*.go", "cmd/tsdb-gateway/handle_reconstructor*.go", "internal/gateway/writer/**", "internal/gateway/reconstructor/**", "internal/book/**", "internal/backfillhold/**", "internal/kafka_producer/**", "pkg/tsdb/inserts/**", "inserts.yaml"], "services": ["tsdb-write", "stream-deduplicated", "streamd"], "data": ["live"], "capture": true},
+      {"globs": ["cmd/tsdb-gateway/handle_api*.go", "cmd/tsdb-gateway/handle_mcp*.go", "cmd/tsdb-gateway/handle_embeddings*.go", "internal/gateway/mcp/**", "internal/gateway/embeddings/**", "pkg/jsoncol/**"], "services": ["tsdb-api"], "data": ["clones"]},
+      {"globs": ["cmd/tsdb-gateway/handle_read*.go", "internal/gateway/reader/**", "internal/gateway/api/**", "internal/gateway/authz/**", "internal/gateway/flags/**", "internal/optionviews/**", "internal/middleware/**", "pkg/easyjsonpb/**", "pkg/math/**", "pkg/tsdb/selects/**", "selects.yaml"], "services": ["tsdb-read", "tsdb-api"], "data": ["clones"]},
+      {"globs": ["**/*.go", "go.mod", "go.sum"], "services": ["tsdb-read", "tsdb-api", "tsdb-write", "tsdb-registry"], "data": ["clones"]}
+    ],
+    "metadata-instrument": [
+      {"globs": ["**/*_test.go", "**/testdata/**", "tests/**"], "skip": true},
+      {"globs": ["migrations/**"], "services": ["metadata-instrument", "tsdb-registry", "tsdb-read"], "data": ["api"], "migrations": "meta"},
+      {"globs": ["**/*.go", "go.mod", "go.sum", "configs/**"], "services": ["metadata-instrument", "tsdb-registry", "tsdb-read"], "data": ["api"]}
+    ],
+    "stream-deduplicated": [
+      {"globs": ["**/*_test.go", "**/testdata/**", "cmd/benchgen/**", "cmd/inttest/**", "cmd/perftest/**"], "skip": true},
+      {"globs": ["**/*.go", "go.mod", "go.sum"], "services": ["stream-deduplicated", "streamd", "tsdb-write"], "data": ["live"], "capture": true}
+    ],
+    "streamd": [
+      {"globs": ["**/*_test.go", "**/testdata/**", "cmd/dominance-coins/**", "cmd/errtest/**", "cmd/mock-producer/**", "cmd/opra-root-terms/**"], "skip": true},
+      {"globs": ["**/*.go", "go.mod", "go.sum"], "services": ["streamd", "stream-deduplicated", "tsdb-write"], "data": ["live"], "capture": true}
+    ],
+    "live-feed": [
+      {"globs": ["**/*_test.go", "**/testdata/**", "cmd/feed-cli/**"], "skip": true},
+      {"globs": ["**/*.go", "go.mod", "go.sum"], "services": ["live-feed", "stream-deduplicated", "streamd", "tsdb-write"], "data": ["live"], "capture": true}
+    ]
+  },
+  "venues": [
+    "deribit", "binance_futures", "binance_delivery", "binance", "binance_options", "coinbase", "bitmex",
+    "bybit", "bybit_spot", "bitget", "okex", "okex_futures", "okex_swap", "okex_options", "derive", "bullish",
+    "bitfinex", "bitfinex_derivatives", "bitstamp", "kraken", "cryptofacilities", "gemini", "gate_io",
+    "gate_io_futures", "upbit", "hyperliquid", "hyperliquid_futures"
+  ]
+}
