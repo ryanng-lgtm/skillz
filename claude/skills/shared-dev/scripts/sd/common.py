@@ -77,7 +77,8 @@ def patch_pg_url(url, *, user=None, password=None, settings=None):
         options.update(settings)
         query = [(k, v) for k, v in query if k != "options"]
         query.append(("options", " ".join(f"-c {k}={v}" for k, v in options.items())))
-    return urlunsplit((parts.scheme, netloc, parts.path, urlencode(query), parts.fragment))
+    # quote, not quote_plus: libpq does not decode "+" as a space in query values.
+    return urlunsplit((parts.scheme, netloc, parts.path, urlencode(query, quote_via=quote), parts.fragment))
 
 
 def run(cmd, *, timeout, check=True, **kw):

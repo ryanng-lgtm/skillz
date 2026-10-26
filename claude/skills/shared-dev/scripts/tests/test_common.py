@@ -30,6 +30,12 @@ class PgUrlTests(unittest.TestCase):
         self.assertEqual(re.findall(r"statement_timeout=(\S+)", options), ["120000"])
         self.assertIn("-c search_path=sd_x,public", options)
 
+    def test_patch_pg_url_encodes_spaces_for_libpq(self):
+        # libpq does not decode "+" as a space in URI query values; Go does both.
+        out = common.patch_pg_url("postgres://dev@h:5432/data?sslmode=disable", settings={"search_path": "a,public"})
+        self.assertNotIn("+", urlsplit(out).query)
+        self.assertIn("options=-c%20search_path%3Da%2Cpublic", out)
+
     def test_patch_pg_url_sets_user_and_password(self):
         out = common.patch_pg_url("postgres://dev:pw@h:5432/data?sslmode=disable", user="sd_guard", password="p@ss/1")
         parts = urlsplit(out)
