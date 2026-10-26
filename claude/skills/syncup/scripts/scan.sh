@@ -11,7 +11,10 @@
 #   blocked  cannot be synced unattended (see reason in the branch column)
 #
 # Usage:
-#   scan.sh [--root DIR] [--no-fetch] [--jobs N] [--all]
+#   scan.sh [--root DIR] [--no-fetch] [--jobs N] [--all] [REPO_PATH ...]
+#
+# With REPO_PATHs, only those repos are scanned; otherwise every repo directly
+# under the root.
 
 set -uo pipefail
 
@@ -19,9 +22,10 @@ ROOT="${SYNCUP_ROOT:-$HOME/Documents/GitLab}"
 DO_FETCH=1
 JOBS=8
 SHOW_ALL=0
+PATHS=()
 
 usage() {
-	sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [ $# -gt 0 ]; do
@@ -46,9 +50,13 @@ while [ $# -gt 0 ]; do
 		usage
 		exit 0
 		;;
-	*)
+	-*)
 		printf 'scan.sh: unknown argument: %s\n' "$1" >&2
 		exit 2
+		;;
+	*)
+		PATHS+=("${1%/}")
+		shift
 		;;
 	esac
 done
@@ -60,12 +68,22 @@ fi
 
 # Collect candidate repo paths (a worktree has .git as a file, not a dir).
 repos=()
-for d in "$ROOT"/*/; do
-	d="${d%/}"
-	if [ -e "$d/.git" ]; then
-		repos+=("$d")
-	fi
-done
+if [ "${#PATHS[@]}" -gt 0 ]; then
+	for d in "${PATHS[@]}"; do
+		if [ -e "$d/.git" ]; then
+			repos+=("$d")
+		else
+			printf 'scan.sh: not a git repo, skipping: %s\n' "$d" >&2
+		fi
+	done
+else
+	for d in "$ROOT"/*/; do
+		d="${d%/}"
+		if [ -e "$d/.git" ]; then
+			repos+=("$d")
+		fi
+	done
+fi
 
 if [ "${#repos[@]}" -eq 0 ]; then
 	printf 'scan.sh: no git repos under %s\n' "$ROOT" >&2
@@ -91,7 +109,7 @@ if [ "$DO_FETCH" -eq 1 ]; then
 	nfail="$(find "$FAIL_DIR" -type f | grep -c '^' | tr -d ' ')"
 	if [ "$nfail" -gt 0 ]; then
 		printf 'scan.sh: fetch FAILED for %s repo(s) — their counts are from stale refs.\n' "$nfail" >&2
-		printf 'scan.sh: check auth first:  ssh-add -l  &&  ssh -T git@github.com\n' >&2
+		printf 'scan.sh: check auth first:  ssh-add -l  &&  ssh -T git@gitlab.com\n' >&2
 	fi
 fi
 

@@ -1,6 +1,6 @@
 ---
 name: syncup
-description: Use when the user wants one or more local repos brought up to date with their default branch — refresh main from origin, rebase the working branch onto it, and resolve every conflict, including when the worktree has uncommitted changes. Trigger: /syncup [repo ...], "sync up my repos", "rebase everything on main", "get me on latest main".
+description: Use when the user wants one or more local repos brought up to date with their default branch — refresh main from origin, rebase the working branch onto it, and resolve every conflict, including when the worktree has uncommitted changes. Picks candidates from the current session and from the user's open MRs that have fallen behind, or from a named stack (om-chat, fe, tc, be). Trigger: /syncup [repo|stack ...], "sync up my repos", "sync the FE stack", "rebase everything on main", "get me on latest main".
 ---
 
 # syncup — bring selected repos up to date with main
@@ -30,19 +30,63 @@ Default repo root: `~/Documents/GitLab`. Override with `--root DIR` or `SYNCUP_R
 - If a repo cannot be finished safely, abort **that repo** back to its pre-sync state and keep going
   with the rest. Never leave a repo mid-rebase.
 
+## Stacks
+
+Named groups of repos that ship together. Paths are relative to the root.
+
+| stack | repos |
+|---|---|
+| `om-chat` | `openmarket-internal`, `om-chat-cloud`, `tharamine-user-service`, `kiyotaka-chat-service` |
+| `fe` | `kiyotaka-frontend`, `orange-v2-backend`, `tharamine-user-service`, `auth-service-backend`, `orange-shared` |
+| `tc` | everything in `fe`, plus `titan-charts` |
+| `be` | `meta_repo/` + `tsdb-gateway`, `replayer`, `kiyotaka-go`, `streamd`, `streamd-cex-playbook`, `stream-deduplicated`, `metadata-instrument` |
+
+- `om-chat-cloud` is the GitLab `openmarket-chat`. The top-level `openmarket-chat` dir is the GitHub
+  repo and is not in the stack.
+- The `be` repos also have top-level clones (`tsdb-gateway`, `streamd`, ...). The stack means the
+  `meta_repo/` ones.
+
 ## Phase 0 — pick the repos
 
-1. If the user passed repo names as arguments, use exactly those. Resolve each to a path under the
-   root; if one does not resolve, ask for the path. Skip Phase 0.2.
-2. Otherwise run the scanner:
+Never scan the whole root on a bare invocation. Build a short candidate set, scan only that set,
+and offer the stacks next to it. Scan the whole root only when the user asks for everything
+(`/syncup all`, "sync all my repos").
+
+1. **Arguments.** If the user named repos or stacks, expand the stacks and use exactly that set.
+   Resolve each repo to a path under the root, and ask for the path if one does not resolve. Go to
+   step 4.
+2. **Session repos.** Look back over this conversation for repos under the root that were worked on:
+   files read or edited, commands run in them, commits or branches made. Use the summary if the
+   session was compacted. Mentioning a repo by name is not enough. Record why each repo qualifies,
+   in a few words.
+3. **Stale MRs.** Run:
 
    ```bash
-   bash ~/.claude/skills/syncup/scripts/scan.sh
+   bash ~/.claude/skills/syncup/scripts/mrs.sh
    ```
 
-   It fetches all repos in parallel (~20–60s for a large root, `--no-fetch` to skip) and prints TSV:
+   It lists the user's open GitLab MRs whose source branch is behind its target on origin, and maps
+   each MR to its local clones. The output is TSV:
+   `path  mr  source  target  behind  checked_out  merge_status  fetch`. Only MRs that are behind
+   are listed.
+   - An MR repo is a candidate only if a clone has the MR's source branch checked out. Syncup
+     rebases the checked-out branch and never switches branches. List the other MRs once as
+     "behind but not checked out" so the user can switch branches and re-run.
+   - When two clones match, use the one on the source branch.
+   - If the MR's target is not the default branch (a stacked MR), flag it. Phase 4 rebases onto the
+     default branch, which is wrong for a stacked MR, so ask before syncing it.
+   - `fetch=failed` rows follow the `stale` rule below.
+4. **Scan the candidates.** Pass the session and MR repos (or the argument set) to the scanner:
+
+   ```bash
+   bash ~/.claude/skills/syncup/scripts/scan.sh <path> ...
+   ```
+
+   With no paths it scans every repo directly under the root, which is the `/syncup all` case only. It
+   fetches in parallel (`--no-fetch` skips the fetch) and prints TSV:
    `name  branch  default  ahead  behind  dirty  state  path  fetch`. Only repos that need work are
-   listed (`--all` includes clean ones).
+   listed (`--all` includes clean ones). A repo the user named that comes back clean is reported as
+   already up to date and is not synced.
 
    | state | meaning |
    |---|---|
@@ -61,7 +105,7 @@ further:
 
 ```bash
 ssh-add -l                                  # "The agent has no identities" is the usual cause
-ssh -o BatchMode=yes -T git@github.com
+ssh -o BatchMode=yes -T git@gitlab.com     # or git@github.com for GitHub remotes
 ```
 
 The fix is usually `ssh-add --apple-use-keychain ~/.ssh/id_ed25519`, which may prompt for a
@@ -69,13 +113,19 @@ passphrase. **Ask the user to run it themselves** — suggest they type `! ssh-a
 then re-run the scanner. Do not proceed with `--no-fetch` and do not present a candidate table
 built on stale refs.
 
-3. Present the `state=sync` rows for selection, sorted dirty-first then by `behind` descending:
-   - **16 or fewer candidates:** use `AskUserQuestion` with `multiSelect: true`, up to 4 questions
-     of 4 options. One option per repo. Label = repo name. Description = its state, e.g.
-     `on ryan/feature-flags-admin · 12 behind · 3 uncommitted`.
-   - **More than 16:** print a numbered list instead and ask the user to reply with numbers, names,
-     or `all`. Do not truncate silently — say how many were listed.
-4. List `blocked` rows once, with the reason, and say they are being skipped. Do not ask about them.
+5. **Ask.** Skip this step when the user passed arguments. Otherwise use one `AskUserQuestion`
+   call, both questions `multiSelect: true`:
+   - **Detected:** the `state=sync` candidates from steps 2–3, sorted dirty-first, then by `behind`
+     descending. Label is the repo name. Description is the reason and state, e.g.
+     `MR !2402 · 5 behind · 3 uncommitted` or `edited this session · 12 behind`. If there are more
+     than 4, spread them over extra questions, keeping one question for stacks. If there are more
+     than 12, print a numbered list instead and ask for numbers, names, or `all`, and say how many
+     were listed. If nothing was detected, say so and ask only the stacks question.
+   - **Stacks:** one option per stack. Description is its repo list.
+
+   If the user picks a stack, scan its repos (step 4) and sync only the ones in `state=sync`. List
+   the rest as already up to date.
+6. List `blocked` rows once, with the reason, and say they are being skipped. Do not ask about them.
 
 ### Protected branches — confirm before rebasing
 
