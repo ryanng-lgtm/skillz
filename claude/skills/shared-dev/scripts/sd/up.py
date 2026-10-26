@@ -11,7 +11,7 @@ is inconsistent; 8 the previous run on the project did not tear down.
 Usage:
   python -I run.py up --scope scope.json --plan plan.json --run-dir DIR --session ID
                       [--symbols A,B] [--venue V] [--seconds N] [--confirm-size]
-                      [--patch SERVICE=FILE ...] [--allow-behind]
+                      [--patch SERVICE=FILE ...] [--allow-behind] [--second-project]
 """
 
 import argparse
@@ -110,7 +110,7 @@ def _branch_indexes(conn, gateway, main_schema_yaml, branch_schema_yaml, passwor
 
 
 def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, seconds=DEFAULT_SECONDS,
-       confirm_size=False, repos=REPOS, patches=None, allow_behind=False):
+       confirm_size=False, repos=REPOS, patches=None, allow_behind=False, second_project=False):
     changes = [Change(**{**c, "worktree": Path(c["worktree"])}) for c in json.loads(Path(scope_path).read_text())]
     p = json.loads(Path(plan_path).read_text())
     run_dir = Path(run_dir)
@@ -135,7 +135,7 @@ def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, secon
             early_warnings.append(f"public is {len(behind)} migrations behind main ({behind[0]}..{behind[-1]}); "
                                   f"objects main has that public lacks: {', '.join(_missing_objects(repos, run_dir, behind))}")
 
-    picked = claim.pick(branch, session)
+    picked = claim.pick(branch, session, second=second_project)
     if picked["state"] == "unclaimed":
         raise Stop(3, f"{picked['project']} has running containers and no claim (started by hand, or by a session "
                       "older than the skill). Ask Ryan before touching it.")
@@ -240,6 +240,8 @@ def main(argv):
     ap.add_argument("--venue")
     ap.add_argument("--seconds", type=int, default=DEFAULT_SECONDS)
     ap.add_argument("--confirm-size", action="store_true", help="Ryan agreed to copies over 70 GB")
+    ap.add_argument("--second-project", action="store_true",
+                    help="run in a project of its own even though the base project is free or unclaimed")
     ap.add_argument("--allow-behind", action="store_true",
                     help="run while public is behind main (Ryan's call); the report lists what public lacks")
     ap.add_argument("--patch", action="append", default=[], metavar="SERVICE=FILE",
@@ -253,7 +255,8 @@ def main(argv):
     try:
         summary = up(args.scope, args.plan, args.run_dir, args.session,
                      symbols=[s for s in args.symbols.split(",") if s], venue=args.venue, seconds=args.seconds,
-                     confirm_size=args.confirm_size, patches=patches, allow_behind=args.allow_behind)
+                     confirm_size=args.confirm_size, patches=patches, allow_behind=args.allow_behind,
+                     second_project=args.second_project)
     except Stop as exc:
         print(f"stop: {exc}", file=sys.stderr)
         sys.exit(exc.code)

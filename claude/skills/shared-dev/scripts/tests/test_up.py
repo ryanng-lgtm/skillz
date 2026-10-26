@@ -59,6 +59,11 @@ class UpTests(unittest.TestCase):
         m["write"].assert_not_called()
         m["wt_build"].assert_not_called()
 
+    def test_second_project_flag_passed_to_pick(self):
+        m = self.patches()
+        up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1", second_project=True)
+        self.assertTrue(m["pick"].call_args.kwargs.get("second"))
+
     def test_claim_written_before_builds(self):
         m = self.patches()
         order = []

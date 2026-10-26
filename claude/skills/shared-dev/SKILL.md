@@ -110,7 +110,7 @@ index gaps). When it stops:
 
 | Exit | Means | Do |
 |---|---|---|
-| 3 | containers running with no claim | show `docker ps --filter label=com.docker.compose.project=<p>`; ask Ryan |
+| 3 | containers running with no claim | show `docker ps --filter label=com.docker.compose.project=<p>`; ask Ryan; if they stay, re-run with `--second-project` |
 | 4 | a copy over 70 GB | show the size; after his yes, re-run with `--confirm-size` |
 | 5 | `public` is behind main | "Public behind main" below; with Ryan's OK re-run with `--allow-behind` |
 | 6 | capture needs `--venue`/`--symbols` | pick them, re-run |

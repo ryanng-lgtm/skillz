@@ -69,18 +69,29 @@ def state(project, session=None):
     return "unclaimed" if running else "free"
 
 
-def pick(branch, session):
-    """Choose the project, port offset and Kafka prefix for this run."""
+def pick(branch, session, second=False):
+    """Choose the project, port offset and Kafka prefix for this run.
+
+    The base project when it is free (or stale, or this session's own);
+    otherwise, or when Ryan asks for one (second=True), a project of the
+    run's own on spare ports and its own Kafka prefix. The returned state is
+    the chosen project's.
+    """
     base_state = state(BASE, session)
-    if base_state in ("free", "stale", "ours", "unclaimed"):
+    if not second and base_state in ("free", "stale", "ours", "unclaimed"):
         return {"project": BASE, "offset": 0, "prefix": "dev.ryan.", "state": base_state,
                 "other": read(BASE) if base_state == "stale" else None}
-    used = {r.get("offset") for r in (json.loads(p.read_text()) for p in STATE.glob("claim-*.json"))}
-    offset = next((n * OFFSET_STEP for n in (1, 2) if n * OFFSET_STEP not in used), None)
+    name = slug(branch)
+    project = f"{BASE}-{name}"
+    mine = read(project)
+    if mine and mine.get("offset"):
+        offset = mine["offset"]
+    else:
+        used = {r.get("offset") for r in (json.loads(p.read_text()) for p in STATE.glob("claim-*.json"))}
+        offset = next((n * OFFSET_STEP for n in (1, 2) if n * OFFSET_STEP not in used), None)
     if offset is None:
         raise SystemExit("two extra shared-dev projects are already claimed; there is no free port range. Ask Ryan.")
-    name = slug(branch)
-    return {"project": f"{BASE}-{name}", "offset": offset, "prefix": f"dev.ryan.{name}.", "state": "live",
+    return {"project": project, "offset": offset, "prefix": f"dev.ryan.{name}.", "state": state(project, session),
             "other": read(BASE)}
 
 

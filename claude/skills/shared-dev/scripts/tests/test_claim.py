@@ -34,8 +34,9 @@ class ClaimTests(unittest.TestCase):
 
     def test_pick_second_project_when_live(self):
         self.write()
-        with patch.object(claim, "containers", return_value=["x"]):
+        with patch.object(claim, "containers", side_effect=lambda project: ["x"] if project == BASE else []):
             picked = claim.pick("feat/mine", session="me")
+        self.assertEqual(picked["state"], "free")
         self.assertEqual(picked["project"], "kiyotaka-shared-dev-feat_mine_" + claim.slug("feat/mine")[-6:])
         self.assertEqual(picked["offset"], 20000)
         self.assertEqual(picked["prefix"], f"dev.ryan.{claim.slug('feat/mine')}.")
@@ -55,6 +56,14 @@ class ClaimTests(unittest.TestCase):
         with patch.object(claim, "containers", return_value=[]):
             picked = claim.pick("feat/mine", session="me")
         self.assertEqual((picked["project"], picked["offset"], picked["prefix"], picked["state"]), (BASE, 0, "dev.ryan.", "free"))
+
+    def test_pick_second_project_leaves_unclaimed_base_alone(self):
+        running = lambda project: ["kiyotaka-shared-dev-metadata-instrument-1"] if project == BASE else []
+        with patch.object(claim, "containers", side_effect=running):
+            picked = claim.pick("feat/mine", session="me", second=True)
+        self.assertEqual(picked["project"], "kiyotaka-shared-dev-" + claim.slug("feat/mine"))
+        self.assertEqual(picked["offset"], 20000)
+        self.assertEqual(picked["state"], "free")
 
     def test_pick_reports_unclaimed(self):
         with patch.object(claim, "containers", return_value=["x"]):
