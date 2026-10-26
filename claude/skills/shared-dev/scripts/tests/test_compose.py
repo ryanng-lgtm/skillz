@@ -143,6 +143,11 @@ class ComposeTests(unittest.TestCase):
         self.assertEqual(dedup["command"][0], "/shared-dev/stream-deduplicated")
         self.assertIn(f"{binary}:/shared-dev/stream-deduplicated:ro", dedup["volumes"])
 
+    def test_render_skips_services_the_bundle_lacks(self):
+        # streamd is planned for live capture but only the capture service runs it
+        doc = self.render(plan("metadata-instrument", "stream-deduplicated", "streamd"))
+        self.assertNotIn("streamd", doc["services"])
+
     def test_render_main_reader(self):
         doc = self.render(plan("metadata-instrument", "tsdb-read"),
                           main_reader=(Path("/bin/main/tsdb-gateway"), "public", Path("/bin/main/schema.yaml")))

@@ -88,5 +88,6 @@ def writer_tables(needed_types):
 def plan_capture(venue, symbols, seconds, streamd_bin, prefix, run_dir, **kw):
     """The `capture` argument compose.render takes."""
     path = config(venue, symbols, prefix, run_dir, **kw)
+    needed = venue_block(venue, kw.get("playbook", PLAYBOOK)).get("needed_types", [])
     return {"service_name": f"streamd-{venue}", "service": service(venue, symbols, seconds, streamd_bin, path),
-            "config": path}
+            "config": path, "tables": writer_tables(needed)}

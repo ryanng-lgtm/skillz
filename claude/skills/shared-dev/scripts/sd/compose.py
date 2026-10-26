@@ -86,7 +86,8 @@ def render(plan, binaries, *, project, offset, prefix, schema, password, run_dir
     base = yaml.safe_load((SHARED_DEV / "compose.yaml").read_text())["services"]
     run_dir = Path(run_dir)
     schemas = schemas or {}
-    wanted = list(dict.fromkeys([*plan["services"], *plan.get("builds", {})]))
+    # streamd has no bundle service: the capture service runs it.
+    wanted = [s for s in dict.fromkeys([*plan["services"], *plan.get("builds", {})]) if s in base]
     services = {}
 
     def build(name, source, *, binary, schema_yaml, search_path, port_shift):
