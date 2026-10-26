@@ -112,13 +112,16 @@ index gaps). When it stops:
 |---|---|---|
 | 3 | containers running with no claim | show `docker ps --filter label=com.docker.compose.project=<p>`; ask Ryan |
 | 4 | a copy over 70 GB | show the size; after his yes, re-run with `--confirm-size` |
-| 5 | `public` is behind main | "Public behind main" below |
+| 5 | `public` is behind main | "Public behind main" below; with Ryan's OK re-run with `--allow-behind` |
 | 6 | capture needs `--venue`/`--symbols` | pick them, re-run |
 | 7 | `plan.json` is inconsistent | fix the plan, re-run |
-| other | read the error | `stack down` before retrying |
+| 8 | the project's previous run (a dead session's, or this session's own) did not tear down | show the leftovers; ask Ryan |
+| other | read the error | `stack down --run-dir $RUN` before retrying |
 
 A second session gets its own project (`kiyotaka-shared-dev-<slug>`, host
-ports +20000, Kafka prefix `dev.ryan.<slug>.`); `up.json` says which.
+ports +20000, Kafka prefix `dev.ryan.<slug>.`); `up.json` says which. A
+claim whose containers are gone (a dead session), or this session's own
+earlier run, is torn down by `up` before it claims again.
 
 ## 5. Data in
 
@@ -182,23 +185,29 @@ local gateway in its logs.
 ## 9. Teardown
 
 ```bash
-$P -I $S/run.py stack down --project <p>
+$P -I $S/run.py stack down --run-dir $RUN
 ```
 
 It stops the project, drops the run's schemas, deletes the topics it
 created, rolls `meta_ryan` back to main, deletes the run's configs and
-releases the claim. Report every
-`leftover:` line. With `--keep`, skip this and give Ryan that command.
+releases the claim. It refuses a run another session claimed; `--force`
+only when Ryan says so. Report every `leftover:` line. With `--keep`, skip
+this and give Ryan that command.
 
 ## Public behind main
 
 `public` is never migrated by a run, so it falls behind main. `up` exits 5
-then. Show Ryan `$P -I $S/run.py rebaseline plan` (forced version,
+then. Until the catch-up is possible, Ryan may OK a run with
+`--allow-behind`: `up.json`'s warnings list what main has that `public`
+lacks, and the report says probes touching those objects are not valid. Show Ryan `$P -I $S/run.py rebaseline plan` (forced version,
 migrations to apply, which touch `registry`) and get his go for this run,
 then `$P -I $S/run.py rebaseline apply --yes --log $RUN/rebaseline.log` in
 the background (it can take hours). It refuses while other sessions are
 connected to `data`; find out who (`pg_stat_activity` application names,
-other Claude sessions) and ask Ryan rather than stopping them.
+other Claude sessions) and ask Ryan rather than stopping them. A migration
+that fails with `function … does not exist` means the dev DB's
+`kiyotaka_toolkit` extension is older than prod's (main's `1791976706` needs
+32.x; the dev DB had 30.1.0 on 2026-10-26): that is Ryan's to upgrade.
 
 ## Common mistakes
 

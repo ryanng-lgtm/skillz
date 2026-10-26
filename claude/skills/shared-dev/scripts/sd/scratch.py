@@ -159,6 +159,21 @@ def copy_data_sql(table, schema, *, time_col, since):
     return sql
 
 
+def sequence_fixes(schema, table, defaults):
+    """SQL giving a copy its own sequences: LIKE … INCLUDING ALL keeps nextval('public.…'),
+    which sd_guard may not use, so a service's inserts into the copy would fail."""
+    out = []
+    for column, expr in defaults:
+        m = re.match(r"nextval\('(?:public\.)?\"?([\w]+)\"?'(?:::regclass)?\)", expr or "")
+        if not m:
+            continue
+        seq = f"{_ident(schema)}.{_ident(m.group(1))}"
+        out.append(f"CREATE SEQUENCE {seq} OWNED BY {_ident(schema)}.{_ident(table)}.{_ident(column)}")
+        out.append(f"ALTER TABLE {_ident(schema)}.{_ident(table)} ALTER COLUMN {_ident(column)} "
+                   f"SET DEFAULT nextval('{seq}')")
+    return out
+
+
 def rewrite_ddl(ddl, schema):
     """Point index DDL that `migrate index` writes for public at the scratch schema."""
     return re.sub(r"\bON\s+(?:ONLY\s+)?public\.", f"ON {_ident(schema)}.", ddl, count=1)
@@ -196,6 +211,13 @@ def copy_table(conn, table, schema, *, mode, since=None, confirmed=False, budget
         raise ValueError(f"slice needs a hypertable and since; {table} is {'a hypertable' if ht else 'a plain table'}")
     dst = f"{_ident(schema)}.{_ident(table)}"
     conn.execute(f"CREATE TABLE {dst} (LIKE public.{_ident(table)} INCLUDING ALL)")
+    defaults = conn.execute(
+        """SELECT a.attname, pg_get_expr(d.adbin, d.adrelid) FROM pg_attrdef d
+           JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+           WHERE d.adrelid = %s::regclass""", (f"{schema}.{table}",)).fetchall()
+    fixes = sequence_fixes(schema, table, defaults)
+    for sql in fixes:
+        conn.execute(sql)
     compressed = 0
     if ht:
         conn.execute("SELECT create_hypertable(%s, by_range(%s, %s), create_default_indexes => false)",
@@ -230,6 +252,9 @@ def copy_table(conn, table, schema, *, mode, since=None, confirmed=False, budget
         else:
             conn.execute(copy_data_sql(table, schema, time_col=None, since=None))
         conn.execute(f"VACUUM (FREEZE, ANALYZE) {dst}")
+    for sql in fixes[::2]:  # each CREATE SEQUENCE: move it past the copied rows
+        seq, column = re.match(r"CREATE SEQUENCE (\S+) OWNED BY \S+\.(\S+)$", sql).groups()
+        conn.execute(f"SELECT setval('{seq}', coalesce((SELECT max({column}) FROM {dst}), 0) + 1, false)")
     conn.execute(f"ALTER TABLE {dst} OWNER TO {GUARD_ROLE}")
     return {"table": table, "mode": mode, "bytes": size, "hypertable": bool(ht), "compressed_chunks": compressed,
             "extra_dims_not_copied": ht["extra_dims"] if ht else 0}

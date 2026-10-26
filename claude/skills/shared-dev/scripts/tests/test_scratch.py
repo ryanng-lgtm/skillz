@@ -34,6 +34,17 @@ class CopySqlTests(unittest.TestCase):
         sql = scratch.copy_data_sql("registry", "sd_x", time_col=None, since=None)
         self.assertNotIn("WHERE", sql)
 
+    def test_sequence_defaults_get_scratch_sequences(self):
+        got = scratch.sequence_fixes("sd_x", "registry", [("id", "nextval('registry_id_seq'::regclass)"),
+                                                          ("name", "'x'::text")])
+        self.assertEqual(got, [
+            'CREATE SEQUENCE "sd_x"."registry_id_seq" OWNED BY "sd_x"."registry"."id"',
+            'ALTER TABLE "sd_x"."registry" ALTER COLUMN "id" SET DEFAULT nextval(\'"sd_x"."registry_id_seq"\')',
+        ])
+
+    def test_needs_copy_names_sequence_owner_issue(self):
+        self.assertIsNone(scratch.needs_copy("permission denied for sequence registry_id_seq"))
+
     def test_rewrite_ddl_moves_index_to_scratch(self):
         ddl = 'CREATE INDEX IF NOT EXISTS trade_x_idx ON public.trade USING btree (symbol, "timestamp" DESC);'
         self.assertEqual(

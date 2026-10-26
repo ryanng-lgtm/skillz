@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, unquote, urlsplit
@@ -74,8 +75,9 @@ def _ts(value, tz=False):
 def proposal(source, table, *, since, until, batch, target, explicit_nodes=False):
     """What Ryan sees before saying go."""
     _check_source(source, explicit_nodes)
-    if not re.match(r"^[a-z_][a-z0-9_]*$", target):
-        raise Refused(f"target {target!r} is not a plain table name")
+    for name in (table, target):
+        if not re.match(r"^[a-z_][a-z0-9_]*$", name):
+            raise Refused(f"{name!r} is not a plain table name")
     return {"source": source, "table": table, "since": since, "until": until, "batch": batch,
             "statement_timeout": "30s (service profile)", "target": f"public.{target}",
             "explicit_nodes": explicit_nodes}
@@ -259,24 +261,23 @@ def finish_target(target, layout, table, compressed):
 
 def _copy_batch(source, table, layout, lo, hi, target, appname):
     cols = [c for c, _ in layout["columns"]]
-    prod = subprocess.Popen([_psql(), f"service={source}", "-X", "-v", "ON_ERROR_STOP=1", "-c",
-                             batch_sql(table, cols, layout["time_col"], lo, hi, layout.get("tz", False))],
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=_prod_env(appname))
-    local = subprocess.Popen([_psql(), "-X", "-v", "ON_ERROR_STOP=1", "-c",
-                              f'\\copy public."{target}" FROM STDIN (FORMAT csv)'],
-                             stdin=prod.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=_local_env())
-    prod.stdout.close()
-    try:
-        _, prod_err = prod.communicate(timeout=BATCH_TIMEOUT)
-        _, local_err = local.communicate(timeout=BATCH_TIMEOUT)
-    except subprocess.TimeoutExpired as exc:
-        prod.kill()
-        local.kill()
-        raise CloneStopped(f"batch {_ts(lo)}..{_ts(hi)} ran past {BATCH_TIMEOUT}s; stopped") from exc
-    if prod.returncode != 0:
-        _raise_for(prod_err.decode())
+    # Spool, then load: a batch prod cancels part way has streamed some rows, and loading
+    # them would leave duplicates once the halves are retried.
+    with tempfile.TemporaryFile() as spool:
+        try:
+            prod = subprocess.run([_psql(), f"service={source}", "-X", "-v", "ON_ERROR_STOP=1", "-c",
+                                   batch_sql(table, cols, layout["time_col"], lo, hi, layout.get("tz", False))],
+                                  stdout=spool, stderr=subprocess.PIPE, env=_prod_env(appname), timeout=BATCH_TIMEOUT)
+        except subprocess.TimeoutExpired as exc:
+            raise CloneStopped(f"batch {_ts(lo)}..{_ts(hi)} ran past {BATCH_TIMEOUT}s; stopped") from exc
+        if prod.returncode != 0:
+            _raise_for(prod.stderr.decode())
+        spool.seek(0)
+        local = subprocess.run([_psql(), "-X", "-v", "ON_ERROR_STOP=1", "-c",
+                                f'\\copy public."{target}" FROM STDIN (FORMAT csv)'],
+                               stdin=spool, capture_output=True, env=_local_env(), timeout=BATCH_TIMEOUT)
     if local.returncode != 0:
-        raise CloneStopped(f"writing into public.{target} failed: {local_err.decode().strip()[-500:]}")
+        raise CloneStopped(f"writing into public.{target} failed: {local.stderr.decode().strip()[-500:]}")
 
 
 def _copy_split(source, table, layout, lo, hi, target, appname, done):
@@ -299,6 +300,9 @@ def run(prop, *, go, confirmed_size=False, pause=2.0):
         raise Refused("a prod clone needs Ryan's go for this request")
     source, table, target = prop["source"], prop["table"], prop["target"].removeprefix("public.")
     _check_source(source, prop.get("explicit_nodes", False))
+    for name in (table, target):
+        if not re.match(r"^[a-z_][a-z0-9_]*$", name):
+            raise Refused(f"{name!r} is not a plain table name")
     if target_exists(target):
         raise Refused(f"public.{target} already exists; a clone never writes into an existing table")
     nbytes = size(source, table, prop["since"], prop["until"])

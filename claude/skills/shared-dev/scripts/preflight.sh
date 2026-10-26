@@ -50,10 +50,22 @@ case $? in
 	fi
 	if [ "$need_mib" -gt 0 ]; then
 		have_mib=$((mem_bytes / 1024 / 1024))
-		if [ "$have_mib" -ge "$need_mib" ]; then
+		# Containers already running (another session's stack, test databases) use part of it.
+		used_mib="$(timeout 20 docker stats --no-stream --format '{{.MemUsage}}' 2>/dev/null | python3 -I -c '
+import re, sys
+units = {"B": 1 / 2**20, "KiB": 1 / 1024, "kB": 1 / 1024, "MiB": 1, "MB": 1, "GiB": 1024, "GB": 1024}
+total = 0
+for line in sys.stdin:
+    m = re.match(r"\s*([\d.]+)\s*([A-Za-z]+)", line)
+    if m:
+        total += float(m.group(1)) * units.get(m.group(2), 0)
+print(int(total))
+')"
+		free_mib=$((have_mib - ${used_mib:-0}))
+		if [ "$free_mib" -ge "$need_mib" ]; then
 			ok memory
 		else
-			fail "memory: Docker has $have_mib MiB, the run needs $need_mib MiB"
+			fail "memory: Docker has $have_mib MiB, $used_mib MiB in use by running containers, the run needs $need_mib MiB"
 		fi
 	fi
 	;;

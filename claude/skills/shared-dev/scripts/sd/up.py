@@ -6,12 +6,12 @@ part way.
 
 Exit codes: 3 an unclaimed stack is running; 4 a copy is over 70 GB;
 5 public is behind main; 6 a capture needs a venue and symbols; 7 plan.json
-is inconsistent.
+is inconsistent; 8 the previous run on the project did not tear down.
 
 Usage:
   python -I run.py up --scope scope.json --plan plan.json --run-dir DIR --session ID
                       [--symbols A,B] [--venue V] [--seconds N] [--confirm-size]
-                      [--patch SERVICE=FILE ...]
+                      [--patch SERVICE=FILE ...] [--allow-behind]
 """
 
 import argparse
@@ -22,7 +22,7 @@ from pathlib import Path
 
 from sd import builds, capture, claim, compose, meta, scratch, stack
 from sd.capture import DEFAULT_SECONDS
-from sd.common import STATE, schema_name, slug
+from sd.common import STATE, run, schema_name, slug
 from sd.migrations import delta, export_dir, parse_dir, scan
 from sd.plan import MAP, REPOS
 from sd.scope import Change
@@ -43,20 +43,36 @@ def _gateway_build(p, binaries, schemas):
 
 
 def _main_delta(repos, run_dir):
-    """Main's tsdb-gateway migrations that public lacks."""
+    """Main's tsdb-gateway migrations that public lacks, from a freshly fetched origin."""
+    clone = repos / "tsdb-gateway"
+    ref = run(["git", "-C", str(clone), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], timeout=30).stdout.strip()
+    run(["git", "-C", str(clone), "fetch", "--quiet", "origin", ref.partition("/")[2]], timeout=300)
     base = json.loads((STATE / "public-baseline.json").read_text())
-    main_dir = export_dir(repos / "tsdb-gateway", "origin/main", Path(run_dir) / "tsdb-main-migrations")
+    main_dir = export_dir(clone, ref, Path(run_dir) / "tsdb-main-migrations")
     return delta(set(base["versions"]), parse_dir(main_dir), {})[0]
 
 
-def _tsdb_delta(conn, change, p, binaries, schemas, run_dir, password, schema, copies, budget, repos):
+def _missing_objects(repos, run_dir, versions):
+    """Tables, views and functions main's missing migrations would create."""
+    from sd.rebaseline import created_objects
+
+    main_dir = Path(run_dir) / "tsdb-main-migrations"
+    stems = parse_dir(main_dir)
+    names = set()
+    for v in versions:
+        names |= created_objects((main_dir / f"{stems[v]}.up.sql").read_text())
+    return sorted(names)
+
+
+def _tsdb_delta(conn, change, p, binaries, schemas, run_dir, password, schema, copies, budget, repos,
+                allow_behind=False):
     """Apply the branch's own migrations into schema; returns (copies, warnings)."""
     base = json.loads((STATE / "public-baseline.json").read_text())
     main_dir = export_dir(repos / "tsdb-gateway", "origin/main", Path(run_dir) / "tsdb-main-migrations")
     branch_dir = Path(change.worktree) / "migrations"
     main, branch = parse_dir(main_dir), parse_dir(branch_dir)
     main_delta, branch_delta = delta(set(base["versions"]), main, branch)
-    if main_delta:
+    if main_delta and not allow_behind:
         raise Stop(5, f"public is {len(main_delta)} migrations behind main ({main_delta[0]}..{main_delta[-1]}); "
                       "run `run.py rebaseline plan` and ask Ryan before `rebaseline apply --yes`")
     warnings = []
@@ -94,7 +110,7 @@ def _branch_indexes(conn, gateway, main_schema_yaml, branch_schema_yaml, passwor
 
 
 def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, seconds=DEFAULT_SECONDS,
-       confirm_size=False, repos=REPOS, patches=None):
+       confirm_size=False, repos=REPOS, patches=None, allow_behind=False):
     changes = [Change(**{**c, "worktree": Path(c["worktree"])}) for c in json.loads(Path(scope_path).read_text())]
     p = json.loads(Path(plan_path).read_text())
     run_dir = Path(run_dir)
@@ -108,18 +124,29 @@ def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, secon
             raise Stop(6, "a live capture needs --venue (none found in the change) and --symbols (the branch's "
                           "symbols, else two or three liquid ones)")
 
+    early_warnings = []
     if any(MAP["binaries"][svc]["repo"] == "tsdb-gateway" for svc in p["builds"]):
         # Gateway code from main or a branch off it expects main's schema, migrations or not.
         behind = _main_delta(repos, run_dir)
-        if behind:
+        if behind and not allow_behind:
             raise Stop(5, f"public is {len(behind)} migrations behind main ({behind[0]}..{behind[-1]}); run "
                           "`run.py rebaseline plan` and ask Ryan before `rebaseline apply --yes`")
+        if behind:
+            early_warnings.append(f"public is {len(behind)} migrations behind main ({behind[0]}..{behind[-1]}); "
+                                  f"objects main has that public lacks: {', '.join(_missing_objects(repos, run_dir, behind))}")
 
     picked = claim.pick(branch, session)
     if picked["state"] == "unclaimed":
         raise Stop(3, f"{picked['project']} has running containers and no claim (started by hand, or by a session "
                       "older than the skill). Ask Ryan before touching it.")
     project, offset, prefix = picked["project"], picked["offset"], picked["prefix"]
+    if picked["state"] in ("stale", "ours"):
+        # A dead session's run (or this session's earlier one): clean it up before claiming again,
+        # so its schemas, meta_ryan migrations and topics are not orphaned.
+        leftovers = stack.teardown(project)
+        if leftovers:
+            raise Stop(8, f"the previous run on {project} did not tear down cleanly: {'; '.join(leftovers)}. "
+                          "Ask Ryan.")
     schema = schema_name(branch)
     exposed = schema + "_x"  # views over prod clones made during the run; both readers search it
     compose_path = run_dir / "compose.json"
@@ -149,7 +176,7 @@ def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, secon
     try:
         if p["migrations"]["tsdb"]:
             copies, warnings = _tsdb_delta(conn, by_repo["tsdb-gateway"], p, binaries, schemas, run_dir, password,
-                                           schema, copies, budget, repos)
+                                           schema, copies, budget, repos, allow_behind)
         else:
             scratch.create_schema(conn, schema)
             for table, mode in copies.items():
@@ -193,7 +220,8 @@ def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, secon
         "project": project, "offset": offset, "prefix": prefix, "schema": schema, "exposed_schema": exposed,
         "compose": str(compose_path),
         "services": start, "binaries": {s: str(b) for s, b in binaries.items()}, "copies": copies,
-        "main_reader": main_reader is not None, "warnings": warnings, "index_gaps_vs_main": index_gaps,
+        "main_reader": main_reader is not None, "warnings": early_warnings + warnings,
+        "index_gaps_vs_main": index_gaps,
         "capture": {"service": cap["service_name"], "venue": venue, "symbols": list(symbols), "seconds": seconds}
         if cap else None,
         "run_dir": str(run_dir), "session": session, "branch": branch, "slug": slug(branch),
@@ -212,6 +240,8 @@ def main(argv):
     ap.add_argument("--venue")
     ap.add_argument("--seconds", type=int, default=DEFAULT_SECONDS)
     ap.add_argument("--confirm-size", action="store_true", help="Ryan agreed to copies over 70 GB")
+    ap.add_argument("--allow-behind", action="store_true",
+                    help="run while public is behind main (Ryan's call); the report lists what public lacks")
     ap.add_argument("--patch", action="append", default=[], metavar="SERVICE=FILE",
                     help="merge a JSON file of non-secret config keys into SERVICE's run config")
     args = ap.parse_args(argv)
@@ -223,7 +253,7 @@ def main(argv):
     try:
         summary = up(args.scope, args.plan, args.run_dir, args.session,
                      symbols=[s for s in args.symbols.split(",") if s], venue=args.venue, seconds=args.seconds,
-                     confirm_size=args.confirm_size, patches=patches)
+                     confirm_size=args.confirm_size, patches=patches, allow_behind=args.allow_behind)
     except Stop as exc:
         print(f"stop: {exc}", file=sys.stderr)
         sys.exit(exc.code)

@@ -9,7 +9,8 @@ from pathlib import Path
 PREFLIGHT = Path(__file__).parents[1] / "preflight.sh"
 
 
-def setup(root, *, docker="ok", ps="", backing="PASS TimescaleDB", ts_ip="100.82.235.54", cfg_ip="100.82.235.54"):
+def setup(root, *, docker="ok", ps="", backing="PASS TimescaleDB", ts_ip="100.82.235.54", cfg_ip="100.82.235.54",
+          stats=""):
     sd = root / "shared-dev"
     (sd / ".venv" / "bin").mkdir(parents=True)
     (sd / "config").mkdir()
@@ -22,7 +23,7 @@ def setup(root, *, docker="ok", ps="", backing="PASS TimescaleDB", ts_ip="100.82
     bin_dir = root / "stubbin"
     bin_dir.mkdir()
     docker_body = {
-        "ok": 'case "$1" in info) echo 8319238144 ;; ps) printf "%s" "$STUB_PS" ;; esac',
+        "ok": 'case "$1" in info) echo 8319238144 ;; ps) printf "%s" "$STUB_PS" ;; stats) printf "%s" "$STUB_STATS" ;; esac',
         "hang": "sleep 60",
     }[docker]
     (bin_dir / "docker").write_text(f"#!/bin/sh\n{docker_body}\n")
@@ -30,7 +31,8 @@ def setup(root, *, docker="ok", ps="", backing="PASS TimescaleDB", ts_ip="100.82
     (bin_dir / "tailscale").write_text(f"#!/bin/sh\necho '{json.dumps({'Peer': peers})}'\n")
     for f in [py, *bin_dir.iterdir()]:
         f.chmod(0o755)
-    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "SHARED_DEV": str(sd), "STUB_PS": ps}
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "SHARED_DEV": str(sd), "STUB_PS": ps,
+           "STUB_STATS": stats}
     return env
 
 
@@ -74,6 +76,14 @@ class PreflightTests(unittest.TestCase):
             proc = run(setup(Path(tmp)), "--need-mib", "9000")
             self.assertEqual(proc.returncode, 1)
             self.assertIn("FAIL memory", proc.stdout)
+
+    def test_preflight_memory_counts_running_containers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stats = "953.2MiB / 2GiB\n1.5GiB / 4GiB\n204.1MiB / 7.748GiB\n"
+            proc = run(setup(Path(tmp), stats=stats), "--need-mib", "6000")
+            self.assertEqual(proc.returncode, 1)
+            self.assertIn("FAIL memory", proc.stdout)
+            self.assertIn("in use", proc.stdout)
 
 
 if __name__ == "__main__":

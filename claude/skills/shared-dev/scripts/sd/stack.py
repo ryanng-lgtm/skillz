@@ -3,7 +3,7 @@
 Usage:
   python -I run.py stack up --compose F --project P SERVICE...
   python -I run.py stack status --project P
-  python -I run.py stack down [--project P]
+  python -I run.py stack down --run-dir RUN | --project P --session ID [--force]
   python -I run.py stack run-once --compose F --project P [--service S] [--timeout N] -- GATEWAY ARGS...
 """
 
@@ -99,7 +99,10 @@ def main(argv):
     s = sub.add_parser("status")
     s.add_argument("--project", default=claim.BASE)
     d = sub.add_parser("down")
-    d.add_argument("--project", default=claim.BASE)
+    d.add_argument("--project")
+    d.add_argument("--run-dir", help="the run's dir; its up.json names the project and session")
+    d.add_argument("--session", help="this session's id; must match the claim's")
+    d.add_argument("--force", action="store_true", help="tear down another session's run (Ryan's call)")
     r = sub.add_parser("run-once")
     r.add_argument("--compose", required=True)
     r.add_argument("--project", required=True)
@@ -119,7 +122,17 @@ def main(argv):
         json.dump(status(args.project), sys.stdout, indent=2)
         print()
     else:
-        leftovers = teardown(args.project)
+        project, session = args.project, args.session
+        if args.run_dir:
+            summary = json.loads((Path(args.run_dir) / "up.json").read_text())
+            project, session = project or summary["project"], session or summary["session"]
+        if not project:
+            raise SystemExit("stack down needs --run-dir or --project")
+        owner = (claim.read(project) or {}).get("session")
+        if owner and owner != session and not args.force:
+            raise SystemExit(f"{project} is claimed by session {owner}, not {session}; tear down only your own run "
+                             "(--force only when Ryan says so)")
+        leftovers = teardown(project)
         for line in leftovers:
             print(f"leftover: {line}")
         print("teardown complete" if not leftovers else "teardown finished with leftovers")

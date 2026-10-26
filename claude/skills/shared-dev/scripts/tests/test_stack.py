@@ -53,6 +53,41 @@ class TeardownTests(unittest.TestCase):
         rollback.assert_called_once_with("mc", [9], Path("/wt/migrations"), to=5)
 
 
+class DownCliTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        p = patch.object(claim, "STATE", Path(self.tmp.name))
+        p.start()
+        self.addCleanup(p.stop)
+        claim.write("kiyotaka-shared-dev", session="A", branch="b", worktrees=[], schemas=["sd_a"], run_dir="/r")
+
+    def test_down_requires_project_or_run_dir(self):
+        with patch.object(stack, "teardown") as td, self.assertRaises(SystemExit):
+            stack.main(["down"])
+        td.assert_not_called()
+
+    def test_down_refuses_other_session(self):
+        with patch.object(stack, "teardown") as td, self.assertRaises(SystemExit) as ctx:
+            stack.main(["down", "--project", "kiyotaka-shared-dev", "--session", "B"])
+        td.assert_not_called()
+        self.assertIn("A", str(ctx.exception.code))
+
+    def test_down_from_run_dir_uses_its_project_and_session(self):
+        run_dir = Path(self.tmp.name) / "run"
+        run_dir.mkdir()
+        (run_dir / "up.json").write_text('{"project": "kiyotaka-shared-dev", "session": "A"}')
+        with patch.object(stack, "teardown", return_value=[]) as td, self.assertRaises(SystemExit) as ctx:
+            stack.main(["down", "--run-dir", str(run_dir)])
+        td.assert_called_once_with("kiyotaka-shared-dev")
+        self.assertEqual(ctx.exception.code, 0)
+
+    def test_down_force_overrides_ownership(self):
+        with patch.object(stack, "teardown", return_value=[]) as td, self.assertRaises(SystemExit):
+            stack.main(["down", "--project", "kiyotaka-shared-dev", "--force"])
+        td.assert_called_once()
+
+
 class RunOnceCliTests(unittest.TestCase):
     def test_run_once_cli_passes_args_after_separator(self):
         with patch.object(stack, "run", return_value=MagicMock(returncode=0, stdout="done", stderr="")) as run:

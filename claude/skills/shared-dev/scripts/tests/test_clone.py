@@ -77,6 +77,11 @@ class RefusalTests(unittest.TestCase):
         self.assertEqual(clone.proposal("tsdb0", "trade", since=T0, until=T0 + timedelta(hours=1),
                                         batch=timedelta(hours=1), target="t", explicit_nodes=True)["source"], "tsdb0")
 
+    def test_refuses_unsafe_table_name(self):
+        with self.assertRaises(clone.Refused):
+            clone.proposal("tsdb2", "trade'; select pg_sleep(100); --", since=T0, until=T0 + timedelta(hours=1),
+                           batch=timedelta(hours=1), target="t")
+
     def test_refuses_long_profile(self):
         with self.assertRaises(clone.Refused):
             proposal(source="tsdb0-long")
@@ -154,6 +159,8 @@ class BatchRunTests(unittest.TestCase):
             with self.assertRaises(clone.CloneStopped):
                 clone.run(proposal(hours=1), go=True, pause=0)
             calls = [c for c in stub.calls() if "service=" in c]
+            all_calls = stub.calls()
+        self.assertFalse(any("\\copy" in c for c in all_calls))
         spans = []
         for call in calls:
             lo, hi = re.findall(r"'(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)'", call)
@@ -162,6 +169,8 @@ class BatchRunTests(unittest.TestCase):
         self.assertLess(spans[-1], timedelta(minutes=2))
         self.assertGreaterEqual(spans[-1], timedelta(minutes=1))
         self.assertTrue(all("service=tsdb2" in c for c in calls))
+        # a batch that failed on prod loads nothing locally, so a retry cannot duplicate rows
+        self.assertFalse(any("\\copy" in c for c in stub.calls()))
 
     def test_vpn_down_stops(self):
         with StubPsql(mode="dns") as stub:

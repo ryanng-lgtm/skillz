@@ -112,6 +112,37 @@ class UpTests(unittest.TestCase):
         self.assertTrue(summary["main_reader"])
         indexes.assert_called_once()
 
+    def test_stale_claim_torn_down_before_new_claim(self):
+        m = self.patches(pick_state="stale")
+        order = []
+        with patch.object(up.stack, "teardown", side_effect=lambda p: order.append("teardown") or []) as td:
+            m["write"].side_effect = lambda *a, **k: order.append("claim")
+            up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
+        td.assert_called_once_with("kiyotaka-shared-dev")
+        self.assertEqual(order[:2], ["teardown", "claim"])
+
+    def test_own_earlier_run_torn_down_too(self):
+        m = self.patches(pick_state="ours")
+        with patch.object(up.stack, "teardown", return_value=[]) as td:
+            up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
+        td.assert_called_once()
+
+    def test_stale_teardown_leftovers_stop(self):
+        m = self.patches(pick_state="stale")
+        with patch.object(up.stack, "teardown", return_value=["could not drop sd_old: OperationalError"]):
+            with self.assertRaises(up.Stop) as ctx:
+                up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
+        self.assertEqual(ctx.exception.code, 8)
+        m["write"].assert_not_called()
+
+    def test_allow_behind_runs_with_warning(self):
+        m = self.patches(behind=[1792749073])
+        with patch.object(up, "_missing_objects", return_value=["market_stats_atr"]):
+            summary = up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1",
+                            allow_behind=True)
+        self.assertTrue(any("behind main" in w and "market_stats_atr" in w for w in summary["warnings"]))
+        m["up"].assert_called_once()
+
     def test_capture_service_not_started_with_stack(self):
         m = self.patches()
         self.plan["services"] = ["metadata-instrument", "tsdb-write", "stream-deduplicated", "streamd"]
