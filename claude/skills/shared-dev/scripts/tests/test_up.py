@@ -59,6 +59,12 @@ class UpTests(unittest.TestCase):
         m["write"].assert_not_called()
         m["wt_build"].assert_not_called()
 
+    def test_reader_change_gets_main_reader_beside_it(self):
+        m = self.patches()
+        summary = up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
+        self.assertTrue(summary["main_reader"])
+        self.assertIn("tsdb-read-main", m["up"].call_args.args[2])
+
     def test_second_project_flag_passed_to_pick(self):
         m = self.patches()
         up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1", second_project=True)

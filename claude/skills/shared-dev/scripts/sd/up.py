@@ -186,9 +186,12 @@ def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, secon
     scratch.create_schema(conn, exposed)
 
     main_reader = None
-    if p["migrations"]["tsdb"] and "tsdb-read" in p["services"]:
+    branch_reader = p["builds"].get("tsdb-read", {}).get("source") == "worktree"
+    if "tsdb-read" in p["services"] and (branch_reader or p["migrations"]["tsdb"]):
+        # Every reader probe runs against main too, on host ports +100.
         main_bin = builds.main_build(repos / "tsdb-gateway", "tsdb-read")
         main_reader = (main_bin, "public", builds.schema_for(main_bin))
+    if main_reader and p["migrations"]["tsdb"]:
         gateway, branch_yaml = _gateway_build(p, binaries, schemas)
         try:
             index_gaps = _branch_indexes(conn, gateway, main_reader[2], branch_yaml, password, run_dir, schema,
