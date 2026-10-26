@@ -15,7 +15,9 @@ from datetime import datetime, timezone
 from sd.common import STATE, run, slug
 
 BASE = "kiyotaka-shared-dev"
-OFFSET_STEP = 1000
+# Base host ports run 4000-19090; +20000 and +40000 clear them and each other
+# (+1000 would put a second tsdb-read on the base live-feed's 5080).
+OFFSET_STEP = 20000
 
 
 def _path(project):
@@ -73,7 +75,9 @@ def pick(branch, session):
         return {"project": BASE, "offset": 0, "prefix": "dev.ryan.", "state": base_state,
                 "other": read(BASE) if base_state == "stale" else None}
     used = {r.get("offset") for r in (json.loads(p.read_text()) for p in STATE.glob("claim-*.json"))}
-    offset = next(n * OFFSET_STEP for n in range(1, 100) if n * OFFSET_STEP not in used)
+    offset = next((n * OFFSET_STEP for n in (1, 2) if n * OFFSET_STEP not in used), None)
+    if offset is None:
+        raise SystemExit("two extra shared-dev projects are already claimed; there is no free port range. Ask Ryan.")
     name = slug(branch)
     return {"project": f"{BASE}-{name}", "offset": offset, "prefix": f"dev.ryan.{name}.", "state": "live",
             "other": read(BASE)}

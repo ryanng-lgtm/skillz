@@ -128,6 +128,40 @@ class BuildsPyTests(unittest.TestCase):
                 out = builds.main_build(clone, "tsdb-read")
             self.assertEqual(out, cached)
             self.assertFalse(log.exists() and "docker" in log.read_text())
+            self.assertFalse(cached.with_name("schema.yaml").exists())  # this repo has no schema.yaml
+
+    def test_main_build_cache_hit_backfills_schema(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            clone = make_repo(root)
+            (clone / "schema.yaml").write_text("tables: {}\n")
+            git(clone, "add", ".")
+            git(clone, "commit", "-m", "schema")
+            git(clone, "push", "origin", "main")
+            sha = subprocess.run(["git", "-C", str(clone), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+            cached = root / "bin" / f"linux-arm64-main-{sha[:12]}" / "tsdb-gateway"
+            cached.parent.mkdir(parents=True)
+            cached.write_text("cached")
+            with patch.object(builds, "BIN_ROOT", root / "bin"):
+                out = builds.main_build(clone, "tsdb-read")
+            self.assertEqual(out.with_name("schema.yaml").read_text(), "tables: {}\n")
+
+    def test_main_build_keeps_schema_beside_binary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            clone = make_repo(root)
+            (clone / "schema.yaml").write_text("tables: {}\n")
+            git(clone, "add", ".")
+            git(clone, "commit", "-m", "schema")
+            git(clone, "push", "origin", "main")
+            bin_dir, _ = stub_bin(root)
+            sha = subprocess.run(["git", "-C", str(clone), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+            out_path = root / "bin" / f"linux-arm64-main-{sha[:12]}" / "tsdb-gateway"
+            with patch.object(builds, "BIN_ROOT", root / "bin"), patch.object(builds, "SRC_CACHE", root / "src"), \
+                    patch.dict(os.environ, {"PATH": f"{bin_dir}:{os.environ['PATH']}", "STUB_OUT": str(out_path)}):
+                out = builds.main_build(clone, "tsdb-read")
+            self.assertEqual(out.with_name("schema.yaml").read_text(), "tables: {}\n")
+            self.assertEqual(builds.schema_for(out), out.with_name("schema.yaml"))
 
     def test_provenance_records_uncommitted(self):
         with tempfile.TemporaryDirectory() as tmp:

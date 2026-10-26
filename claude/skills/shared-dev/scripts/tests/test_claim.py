@@ -37,9 +37,19 @@ class ClaimTests(unittest.TestCase):
         with patch.object(claim, "containers", return_value=["x"]):
             picked = claim.pick("feat/mine", session="me")
         self.assertEqual(picked["project"], "kiyotaka-shared-dev-feat_mine_" + claim.slug("feat/mine")[-6:])
-        self.assertEqual(picked["offset"], 1000)
+        self.assertEqual(picked["offset"], 20000)
         self.assertEqual(picked["prefix"], f"dev.ryan.{claim.slug('feat/mine')}.")
         self.assertEqual(picked["other"]["session"], "other")
+
+    def test_pick_refuses_when_no_offset_free(self):
+        self.write()
+        self.write(project="kiyotaka-shared-dev-a", session="a")
+        claim.update("kiyotaka-shared-dev-a", offset=20000)
+        self.write(project="kiyotaka-shared-dev-b", session="b")
+        claim.update("kiyotaka-shared-dev-b", offset=40000)
+        with patch.object(claim, "containers", return_value=["x"]):
+            with self.assertRaises(SystemExit):
+                claim.pick("feat/mine", session="me")
 
     def test_pick_base_when_free(self):
         with patch.object(claim, "containers", return_value=[]):

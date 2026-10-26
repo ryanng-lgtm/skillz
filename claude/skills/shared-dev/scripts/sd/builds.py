@@ -6,6 +6,7 @@ Each binary gets a provenance JSON next to it.
 
 import hashlib
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -78,6 +79,11 @@ def main_build(repo_clone, service, *, run_dir=None, replace=None):
     else:
         out = BIN_ROOT / f"linux-arm64-main-{sha[:12]}" / name
         if out.exists():
+            schema = out.with_name("schema.yaml")
+            if not schema.exists():
+                shown = run(["git", "-C", str(repo_clone), "show", f"{sha}:schema.yaml"], timeout=60, check=False)
+                if shown.returncode == 0:
+                    schema.write_text(shown.stdout)
             return out
     out.parent.mkdir(parents=True, exist_ok=True)
     repo = MAP["binaries"][service]["repo"]
@@ -87,7 +93,23 @@ def main_build(repo_clone, service, *, run_dir=None, replace=None):
         _git(repo_clone, "worktree", "add", "--detach", str(src), sha, timeout=300)
     try:
         _build(src, service, out, replace)
+        if (src / "schema.yaml").exists():  # tsdb-gateway's -s schema must match its binary
+            shutil.copy2(src / "schema.yaml", out.with_name("schema.yaml"))
     finally:
         _git(repo_clone, "worktree", "remove", "--force", str(src), timeout=120)
     _provenance(out, repo=repo, source="main", worktree=base, head=sha, uncommitted=False, replace=replace)
     return out
+
+
+def schema_for(binary):
+    """The schema yaml that matches a built gateway binary.
+
+    Main builds keep a copy beside the binary; worktree builds use the
+    worktree's own schema.yaml, named in the provenance.
+    """
+    binary = Path(binary)
+    beside = binary.with_name("schema.yaml")
+    if beside.exists():
+        return beside
+    prov = json.loads(binary.with_name(binary.name + ".json").read_text())
+    return Path(prov["worktree"]) / "schema.yaml"
