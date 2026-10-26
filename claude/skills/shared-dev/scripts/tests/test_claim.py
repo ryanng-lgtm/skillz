@@ -66,6 +66,12 @@ class ClaimTests(unittest.TestCase):
             self.assertEqual(claim.state(BASE), "stale")
         self.assertEqual(claim.read(BASE)["schemas"], ["sd_feat_x", "sd_main_abc"])
 
+    def test_add_topic_cli(self):
+        self.write()
+        claim.main(["add-topic", BASE, "dev.ryan.dedup.long-ids.v1"])
+        claim.main(["add-topic", BASE, "dev.ryan.dedup.long-ids.v1"])
+        self.assertEqual(claim.read(BASE)["topics"], ["dev.ryan.dedup.long-ids.v1"])
+
     def test_update_and_release(self):
         self.write()
         claim.update(BASE, meta={"before": 1, "branch": [2], "dir": "/m"})

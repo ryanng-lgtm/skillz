@@ -6,6 +6,7 @@ cleaned up.
 
 Usage: python -I run.py claim pick BRANCH SESSION
        python -I run.py claim state PROJECT
+       python -I run.py claim add-topic PROJECT TOPIC   (a topic this run created; teardown reports it)
 """
 
 import json
@@ -86,6 +87,10 @@ def pick(branch, session):
 def main(argv):
     if argv[:1] == ["pick"] and len(argv) == 3:
         out = pick(argv[1], argv[2])
+    elif argv[:1] == ["add-topic"] and len(argv) == 3:
+        topics = (read(argv[1]) or {}).get("topics", [])
+        update(argv[1], topics=sorted(set(topics) | {argv[2]}))
+        return
     elif argv[:1] == ["state"] and len(argv) == 2:
         out = {"project": argv[1], "state": state(argv[1]), "claim": read(argv[1])}
     else:

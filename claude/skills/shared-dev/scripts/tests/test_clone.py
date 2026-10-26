@@ -165,6 +165,32 @@ class BatchRunTests(unittest.TestCase):
         self.assertTrue(all("PGPASSWORD=set" in c for c in local))
 
 
+class CliTests(unittest.TestCase):
+    ARGS = ["--source", "tsdb2", "--table", "trade", "--since", "2026-10-20T00:00", "--until", "2026-10-20T02:00",
+            "--batch", "60", "--target", "trade_tsdb2_20261020"]
+
+    def test_run_without_go_exits(self):
+        with self.assertRaises(SystemExit) as ctx:
+            clone.main(["run", *self.ARGS])
+        self.assertIn("--go", str(ctx.exception.code))
+
+    def test_propose_prints_without_touching_prod(self):
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with patch.object(clone, "_prod") as prod, contextlib.redirect_stdout(buf):
+            clone.main(["propose", *self.ARGS])
+        prod.assert_not_called()
+        self.assertIn('"target": "public.trade_tsdb2_20261020"', buf.getvalue())
+
+    def test_run_exposes_under_service_name(self):
+        with patch.object(clone, "run", return_value={"target": "public.trade_tsdb2_20261020"}) as run_, \
+                patch.object(clone, "_expose") as expose:
+            clone.main(["run", *self.ARGS, "--go", "--expose-in", "sd_x"])
+        self.assertTrue(run_.call_args.kwargs["go"])
+        expose.assert_called_once_with("sd_x", "trade", "trade_tsdb2_20261020")
+
+
 class ProbeTests(unittest.TestCase):
     def test_probe_rewrites_to_explain(self):
         with StubPsql() as stub:

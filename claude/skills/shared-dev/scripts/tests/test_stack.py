@@ -46,5 +46,17 @@ class TeardownTests(unittest.TestCase):
         rollback.assert_called_once_with("mc", [9], Path("/wt/migrations"), to=5)
 
 
+class RunOnceCliTests(unittest.TestCase):
+    def test_run_once_cli_passes_args_after_separator(self):
+        with patch.object(stack, "run", return_value=MagicMock(returncode=0, stdout="done", stderr="")) as run:
+            with self.assertRaises(SystemExit) as ctx:
+                stack.main(["run-once", "--compose", "/r/compose.json", "--project", "p", "--service", "tsdb-registry",
+                            "--timeout", "600", "--", "cjob", "--dry-run", "dark-index"])
+        self.assertEqual(ctx.exception.code, 0)
+        cmd = run.call_args.args[0]
+        self.assertEqual(cmd[-4:], ["/schema.yaml", "cjob", "--dry-run", "dark-index"][-4:])
+        self.assertIn("--no-deps", cmd)
+
+
 if __name__ == "__main__":
     unittest.main()

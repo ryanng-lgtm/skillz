@@ -287,3 +287,50 @@ def probe(source, sql, *, analyze_approved=False, explicit_nodes=False):
     else:
         stmt = f"EXPLAIN {stmt}"
     return _prod(source, stmt, "sd-probe")
+
+
+def _expose(schema, name, target):
+    from sd import scratch
+
+    scratch.expose(scratch.connect(), schema, name, target)
+
+
+def main(argv):
+    import argparse
+
+    ap = argparse.ArgumentParser(prog="clone")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    for name in ("propose", "run"):
+        c = sub.add_parser(name)
+        c.add_argument("--source", required=True)
+        c.add_argument("--table", required=True)
+        c.add_argument("--since", required=True, type=datetime.fromisoformat)
+        c.add_argument("--until", required=True, type=datetime.fromisoformat)
+        c.add_argument("--batch", type=int, default=60, help="minutes per batch")
+        c.add_argument("--target", required=True, help="new table name in public")
+        c.add_argument("--explicit-nodes", action="store_true", help="Ryan named a node other than tsdb2")
+        if name == "run":
+            c.add_argument("--go", action="store_true", help="Ryan said go for this clone")
+            c.add_argument("--confirm-size", action="store_true", help="Ryan agreed to more than 70 GB")
+            c.add_argument("--expose-in", help="scratch schema to expose the clone in under the table's name")
+    pr = sub.add_parser("probe")
+    pr.add_argument("--source", default="tsdb2")
+    pr.add_argument("--analyze-approved", action="store_true")
+    pr.add_argument("--explicit-nodes", action="store_true")
+    pr.add_argument("-c", "--command", required=True)
+    args = ap.parse_args(argv)
+    if args.cmd == "probe":
+        print(probe(args.source, args.command, analyze_approved=args.analyze_approved,
+                    explicit_nodes=args.explicit_nodes), end="")
+        return
+    prop = proposal(args.source, args.table, since=args.since, until=args.until,
+                    batch=timedelta(minutes=args.batch), target=args.target, explicit_nodes=args.explicit_nodes)
+    if args.cmd == "propose":
+        print(json.dumps(prop, indent=2, default=str))
+        return
+    if not args.go:
+        raise SystemExit("a prod clone runs only with --go, after Ryan said go for this clone")
+    result = run(prop, go=True, confirmed_size=args.confirm_size)
+    if args.expose_in:
+        _expose(args.expose_in, args.table, prop["target"].removeprefix("public."))
+    print(json.dumps(result, indent=2, default=str))

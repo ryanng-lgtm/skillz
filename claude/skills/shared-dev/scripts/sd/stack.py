@@ -4,6 +4,7 @@ Usage:
   python -I run.py stack up --compose F --project P SERVICE...
   python -I run.py stack status --project P
   python -I run.py stack down [--project P]
+  python -I run.py stack run-once --compose F --project P [--service S] [--timeout N] -- GATEWAY ARGS...
 """
 
 import argparse
@@ -96,7 +97,19 @@ def main(argv):
     s.add_argument("--project", default=claim.BASE)
     d = sub.add_parser("down")
     d.add_argument("--project", default=claim.BASE)
+    r = sub.add_parser("run-once")
+    r.add_argument("--compose", required=True)
+    r.add_argument("--project", required=True)
+    r.add_argument("--service", default="tsdb-registry")
+    r.add_argument("--timeout", type=int, default=1800)
+    r.add_argument("args", nargs=argparse.REMAINDER)
     args = ap.parse_args(argv)
+    if args.cmd == "run-once":
+        extra = args.args[1:] if args.args[:1] == ["--"] else args.args
+        proc = run_once(args.compose, args.project, args.service, extra, args.timeout)
+        print(proc.stdout, end="")
+        print(proc.stderr, end="", file=sys.stderr)
+        sys.exit(proc.returncode)
     if args.cmd == "up":
         up(args.compose, args.project, args.services)
     elif args.cmd == "status":
