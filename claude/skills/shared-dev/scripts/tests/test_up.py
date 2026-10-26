@@ -89,7 +89,7 @@ class UpTests(unittest.TestCase):
         m = self.patches()
         summary = up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
         m["up"].assert_called_once_with(self.run_dir / "compose.json", "kiyotaka-shared-dev",
-                                        ["metadata-instrument", "tsdb-read", "tsdb-api"])
+                                        ["metadata-instrument", "tsdb-read", "tsdb-api", "tsdb-read-main"])
         self.assertEqual(summary["project"], "kiyotaka-shared-dev")
         self.assertEqual(json.loads((self.run_dir / "up.json").read_text())["schema"], summary["schema"])
         self.assertEqual(m["wt_build"].call_count, 2)

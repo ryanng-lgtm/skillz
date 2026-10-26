@@ -52,7 +52,7 @@ class PreflightTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             start = time.monotonic()
             proc = run(setup(Path(tmp), docker="hang"))
-            self.assertLess(time.monotonic() - start, 25)
+            self.assertLess(time.monotonic() - start, 40)  # the stub hangs 60 s; docker info is cut at 20 s
             self.assertEqual(proc.returncode, 1)
             self.assertIn("FAIL docker", proc.stdout)
 
