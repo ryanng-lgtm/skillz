@@ -37,6 +37,7 @@ class UpTests(unittest.TestCase):
         self.addCleanup(stack.close)
         m = {}
         m["behind"] = stack.enter_context(patch.object(up, "_main_delta", return_value=list(behind)))
+        stack.enter_context(patch.object(up, "_skipped", return_value=[]))
         m["pick"] = stack.enter_context(patch.object(up.claim, "pick", return_value={
             "project": "kiyotaka-shared-dev", "offset": 0, "prefix": "dev.ryan.", "state": pick_state, "other": None}))
         m["write"] = stack.enter_context(patch.object(up.claim, "write"))
@@ -64,6 +65,13 @@ class UpTests(unittest.TestCase):
         summary = up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
         self.assertTrue(summary["main_reader"])
         self.assertIn("tsdb-read-main", m["up"].call_args.args[2])
+
+    def test_skipped_migrations_warned_every_run(self):
+        m = self.patches()
+        m_skip = patch.object(up, "_skipped", return_value=[1791976706])
+        with m_skip:
+            summary = up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
+        self.assertTrue(any("1791976706" in w and "skipped" in w for w in summary["warnings"]))
 
     def test_second_project_flag_passed_to_pick(self):
         m = self.patches()

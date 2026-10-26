@@ -6,8 +6,8 @@ scratch schema cannot hold), Ryan approves this one-time catch-up: prod has
 already run these exact migrations, so the clones end up closer to prod.
 
 Usage:
-  python -I run.py rebaseline plan [--repo R]
-  python -I run.py rebaseline apply --yes [--repo R] [--log FILE]
+  python -I run.py rebaseline plan [--repo R] [--skip V ...]
+  python -I run.py rebaseline apply --yes [--repo R] [--log FILE] [--skip V ...]
 """
 
 import argparse
@@ -28,20 +28,45 @@ class Unsafe(Exception):
     pass
 
 
-def plan(base, main):
-    """What a catch-up would do, from the recorded baseline and main's migrations."""
+def plan(base, main, skip=()):
+    """What a catch-up would do, from the recorded baseline and main's migrations.
+
+    skip: missing migrations to mark applied without running (one whose
+    extension the dev DB lacks); they are recorded and applied by hand later.
+    """
     version, dirty = base["version"], base.get("dirty", False)
     if version not in main:
         raise Unsafe(f"public is at {version}, which main does not have; ask Ryan which branch it came from")
     have = set(base["versions"])
+    missing = set(main) - have
+    bad = [v for v in skip if v not in missing]
+    if bad:
+        raise Unsafe(f"can only skip migrations public lacks; {bad} are not among them")
     force = max(v for v in have if v < version) if dirty else None
     current = force if dirty else version
-    apply = sorted(set(main) - have)
-    skipped = [v for v in apply if v <= current]
-    if skipped:
-        raise Unsafe(f"main has migrations numbered at or below public's version that public lacks: {skipped}; "
+    apply = sorted(missing - set(skip))
+    lower = [v for v in sorted(missing) if v <= current]
+    if lower:
+        raise Unsafe(f"main has migrations numbered at or below public's version that public lacks: {lower}; "
                      "golang-migrate up would skip them")
-    return {"from": version, "dirty": dirty, "force": force, "apply": apply, "to": max(main)}
+    return {"from": version, "dirty": dirty, "force": force, "apply": apply, "to": max(main), "skip": sorted(skip)}
+
+
+def steps(todo):
+    """The gateway `migrate` commands for a plan: up to each skipped version, force past it, then up."""
+    out = []
+    current = todo["from"]
+    if todo["dirty"]:
+        out.append(["migrate", "force", str(todo["force"])])
+        current = todo["force"]
+    for s in todo["skip"]:
+        before = [v for v in todo["apply"] if current < v < s]
+        if before:
+            out.append(["migrate", "to", str(max(before))])
+        out.append(["migrate", "force", str(s)])
+        current = s
+    out.append(["migrate", "up"])
+    return out
 
 
 _NON_TX = re.compile(r"^\s*(begin|commit|rollback|start\s+transaction|vacuum)\b|\bconcurrently\b", re.I | re.M)
@@ -85,7 +110,7 @@ def _preflight(conn, todo, main_dir, main):
             raise Unsafe(f"the dirty migration {todo['from']} left objects behind: {left}. Ask Ryan.")
 
 
-def apply(repo=REPO, log=None):
+def apply(repo=REPO, log=None, skip=()):
     base = json.loads((STATE / "public-baseline.json").read_text())
     gateway, sha = _main_inputs(repo)
     schema_yaml = builds.schema_for(gateway)
@@ -93,13 +118,11 @@ def apply(repo=REPO, log=None):
     with tempfile.TemporaryDirectory() as tmp:
         main_dir = migrations.export_dir(repo, sha, Path(tmp) / "migrations")
         main = migrations.parse_dir(main_dir)
-        todo = plan(base, main)
+        todo = plan(base, main, skip)
         conn = scratch.connect()
         _preflight(conn, todo, main_dir, main)
-        steps = ([["-M", "/migrations", "migrate", "force", str(todo["force"])]] if todo["dirty"] else []) + \
-                [["-M", "/migrations", "migrate", "up"]]
         out = []
-        for args in steps:
+        for args in (["-M", "/migrations", *step] for step in steps(todo)):
             proc = scratch._gateway(gateway, config, schema_yaml, args, mounts=[(main_dir, "/migrations")],
                                     timeout=APPLY_TIMEOUT)
             out.append(scratch._redact(proc.stdout + proc.stderr))
@@ -112,6 +135,7 @@ def apply(repo=REPO, log=None):
         raise SystemExit(f"after the catch-up public is at {version} (dirty={dirty}), expected {todo['to']}")
     found = migrations.baseline(repo, version, sha)
     found["versions"] = sorted(found["versions"])
+    found["skipped"] = sorted(set(base.get("skipped", [])) | set(todo["skip"]))
     (STATE / "public-baseline.json").write_text(json.dumps(found, indent=2) + "\n")
     scratch.ensure_guard(conn)  # SELECT on the tables and views the catch-up created
     if log:
@@ -124,8 +148,11 @@ def main(argv):
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("plan")
     p.add_argument("--repo", default=str(REPO))
+    p.add_argument("--skip", type=int, action="append", default=[])
     a = sub.add_parser("apply")
     a.add_argument("--repo", default=str(REPO))
+    a.add_argument("--skip", type=int, action="append", default=[],
+                   help="mark this missing migration applied without running it (recorded; run it later)")
     a.add_argument("--yes", action="store_true", help="Ryan approved this catch-up of public")
     a.add_argument("--log")
     args = ap.parse_args(argv)
@@ -136,7 +163,8 @@ def main(argv):
         gateway, sha = _main_inputs(Path(args.repo))
         with tempfile.TemporaryDirectory() as tmp:
             main = migrations.parse_dir(migrations.export_dir(Path(args.repo), sha, Path(tmp) / "m"))
-        todo = plan(base, main)
-        print(json.dumps({**todo, "apply_count": len(todo["apply"]), "main_sha": sha}, indent=2))
+        todo = plan(base, main, args.skip)
+        print(json.dumps({**todo, "apply_count": len(todo["apply"]), "main_sha": sha, "steps": steps(todo)},
+                         indent=2))
         return
-    print(json.dumps(apply(Path(args.repo), args.log), indent=2))
+    print(json.dumps(apply(Path(args.repo), args.log, args.skip), indent=2))

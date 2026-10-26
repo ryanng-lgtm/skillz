@@ -52,6 +52,12 @@ def _main_delta(repos, run_dir):
     return delta(set(base["versions"]), parse_dir(main_dir), {})[0]
 
 
+def _skipped():
+    """Migrations the catch-up marked applied without running (see rebaseline --skip)."""
+    path = STATE / "public-baseline.json"
+    return json.loads(path.read_text()).get("skipped", []) if path.exists() else []
+
+
 def _missing_objects(repos, run_dir, versions):
     """Tables, views and functions main's missing migrations would create."""
     from sd.rebaseline import created_objects
@@ -131,6 +137,10 @@ def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, secon
         if behind and not allow_behind:
             raise Stop(5, f"public is {len(behind)} migrations behind main ({behind[0]}..{behind[-1]}); run "
                           "`run.py rebaseline plan` and ask Ryan before `rebaseline apply --yes`")
+        if _skipped():
+            early_warnings.append(f"public skipped migration(s) {_skipped()} in its catch-up (the dev DB's "
+                                  "kiyotaka_toolkit was too old); their objects are missing and probes that "
+                                  "read them are not valid")
         if behind:
             early_warnings.append(f"public is {len(behind)} migrations behind main ({behind[0]}..{behind[-1]}); "
                                   f"objects main has that public lacks: {', '.join(_missing_objects(repos, run_dir, behind))}")

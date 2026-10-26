@@ -12,7 +12,8 @@ MAIN = {v: f"{v}_m" for v in (1, 2, 3, 4, 5)}
 class PlanTests(unittest.TestCase):
     def test_plan_dirty_forces_previous(self):
         base = {"version": 3, "dirty": True, "versions": [1, 2]}
-        self.assertEqual(rebaseline.plan(base, MAIN), {"from": 3, "dirty": True, "force": 2, "apply": [3, 4, 5], "to": 5})
+        self.assertEqual(rebaseline.plan(base, MAIN),
+                         {"from": 3, "dirty": True, "force": 2, "apply": [3, 4, 5], "to": 5, "skip": []})
 
     def test_plan_clean_needs_no_force(self):
         base = {"version": 3, "dirty": False, "versions": [1, 2, 3]}
@@ -28,6 +29,30 @@ class PlanTests(unittest.TestCase):
     def test_plan_refuses_version_not_on_main(self):
         with self.assertRaises(rebaseline.Unsafe):
             rebaseline.plan({"version": 9, "dirty": False, "versions": [1, 9]}, MAIN)
+
+
+class SkipTests(unittest.TestCase):
+    def test_skip_the_dirty_version(self):
+        base = {"version": 3, "dirty": True, "versions": [1, 2]}
+        todo = rebaseline.plan(base, MAIN, skip=[3])
+        self.assertEqual((todo["force"], todo["apply"], todo["skip"]), (2, [4, 5], [3]))
+        self.assertEqual(rebaseline.steps(todo), [["migrate", "force", "2"], ["migrate", "force", "3"],
+                                                  ["migrate", "up"]])
+
+    def test_skip_in_the_middle(self):
+        base = {"version": 2, "dirty": False, "versions": [1, 2]}
+        todo = rebaseline.plan(base, MAIN, skip=[4])
+        self.assertEqual(todo["apply"], [3, 5])
+        self.assertEqual(rebaseline.steps(todo), [["migrate", "to", "3"], ["migrate", "force", "4"],
+                                                  ["migrate", "up"]])
+
+    def test_skip_must_be_a_missing_migration(self):
+        with self.assertRaises(rebaseline.Unsafe):
+            rebaseline.plan({"version": 3, "dirty": False, "versions": [1, 2, 3]}, MAIN, skip=[2])
+
+    def test_no_skip_steps_unchanged(self):
+        todo = rebaseline.plan({"version": 3, "dirty": True, "versions": [1, 2]}, MAIN)
+        self.assertEqual(rebaseline.steps(todo), [["migrate", "force", "2"], ["migrate", "up"]])
 
 
 class SafetyTests(unittest.TestCase):
