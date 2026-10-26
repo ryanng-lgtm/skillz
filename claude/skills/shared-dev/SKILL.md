@@ -55,13 +55,13 @@ Prod clones and probes: `references/prod-access.md`.
 
 ## 1. Scope
 
-Run dir: if the work has a plan, `<that plan's -evidence dir>/shared-dev/<YYYY-MM-DD-HHMM>/`
-(`grep -rlF '<branch>' ~/.claude/plans`); otherwise
-`<scratchpad>/shared-dev/<YYYY-MM-DD-HHMM>/`. Call it `$RUN`.
-
 ```bash
+RUN=$($P -I $S/run.py rundir --branch <branch> --scratchpad <this session's scratchpad>)
 $P -I $S/run.py scope <worktree> ... > $RUN/scope.json
 ```
+
+`rundir` picks the evidence dir of the newest plan naming the branch, else
+the scratchpad, and creates `<that>/shared-dev/<YYYY-MM-DD-HHMM>/`.
 
 The worktrees are the ones this session edited or pushed from. None: ask
 once. If the branch's MR has squash-merged, keep the worktree builds when

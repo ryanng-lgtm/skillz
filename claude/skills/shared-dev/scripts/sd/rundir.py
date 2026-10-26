@@ -14,7 +14,7 @@ from sd.common import PLANS, evidence_dir
 def run_dir(branch, *, scratchpad, plans=PLANS, stamp=None):
     stamp = stamp or datetime.now().strftime("%Y-%m-%d-%H%M")
     base = evidence_dir(branch, plans) or Path(scratchpad)
-    out = Path(base).resolve() / "shared-dev" / stamp
+    out = Path(base).absolute() / "shared-dev" / stamp
     out.mkdir(parents=True, exist_ok=True)
     return out
 
