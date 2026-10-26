@@ -32,10 +32,11 @@ class UpTests(unittest.TestCase):
                      "data": ["clones"], "migrations": {"tsdb": False, "meta": False}, "cjob": False,
                      "capture": None, "fe": False, "unmapped": []}
 
-    def patches(self, pick_state="free"):
+    def patches(self, pick_state="free", behind=()):
         stack = ExitStack()
         self.addCleanup(stack.close)
         m = {}
+        m["behind"] = stack.enter_context(patch.object(up, "_main_delta", return_value=list(behind)))
         m["pick"] = stack.enter_context(patch.object(up.claim, "pick", return_value={
             "project": "kiyotaka-shared-dev", "offset": 0, "prefix": "dev.ryan.", "state": pick_state, "other": None}))
         m["write"] = stack.enter_context(patch.object(up.claim, "write"))
@@ -86,6 +87,14 @@ class UpTests(unittest.TestCase):
                 up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
         self.assertEqual(ctx.exception.code, 5)
         m["up"].assert_not_called()
+
+    def test_reader_only_branch_stops_when_public_behind_main(self):
+        m = self.patches(behind=[1792749073, 1792754570])
+        with self.assertRaises(up.Stop) as ctx:
+            up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
+        self.assertEqual(ctx.exception.code, 5)
+        self.assertIn("2 migrations behind", str(ctx.exception))
+        m["write"].assert_not_called()
 
     def test_capture_service_not_started_with_stack(self):
         m = self.patches()

@@ -39,6 +39,13 @@ def _gateway_build(p, binaries, schemas):
     raise Stop(5, "the plan has tsdb migrations but no tsdb-gateway worktree build")
 
 
+def _main_delta(repos, run_dir):
+    """Main's tsdb-gateway migrations that public lacks."""
+    base = json.loads((STATE / "public-baseline.json").read_text())
+    main_dir = export_dir(repos / "tsdb-gateway", "origin/main", Path(run_dir) / "tsdb-main-migrations")
+    return delta(set(base["versions"]), parse_dir(main_dir), {})[0]
+
+
 def _tsdb_delta(conn, change, p, binaries, schemas, run_dir, password, schema, copies, budget, repos):
     """Apply the branch's own migrations into schema; returns (copies, warnings)."""
     base = json.loads((STATE / "public-baseline.json").read_text())
@@ -97,6 +104,13 @@ def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, secon
         if not venue or not symbols:
             raise Stop(6, "a live capture needs --venue (none found in the change) and --symbols (the branch's "
                           "symbols, else two or three liquid ones)")
+
+    if any(MAP["binaries"][svc]["repo"] == "tsdb-gateway" for svc in p["builds"]):
+        # Gateway code from main or a branch off it expects main's schema, migrations or not.
+        behind = _main_delta(repos, run_dir)
+        if behind:
+            raise Stop(5, f"public is {len(behind)} migrations behind main ({behind[0]}..{behind[-1]}); run "
+                          "`run.py rebaseline plan` and ask Ryan before `rebaseline apply --yes`")
 
     picked = claim.pick(branch, session)
     if picked["state"] == "unclaimed":
