@@ -48,9 +48,9 @@ Named groups of repos that ship together. Paths are relative to the root.
 
 ## Phase 0 — pick the repos
 
-Never scan the whole root on a bare invocation. Build a short candidate set, scan only that set,
-and offer the stacks next to it. Scan the whole root only when the user asks for everything
-(`/syncup all`, "sync all my repos").
+Never scan the whole root on a bare invocation. Build a short candidate set and scan only that
+set. Offer the stacks only when the user named nothing and the session has touched no repos. Scan
+the whole root only when the user asks for everything (`/syncup all`, "sync all my repos").
 
 1. **Arguments.** If the user named repos or stacks, expand the stacks and use exactly that set.
    Resolve each repo to a path under the root, and ask for the path if one does not resolve. Go to
@@ -114,14 +114,17 @@ then re-run the scanner. Do not proceed with `--no-fetch` and do not present a c
 built on stale refs.
 
 5. **Ask.** Skip this step when the user passed arguments. Otherwise use one `AskUserQuestion`
-   call, both questions `multiSelect: true`:
+   call, every question `multiSelect: true`:
    - **Detected:** the `state=sync` candidates from steps 2–3, sorted dirty-first, then by `behind`
      descending. Label is the repo name. Description is the reason and state, e.g.
      `MR !2402 · 5 behind · 3 uncommitted` or `edited this session · 12 behind`. If there are more
-     than 4, spread them over extra questions, keeping one question for stacks. If there are more
-     than 12, print a numbered list instead and ask for numbers, names, or `all`, and say how many
-     were listed. If nothing was detected, say so and ask only the stacks question.
-   - **Stacks:** one option per stack. Description is its repo list.
+     than 4, spread them over extra questions, keeping one for stacks when it is asked. If there
+     are more than 12, print a numbered list instead and ask for numbers, names, or `all`, and say
+     how many were listed. If nothing was detected, say so, then ask only the stacks question in a
+     fresh session, or stop otherwise.
+   - **Stacks:** only when step 2 found no session repos. One option per stack. Description is its
+     repo list. A session that has touched repos already says what to sync; leave the stacks out
+     and mention that `/syncup <stack>` still works.
 
    If the user picks a stack, scan its repos (step 4) and sync only the ones in `state=sync`. List
    the rest as already up to date.
