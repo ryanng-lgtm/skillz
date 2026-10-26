@@ -2,7 +2,7 @@
 
 # sync bookkeeping — local to each machine
 .sync.log
-.sync.lock/
+.sync.lock
 .sync-conflict
 .sync-hold
 

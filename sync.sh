@@ -15,13 +15,44 @@ cd "$REPO" || exit 1
 LOCK="$REPO/.sync.lock"
 LOG="$REPO/.sync.log"
 
-# Serialize overlapping runs; a hook can fire several times in a burst.
-if ! mkdir "$LOCK" 2>/dev/null; then
-  exit 0
-fi
-trap 'rmdir "$LOCK" 2>/dev/null' EXIT
-
 log() { printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"$LOG"; }
+
+# Serialize overlapping runs; a hook can fire several times in a burst.
+#
+# The lock is a kernel flock on fd 9, not a lock directory. A directory outlives
+# a run that dies before its EXIT trap fires (SIGKILL after the hook timeout, a
+# closed session), and every later run then sees it and quietly exits — that
+# stopped all syncing from Sep 23 to Oct 26 2026. The kernel drops a flock
+# however the process dies.
+#
+# flock(1) is not on macOS, so perl takes the lock there. The lock belongs to
+# the open file, not the process, so it stays held after perl exits.
+take_lock() {
+  if command -v flock >/dev/null; then
+    flock -n 9
+    return
+  fi
+  perl -MFcntl=:flock -e 'open(my $fh, ">&=", 9) or exit 2; flock($fh, LOCK_EX | LOCK_NB) or exit 1'
+}
+
+[ -d "$LOCK" ] && rmdir "$LOCK" 2>/dev/null # lock directory left by the old scheme
+if ! exec 9>>"$LOCK"; then
+  log "cannot open $LOCK — sync skipped"
+  exit 1
+fi
+take_lock
+case $? in
+  0) ;;
+  1) exit 0 ;; # another run holds it
+  *)
+    log "cannot lock $LOCK — sync skipped"
+    exit 1
+    ;;
+esac
+
+# A child that inherits fd 9 and outlives this shell (a hung push, a detached
+# `git gc --auto`) would keep the lock held, so no git call gets it.
+git() { command git "$@" 9>&-; }
 
 # Safety hold. `touch .sync-hold` stops automatic pushes on this machine —
 # used while the remote is not yet in the state you want, or to work offline
@@ -97,6 +128,13 @@ Synced from $(hostname -s)."
 if ! git commit -q -m "$subject" -m "$body"; then
   log "nothing to commit"
   exit 0
+fi
+
+# A branch with no upstream can't be pulled, and a failed pull below is reported
+# as a rebase conflict. Say what actually happened instead.
+if ! git rev-parse -q --verify '@{upstream}' >/dev/null 2>&1; then
+  log "no upstream for $(git rev-parse --abbrev-ref HEAD) — committed locally, push skipped"
+  exit 1
 fi
 
 if ! git pull --rebase --autostash -q 2>>"$LOG"; then
