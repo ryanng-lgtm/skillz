@@ -64,8 +64,11 @@ def _check_source(source, explicit_nodes=False):
     raise Refused(f"{source}: clones and probes use tsdb2 or pgmeta0; other tsdb nodes only when Ryan says so")
 
 
-def _ts(value):
-    return value.strftime("%Y-%m-%d %H:%M:%S")
+def _ts(value, tz=False):
+    """A SQL literal in UTC; with tz, marked +00 for timestamptz columns."""
+    if value.tzinfo is not None:
+        value = value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value.strftime("%Y-%m-%d %H:%M:%S") + ("+00" if tz else "")
 
 
 def proposal(source, table, *, since, until, batch, target, explicit_nodes=False):
@@ -99,7 +102,7 @@ def size(source, table, since, until):
     sql = f"""SELECT coalesce(sum(s.total_bytes), 0)
               FROM chunks_detailed_size('public.{table}') s
               JOIN timescaledb_information.chunks c ON c.chunk_schema = s.chunk_schema AND c.chunk_name = s.chunk_name
-              WHERE c.hypertable_name = '{table}' AND c.range_end > '{_ts(since)}' AND c.range_start < '{_ts(until)}'"""
+              WHERE c.hypertable_name = '{table}' AND c.range_end > '{_ts(since, True)}' AND c.range_start < '{_ts(until, True)}'"""
     return int(_prod(source, sql, "sd-clone-size").strip() or 0)
 
 
@@ -115,14 +118,42 @@ def source_layout(source, table):
     if not dim:
         raise Refused(f"{table} is not a hypertable on {source}; a time-bounded clone needs one")
     time_col, seconds = dim.split("|")
-    return {"columns": [tuple(line.split("|", 1)) for line in cols.splitlines() if line],
-            "time_col": time_col, "interval": timedelta(seconds=int(seconds))}
+    columns = [tuple(line.split("|", 1)) for line in cols.splitlines() if line]
+    indexes = _prod(source, f"SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND tablename = '{table}'",
+                    "sd-clone-layout").splitlines()
+    comp = _prod(source, f"""SELECT coalesce(segmentby, ''), coalesce(orderby, '')
+                             FROM timescaledb_information.hypertable_compression_settings
+                             WHERE hypertable = 'public.{table}'::regclass""", "sd-clone-layout").strip()
+    return {"columns": columns, "time_col": time_col, "interval": timedelta(seconds=int(seconds)),
+            "tz": "with time zone" in dict(columns).get(time_col, ""), "indexes": [i for i in indexes if i],
+            "compression": dict(zip(("segmentby", "orderby"), comp.split("|"))) if comp else None}
 
 
-def batch_sql(table, columns, time_col, lo, hi):
+def compressed_starts(source, table, since, until):
+    """range_start of the source's compressed chunks in the slice, so the clone compresses the same ones."""
+    out = _prod(source, f"""SELECT range_start FROM timescaledb_information.chunks
+                            WHERE hypertable_name = '{table}' AND is_compressed
+                              AND range_end > '{_ts(since, True)}' AND range_start < '{_ts(until, True)}'""",
+                "sd-clone-layout")
+    return [line for line in out.splitlines() if line]
+
+
+def index_ddl_for(indexdefs, table, target, time_col):
+    """The source's indexes for the clone, renamed; the default time index create_hypertable made is skipped."""
+    out = []
+    for ddl in indexdefs:
+        if re.search(rf'USING \w+ \("?{re.escape(time_col)}"?( DESC)?\)$', ddl):
+            continue
+        ddl = re.sub(rf'\bON (ONLY )?public\."?{re.escape(table)}"? ', f'ON public."{target}" ', ddl, count=1)
+        ddl = re.sub(r'^(CREATE (UNIQUE )?INDEX) \S+', rf'\1 "{target}_{len(out) + 1}_idx"', ddl, count=1)
+        out.append(ddl)
+    return out
+
+
+def batch_sql(table, columns, time_col, lo, hi, tz=False):
     cols = ", ".join(f'"{c}"' for c in columns)
-    return (f'COPY (SELECT {cols} FROM public."{table}" WHERE "{time_col}" >= \'{_ts(lo)}\' '
-            f'AND "{time_col}" < \'{_ts(hi)}\') TO STDOUT (FORMAT csv)')
+    return (f'COPY (SELECT {cols} FROM public."{table}" WHERE "{time_col}" >= \'{_ts(lo, tz)}\' '
+            f'AND "{time_col}" < \'{_ts(hi, tz)}\') TO STDOUT (FORMAT csv)')
 
 
 def _align_up(t, chunk):
@@ -153,7 +184,8 @@ def batches(since, until, batch, chunk):
 def explain_ok(source, table, layout, lo, hi):
     """Plain EXPLAIN of one batch: no execution, just the plan's chunk count."""
     cols = [c for c, _ in layout["columns"]]
-    select = batch_sql(table, cols, layout["time_col"], lo, hi)[len("COPY ("):-len(") TO STDOUT (FORMAT csv)")]
+    select = batch_sql(table, cols, layout["time_col"], lo, hi, layout.get("tz", False))[
+        len("COPY ("):-len(") TO STDOUT (FORMAT csv)")]
     plan = json.loads(_prod(source, f"EXPLAIN (FORMAT JSON) {select}", "sd-clone-explain"))
     chunks = set()
 
@@ -203,12 +235,32 @@ def create_target(target, layout):
     conn.execute(f'CREATE TABLE public."{target}" ({cols})')
     conn.execute("SELECT create_hypertable(%s, by_range(%s, %s))",
                  (f"public.{target}", layout["time_col"], layout["interval"]))
+    comp = layout.get("compression")
+    if comp:
+        opts = ["timescaledb.compress"] + [f"timescaledb.compress_{k} = '{v}'" for k, v in comp.items() if v]
+        conn.execute(f'ALTER TABLE public."{target}" SET ({", ".join(opts)})')
+
+
+def finish_target(target, layout, table, compressed):
+    """After the data: the source's indexes, the same chunks compressed, then VACUUM ANALYZE."""
+    from sd import scratch
+
+    conn = scratch.connect()
+    for ddl in index_ddl_for(layout.get("indexes", []), table, target, layout["time_col"]):
+        conn.execute(ddl)
+    if compressed:
+        conn.execute(
+            """SELECT compress_chunk(format('%%I.%%I', chunk_schema, chunk_name)::regclass, if_not_compressed => true)
+               FROM timescaledb_information.chunks
+               WHERE hypertable_schema = 'public' AND hypertable_name = %s AND range_start = ANY(%s::timestamptz[])""",
+            (target, compressed))
+    conn.execute(f'VACUUM (FREEZE, ANALYZE) public."{target}"')
 
 
 def _copy_batch(source, table, layout, lo, hi, target, appname):
     cols = [c for c, _ in layout["columns"]]
     prod = subprocess.Popen([_psql(), f"service={source}", "-X", "-v", "ON_ERROR_STOP=1", "-c",
-                             batch_sql(table, cols, layout["time_col"], lo, hi)],
+                             batch_sql(table, cols, layout["time_col"], lo, hi, layout.get("tz", False))],
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=_prod_env(appname))
     local = subprocess.Popen([_psql(), "-X", "-v", "ON_ERROR_STOP=1", "-c",
                               f'\\copy public."{target}" FROM STDIN (FORMAT csv)'],
@@ -257,6 +309,7 @@ def run(prop, *, go, confirmed_size=False, pause=2.0):
     ok, detail = explain_ok(source, table, layout, *plan[0])
     if not ok:
         raise Refused(detail)
+    compressed = compressed_starts(source, table, prop["since"], prop["until"])
     create_target(target, layout)
     appname = f"sd-clone-{slug(target)}"[:63]
     done = []
@@ -264,7 +317,10 @@ def run(prop, *, go, confirmed_size=False, pause=2.0):
         _copy_split(source, table, layout, lo, hi, target, appname, done)
         if pause and i + 1 < len(plan):
             time.sleep(pause)
+    finish_target(target, layout, table, compressed)
     return {"target": f"public.{target}", "batches": len(done), "bytes_on_source": nbytes, "explain": detail,
+            "indexes": len(index_ddl_for(layout.get("indexes", []), table, target, layout["time_col"])),
+            "compressed_chunks": len(compressed),
             "finished_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
 
 

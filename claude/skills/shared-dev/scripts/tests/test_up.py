@@ -67,7 +67,11 @@ class UpTests(unittest.TestCase):
         up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
         self.assertEqual(order[0], "claim")
         kwargs = m["write"].call_args.kwargs
-        self.assertEqual(kwargs["schemas"], ["sd_feat_x_" + up.slug("feat/x")[-6:]])
+        schema = "sd_feat_x_" + up.slug("feat/x")[-6:]
+        self.assertEqual(kwargs["schemas"], [schema, schema + "_x"])
+        created = [c.args[1] for c in m["create"].call_args_list]
+        self.assertEqual(created, [schema, schema + "_x"])
+        self.assertEqual(m["render"].call_args.kwargs["exposed"], schema + "_x")
         self.assertEqual(kwargs["compose"], str(self.run_dir / "compose.json"))
 
     def test_happy_path_starts_planned_services(self):
@@ -95,6 +99,18 @@ class UpTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 5)
         self.assertIn("2 migrations behind", str(ctx.exception))
         m["write"].assert_not_called()
+
+    def test_merged_branch_built_from_main_runs(self):
+        # a squash-merged MR: its migrations are on main (and in public after a rebaseline)
+        m = self.patches()
+        self.plan["migrations"]["tsdb"] = True
+        for b in self.plan["builds"].values():
+            b["source"], b["worktree"] = "main", None
+        with patch.object(up, "_tsdb_delta", return_value=({}, [])), \
+                patch.object(up, "_branch_indexes", return_value=[]) as indexes:
+            summary = up.up(self.scope, write(self.run_dir / "plan.json", self.plan), self.run_dir, "session-1")
+        self.assertTrue(summary["main_reader"])
+        indexes.assert_called_once()
 
     def test_capture_service_not_started_with_stack(self):
         m = self.patches()

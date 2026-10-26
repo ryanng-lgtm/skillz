@@ -6,7 +6,7 @@ read-only.
 
 Usage:
   python -I run.py query --schema sd_x -c "SELECT ..." [--timeout 60s]
-  python -I run.py query --as dev -c "SELECT ..."
+  python -I run.py query --as dev [--io-timing] -c "EXPLAIN (ANALYZE, BUFFERS) ..."
 """
 
 import argparse
@@ -24,7 +24,11 @@ def main(argv):
     ap.add_argument("--schema", help="the run's scratch schema (required as sd_guard)")
     ap.add_argument("--as", dest="role", choices=["guard", "dev"], default="guard")
     ap.add_argument("--timeout", default="60s")
+    ap.add_argument("--io-timing", action="store_true",
+                    help="SET track_io_timing = on for this session (superuser-only, so --as dev)")
     args = ap.parse_args(argv)
+    if args.io_timing and args.role != "dev":
+        ap.error("--io-timing needs --as dev: track_io_timing is superuser-only")
     if args.role == "guard":
         if not args.schema:
             ap.error("--schema is required as sd_guard")
@@ -32,6 +36,8 @@ def main(argv):
     else:
         conn = scratch.connect()
         conn.execute("SET default_transaction_read_only = on")
+        if args.io_timing:
+            conn.execute("SET track_io_timing = on")  # this session only
     conn.execute(f"SET statement_timeout = '{args.timeout}'")
     cur = conn.execute(args.command)
     if cur.description is None:

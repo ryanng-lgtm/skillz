@@ -13,7 +13,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from sd import claim, meta, scratch
+from sd import claim, meta, scratch, topics
 from sd.common import Stuck, run
 
 
@@ -79,8 +79,11 @@ def teardown(project):
             leftovers.append(f"could not roll back meta_ryan {m['branch']} to {m['before']}: {type(exc).__name__}: {exc}")
     if record.get("run_dir"):
         shutil.rmtree(Path(record["run_dir"]) / "config", ignore_errors=True)
-    if record.get("topics"):
-        leftovers.append(f"topics this run created, delete them: {', '.join(record['topics'])}")
+    for topic in record.get("topics", []):
+        try:
+            topics.delete(project, topic)
+        except BaseException as exc:  # noqa: BLE001 - SystemExit included; every step runs
+            leftovers.append(f"could not delete topic {topic}: {exc}")
     if db_ok:
         claim.release(project)
     return leftovers

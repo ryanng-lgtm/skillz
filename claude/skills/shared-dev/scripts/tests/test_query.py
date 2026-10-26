@@ -33,6 +33,17 @@ class QueryTests(unittest.TestCase):
         sql = [c.args[0] for c in conn.execute.call_args_list]
         self.assertTrue(any("default_transaction_read_only" in s for s in sql[:2]))
 
+    def test_io_timing_only_as_dev_and_session_scoped(self):
+        conn = MagicMock()
+        conn.execute.return_value.description = None
+        with patch.object(query.scratch, "connect", return_value=conn), contextlib.redirect_stdout(io.StringIO()):
+            query.main(["--as", "dev", "--io-timing", "-c", "EXPLAIN (ANALYZE, BUFFERS) SELECT 1"])
+        sql = [c.args[0] for c in conn.execute.call_args_list]
+        self.assertIn("SET track_io_timing = on", sql)
+        self.assertFalse(any("ALTER SYSTEM" in s or "ALTER DATABASE" in s for s in sql))
+        with self.assertRaises(SystemExit):
+            query.main(["--schema", "sd_x", "--io-timing", "-c", "SELECT 1"])
+
 
 if __name__ == "__main__":
     unittest.main()

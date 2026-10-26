@@ -52,9 +52,20 @@ def _rewrite_prefix(node, prefix):
     return node
 
 
-def _config(base_mount, *, search_path, password, prefix):
-    """The base rendered config with the run's DB role, search_path and Kafka prefix."""
+def _merge(base, extra):
+    for key, value in extra.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def _config(base_mount, *, search_path, password, prefix, patch=None):
+    """The base rendered config with the run's DB role, search_path, Kafka prefix and patch."""
     cfg = json.loads(Path(_abs(base_mount).split(":")[0]).read_text())
+    if patch:
+        _merge(cfg, patch)
     for key in ("primary", "secondary", "free_secondary"):
         entry = cfg.get("timescaledb", {}).get(key)
         if entry and "url" in entry:
@@ -76,13 +87,18 @@ def _write_secret(path, doc):
 
 
 def render(plan, binaries, *, project, offset, prefix, schema, password, run_dir, schemas=None, main_reader=None,
-           capture=None):
+           capture=None, exposed=None, patches=None):
     """Write run_dir/compose.json and run_dir/config/<service>.yaml; return the compose path.
 
     main_reader is (binary, search schema, schema yaml) for a tsdb-read-main
     service on host ports +100, built from main, for side-by-side probes.
     capture is {"service": dict, "config": Path} from capture.service().
+    exposed is the run's exposure schema (views over new prod clones); both
+    readers search it, so main and branch probes read the same data.
+    patches maps a service to non-secret config keys merged into its config
+    (a branch's new settings); topic names in them follow the run's prefix.
     """
+    patches = patches or {}
     base = yaml.safe_load((SHARED_DEV / "compose.yaml").read_text())["services"]
     run_dir = Path(run_dir)
     schemas = schemas or {}
@@ -95,7 +111,8 @@ def render(plan, binaries, *, project, offset, prefix, schema, password, run_dir
         volumes = [_abs(v) for v in svc.get("volumes", [])]
         config_mount = next(v for v in base[source]["volumes"] if _target(v) == "/config.yaml")
         cfg_path = run_dir / "config" / f"{name}.yaml"
-        _write_secret(cfg_path, _config(config_mount, search_path=search_path, password=password, prefix=prefix))
+        _write_secret(cfg_path, _config(config_mount, search_path=search_path, password=password, prefix=prefix,
+                                        patch=patches.get(name)))
         volumes = _set_mount(volumes, "/config.yaml", cfg_path)
         bin_name = MAP["binaries"][source]["name"]
         if binary:
@@ -114,11 +131,12 @@ def render(plan, binaries, *, project, offset, prefix, schema, password, run_dir
 
     for name in wanted:
         build(name, name, binary=binaries.get(name), schema_yaml=schemas.get(name),
-              search_path=f"{schema},public", port_shift=offset)
+              search_path=",".join([schema, *([exposed] if exposed else []), "public"]), port_shift=offset)
     if main_reader:
         binary, search, schema_yaml = main_reader
         build("tsdb-read-main", "tsdb-read", binary=binary, schema_yaml=schema_yaml,
-              search_path=search if search == "public" else f"{search},public", port_shift=offset + MAIN_READER_PORTS)
+              search_path=",".join([*([] if search == "public" else [search]), *([exposed] if exposed else []),
+                                    "public"]), port_shift=offset + MAIN_READER_PORTS)
     if capture:
         services[capture["service_name"]] = capture["service"]
 

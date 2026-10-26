@@ -13,6 +13,10 @@ from sd.scope import Change
 MAP = json.loads(Path(__file__).with_name("service_map.json").read_text())
 REPOS = Path.home() / "Documents" / "GitLab" / "meta_repo"
 DATA_ORDER = ["live", "api", "clones"]
+# Measured: metadata-instrument holds the catalog (~950 MiB); tsdb-registry was
+# OOM-killed at 2g and runs at 4g; the rest stay well under 512 MiB.
+MEMORY_MIB = {"metadata-instrument": 1024, "tsdb-registry": 3072}
+DEFAULT_MIB = 512
 
 
 def _rule_for(repo, path):
@@ -115,6 +119,7 @@ def plan(changes, *, fe=False, only=None, repos=REPOS):
         capture = {"venue": _venue(capture_files)}
 
     return {
+        "need_mib": sum(MEMORY_MIB.get(svc, DEFAULT_MIB) for svc in ordered),
         "services": ordered,
         "builds": builds,
         "data": [d for d in DATA_ORDER if d in data],

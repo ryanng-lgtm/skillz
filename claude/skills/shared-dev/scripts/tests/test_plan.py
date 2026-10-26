@@ -21,6 +21,12 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(p["builds"]["metadata-instrument"]["source"], "main")
         self.assertFalse(p["migrations"]["tsdb"])
 
+    def test_plan_memory_estimate(self):
+        p = plan.plan([change("tsdb-gateway", "internal/gateway/reader/query.go")])
+        self.assertEqual(p["need_mib"], 1024 + 512 + 512)
+        p = plan.plan([change("tsdb-gateway", "internal/gateway/registrar/r.go")])
+        self.assertEqual(p["need_mib"], 1024 + 3072)
+
     def test_plan_migration_change(self):
         p = plan.plan([change("tsdb-gateway", "migrations/1792800000_add_x.up.sql")])
         self.assertTrue(p["migrations"]["tsdb"])

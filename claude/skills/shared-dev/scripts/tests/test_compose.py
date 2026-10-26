@@ -143,6 +143,24 @@ class ComposeTests(unittest.TestCase):
         self.assertEqual(dedup["command"][0], "/shared-dev/stream-deduplicated")
         self.assertIn(f"{binary}:/shared-dev/stream-deduplicated:ro", dedup["volumes"])
 
+    def test_render_exposed_schema_in_both_readers(self):
+        self.render(plan("metadata-instrument", "tsdb-read"), exposed="sd_b_x",
+                    main_reader=(Path("/bin/main/tsdb-gateway"), "public", Path("/bin/main/schema.yaml")))
+        def search(name):
+            url = json.loads((self.run_dir / "config" / f"{name}.yaml").read_text())["timescaledb"]["primary"]["url"]
+            return parse_qs(urlsplit(url).query)["options"][0]
+        self.assertIn("search_path=sd_b,sd_b_x,public", search("tsdb-read"))
+        self.assertIn("search_path=sd_b_x,public", search("tsdb-read-main"))
+
+    def test_render_patches_merge_before_prefix(self):
+        patch_doc = {"long_dedup": {"ids_topic": "dev.ryan.dedup.long-ids.v1", "shadow": False},
+                     "kafka": {"consumer": {"options": {"max.poll.interval.ms": 600000}}}}
+        self.render(plan("stream-deduplicated"), prefix="dev.ryan.x.", patches={"stream-deduplicated": patch_doc})
+        cfg = json.loads((self.run_dir / "config" / "stream-deduplicated.yaml").read_text())
+        self.assertEqual(cfg["long_dedup"], {"ids_topic": "dev.ryan.x.dedup.long-ids.v1", "shadow": False})
+        self.assertEqual(cfg["kafka"]["consumer"]["options"],
+                         {"group.id": "dev.ryan.x.dedup", "max.poll.interval.ms": 600000})
+
     def test_render_skips_services_the_bundle_lacks(self):
         # streamd is planned for live capture but only the capture service runs it
         doc = self.render(plan("metadata-instrument", "stream-deduplicated", "streamd"))

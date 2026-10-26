@@ -64,8 +64,11 @@ $P -I $S/run.py scope <worktree> ... > $RUN/scope.json
 ```
 
 The worktrees are the ones this session edited or pushed from. None: ask
-once. If the branch's MR has merged (squash), test what landed: after
-`plan`, set that repo's builds to `"source": "main"` in `plan.json`.
+once. If the branch's MR has squash-merged, keep the worktree builds when
+the worktree holds the same code as what landed (`git diff origin/main` on
+the changed files is empty); `tsdb-read-main` already runs main. If the
+worktree is stale, set that repo's builds to `"source": "main"` in
+`plan.json`.
 
 ## 2. Plan
 
@@ -77,12 +80,15 @@ Show Ryan, in a few lines: the services and whether each runs the worktree
 or main, the data source (`clones`, `api`, `live`), migrations, the capture
 venue, and unmapped files that matter at runtime (chart values, configs),
 marked "not exercised locally". Live capture needs symbols: the branch's
-own, else two or three liquid ones on the venue.
+own, else two or three liquid ones on the venue. If the branch adds config
+keys (a new feature block), write them, without secrets, to a JSON file per
+service for `up --patch`. If `need_mib` is over Docker's memory, drop
+services the change does not need from `plan.json` and say so.
 
 ## 3. Preflight
 
 ```bash
-bash $S/preflight.sh --need-mib <1024 per service, +2048 for tsdb-registry> [--prod]
+bash $S/preflight.sh --need-mib <plan.json need_mib> [--prod]
 ```
 
 Any `FAIL` stops the run; report the line. A Tailscale move is reported
@@ -93,7 +99,7 @@ with the new IP, never fixed by editing configs.
 ```bash
 $P -I $S/run.py up --scope $RUN/scope.json --plan $RUN/plan.json --run-dir $RUN \
   --session <this session's id, else the run dir's name> \
-  [--venue V --symbols A,B --seconds 180]
+  [--venue V --symbols A,B --seconds 180] [--patch SERVICE=FILE ...]
 ```
 
 It claims the project, builds, creates `sd_<slug>` with the copies the
@@ -108,6 +114,7 @@ index gaps). When it stops:
 | 4 | a copy over 70 GB | show the size; after his yes, re-run with `--confirm-size` |
 | 5 | `public` is behind main | "Public behind main" below |
 | 6 | capture needs `--venue`/`--symbols` | pick them, re-run |
+| 7 | `plan.json` is inconsistent | fix the plan, re-run |
 | other | read the error | `stack down` before retrying |
 
 A second session gets its own project (`kiyotaka-shared-dev-<slug>`, host
@@ -122,16 +129,18 @@ ports +20000, Kafka prefix `dev.ryan.<slug>.`); `up.json` says which.
   then `docker wait <p>-streamd-<venue>-1` (it stops itself). Check
   `docker compose -p <p> logs tsdb-write` for `permission denied`: a table
   the writer needed was not copied; report it rather than working around it.
-  A topic the run had to create (for example a dedup IDs topic) goes under
-  the run's prefix and is recorded: `$P -I $S/run.py claim add-topic <p> <topic>`.
+  A topic the run needs (a dedup IDs topic, say) is created under the run's
+  prefix and deleted by teardown:
+  `$P -I $S/run.py topics create --project <p> <prefix><name> --like <prefix>normalized --config retention.ms=…`.
+  Restarting a service of this run to pick up a change:
+  `docker compose -p <p> -f $RUN/compose.json up -d --no-deps --force-recreate <service>`.
 
 ## 6. Probe
 
-SQL, as `sd_guard` on the run's search_path:
-
 ```bash
-$P -I $S/run.py query --schema <schema> -c "SELECT ..."
+$P -I $S/run.py query --schema <schema> -c "SELECT ..."          # as sd_guard, run's search_path
 $P -I $S/run.py scratch coverage --schema <schema> <table> ...
+$P -I $S/run.py api --port <4084+offset> "/v1/..."                # tsdb-api with the dev key
 ```
 
 - **Main against branch**: when `up.json` has `main_reader`, every reader
@@ -140,8 +149,11 @@ $P -I $S/run.py scratch coverage --schema <schema> <table> ...
 - **Deploy-order check** when the branch changes migrations or views: the
   main reader against the branch's schema.
 - **Performance**: `EXPLAIN (ANALYZE, BUFFERS)` main against branch, same
-  machine, same data. Coverage first: a working set smaller than memory
-  means I/O-wait numbers say nothing; say so, and offer a prod clone.
+  machine, same data, through
+  `$P -I $S/run.py query --as dev --io-timing -c "EXPLAIN (ANALYZE, BUFFERS) …"`
+  (`track_io_timing` for that session only). Coverage first: a working set
+  smaller than memory means I/O-wait numbers say nothing; say so, and offer
+  a prod clone.
 - **Correctness**: recompute the value with an independent query; metrics
   endpoints count too.
 - **Too thin**: `references/prod-access.md`.
@@ -173,8 +185,9 @@ local gateway in its logs.
 $P -I $S/run.py stack down --project <p>
 ```
 
-It stops the project, drops the run's schemas, rolls `meta_ryan` back to
-main, deletes the run's configs and releases the claim. Report every
+It stops the project, drops the run's schemas, deletes the topics it
+created, rolls `meta_ryan` back to main, deletes the run's configs and
+releases the claim. Report every
 `leftover:` line. With `--keep`, skip this and give Ryan that command.
 
 ## Public behind main

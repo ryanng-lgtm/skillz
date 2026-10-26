@@ -37,6 +37,13 @@ class TeardownTests(unittest.TestCase):
         self.assertTrue(any("sd_feat_x" in line for line in leftovers))
         self.assertIsNotNone(claim.read("kiyotaka-shared-dev"))
 
+    def test_teardown_deletes_recorded_topics(self):
+        claim.update("kiyotaka-shared-dev", topics=["dev.ryan.dedup.long-ids.v1"])
+        with patch.object(stack, "run"), patch.object(stack.scratch, "connect", return_value=MagicMock()), \
+                patch.object(stack.scratch, "drop_schema"), patch.object(stack.topics, "delete") as delete:
+            stack.teardown("kiyotaka-shared-dev")
+        delete.assert_called_once_with("kiyotaka-shared-dev", "dev.ryan.dedup.long-ids.v1")
+
     def test_teardown_rolls_back_meta(self):
         claim.update("kiyotaka-shared-dev", meta={"before": 5, "branch": [9], "dir": "/wt/migrations"})
         with patch.object(stack, "run"), patch.object(stack.scratch, "connect", return_value=MagicMock()), \

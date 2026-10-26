@@ -25,14 +25,17 @@ When coverage shows the clone is too thin for the probe:
 
 1. `$P -I $S/run.py clone propose --source tsdb2 --table T --since … --until … --batch 60 --target T_tsdb2_<from>_<to>`
 2. Show Ryan the proposal (source, slice, batch minutes, 30 s cap, target).
-3. On his go: `$P -I $S/run.py clone run <same args> --go [--expose-in <schema>]`.
+3. On his go: `$P -I $S/run.py clone run <same args> --go [--expose-in <up.json exposed_schema>]`.
    It sizes the slice from the catalog (over 70 GB needs `--confirm-size`
    after his yes), runs a plain `EXPLAIN` of the first batch, creates
    `public.<target>` (a new table; it never writes into an existing one),
    then copies chunk-aligned batches, one short psql per batch, pausing
    between. A batch that hits the 30 s cap is halved down to one minute,
-   then the clone stops. `--expose-in` adds a view in the run's schema so
-   the services read the clone under the table's own name.
+   then the clone stops. Afterwards it builds the source's indexes,
+   compresses the chunks prod has compressed, and runs VACUUM ANALYZE, so
+   plans and I/O look like prod's. `--expose-in` adds a view in the run's
+   exposure schema, which both the branch and the main reader search, so
+   they read the clone under the table's own name and on the same data.
 4. The clone stays in `public` after teardown, as part of the prod-clone set.
 
 ## Probe

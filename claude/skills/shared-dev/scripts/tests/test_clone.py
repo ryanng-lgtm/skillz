@@ -2,7 +2,7 @@ import os
 import re
 import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,7 +11,7 @@ from sd import clone
 GB = 2**30
 T0 = datetime(2026, 10, 20)
 LAYOUT = {"columns": [("timestamp", "timestamp without time zone"), ("symbol", "text")], "time_col": "timestamp",
-          "interval": timedelta(hours=1)}
+          "interval": timedelta(hours=1), "tz": False, "indexes": [], "compression": None}
 
 STUB = """#!/bin/sh
 # printf, not echo: macOS sh's echo treats the "\\c" in "\\copy" as end of output
@@ -61,7 +61,9 @@ def checks_pass():
             patch.object(clone, "size", return_value=GB),
             patch.object(clone, "source_layout", return_value=LAYOUT),
             patch.object(clone, "explain_ok", return_value=(True, "1 chunk")),
-            patch.object(clone, "create_target")]
+            patch.object(clone, "create_target"),
+            patch.object(clone, "finish_target"),
+            patch.object(clone, "compressed_starts", return_value=[])]
 
 
 class RefusalTests(unittest.TestCase):
@@ -106,6 +108,26 @@ class SqlTests(unittest.TestCase):
             'COPY (SELECT "timestamp", "symbol" FROM public."trade" WHERE "timestamp" >= \'2026-10-20 00:00:00\' '
             'AND "timestamp" < \'2026-10-20 01:00:00\') TO STDOUT (FORMAT csv)',
         )
+
+    def test_aware_bounds_become_utc(self):
+        plus8 = timezone(timedelta(hours=8))
+        sql = clone.batch_sql("trade", ["timestamp"], "timestamp", datetime(2026, 10, 20, 8, tzinfo=plus8),
+                              datetime(2026, 10, 20, 9, tzinfo=plus8))
+        self.assertIn("\"timestamp\" >= '2026-10-20 00:00:00' AND", sql)
+
+    def test_timestamptz_column_bounds_carry_offset(self):
+        sql = clone.batch_sql("trade", ["ts"], "ts", T0, T0 + timedelta(hours=1), tz=True)
+        self.assertIn("\"ts\" >= '2026-10-20 00:00:00+00' AND \"ts\" < '2026-10-20 01:00:00+00'", sql)
+
+    def test_index_ddl_rewritten_for_target(self):
+        defs = ['CREATE INDEX trade_timestamp_idx ON public.trade USING btree ("timestamp" DESC)',
+                'CREATE INDEX trade_symbol_ts_idx ON public.trade USING btree (exchange, symbol, "timestamp" DESC)',
+                'CREATE UNIQUE INDEX trade_pk ON public.trade USING btree (id, "timestamp")']
+        got = clone.index_ddl_for(defs, "trade", "trade_tsdb2_x", "timestamp")
+        self.assertEqual(got, [
+            'CREATE INDEX "trade_tsdb2_x_1_idx" ON public."trade_tsdb2_x" USING btree (exchange, symbol, "timestamp" DESC)',
+            'CREATE UNIQUE INDEX "trade_tsdb2_x_2_idx" ON public."trade_tsdb2_x" USING btree (id, "timestamp")',
+        ])
 
     def test_batches_chunk_aligned(self):
         got = clone.batches(T0, T0 + timedelta(days=2), timedelta(hours=6), timedelta(days=1))

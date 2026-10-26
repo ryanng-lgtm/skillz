@@ -5,11 +5,13 @@ the claim is written first, so `stack down` can clean up a run that stopped
 part way.
 
 Exit codes: 3 an unclaimed stack is running; 4 a copy is over 70 GB;
-5 public is behind main; 6 a capture needs a venue and symbols.
+5 public is behind main; 6 a capture needs a venue and symbols; 7 plan.json
+is inconsistent.
 
 Usage:
   python -I run.py up --scope scope.json --plan plan.json --run-dir DIR --session ID
                       [--symbols A,B] [--venue V] [--seconds N] [--confirm-size]
+                      [--patch SERVICE=FILE ...]
 """
 
 import argparse
@@ -33,10 +35,11 @@ class Stop(Exception):
 
 
 def _gateway_build(p, binaries, schemas):
-    for service, b in p["builds"].items():
-        if b["repo"] == "tsdb-gateway" and b["source"] == "worktree":
-            return binaries[service], schemas[service]
-    raise Stop(5, "the plan has tsdb migrations but no tsdb-gateway worktree build")
+    """The branch's gateway build; a merged branch built from main uses that main build."""
+    gateway = [(s, b) for s, b in p["builds"].items() if b["repo"] == "tsdb-gateway"]
+    for service, b in sorted(gateway, key=lambda sb: sb[1]["source"] != "worktree"):
+        return binaries[service], schemas[service]
+    raise Stop(7, "the plan has tsdb migrations but builds no tsdb-gateway service; check plan.json")
 
 
 def _main_delta(repos, run_dir):
@@ -91,7 +94,7 @@ def _branch_indexes(conn, gateway, main_schema_yaml, branch_schema_yaml, passwor
 
 
 def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, seconds=DEFAULT_SECONDS,
-       confirm_size=False, repos=REPOS):
+       confirm_size=False, repos=REPOS, patches=None):
     changes = [Change(**{**c, "worktree": Path(c["worktree"])}) for c in json.loads(Path(scope_path).read_text())]
     p = json.loads(Path(plan_path).read_text())
     run_dir = Path(run_dir)
@@ -118,9 +121,11 @@ def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, secon
                       "older than the skill). Ask Ryan before touching it.")
     project, offset, prefix = picked["project"], picked["offset"], picked["prefix"]
     schema = schema_name(branch)
+    exposed = schema + "_x"  # views over prod clones made during the run; both readers search it
     compose_path = run_dir / "compose.json"
     claim.write(project, session=session, branch=branch, worktrees=[str(c.worktree) for c in changes],
-                schemas=[schema], run_dir=str(run_dir), offset=offset, prefix=prefix, compose=str(compose_path))
+                schemas=[schema, exposed], run_dir=str(run_dir), offset=offset, prefix=prefix,
+                compose=str(compose_path))
 
     binaries, schemas = {}, {}
     for service, b in p["builds"].items():
@@ -151,6 +156,7 @@ def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, secon
                 scratch.copy_object(conn, table, schema, mode=mode, budget=budget)
     except scratch.TooBig as exc:
         raise Stop(4, f"{exc}. Ask Ryan; re-run with --confirm-size only after he agrees.") from exc
+    scratch.create_schema(conn, exposed)
 
     main_reader = None
     if p["migrations"]["tsdb"] and "tsdb-read" in p["services"]:
@@ -178,13 +184,14 @@ def up(scope_path, plan_path, run_dir, session, *, symbols=(), venue=None, secon
 
     compose_path = compose.render(p, binaries, project=project, offset=offset, prefix=prefix, schema=schema,
                                   password=password, run_dir=run_dir, schemas=schemas, main_reader=main_reader,
-                                  capture=cap)
+                                  capture=cap, exposed=exposed, patches=patches)
     start = [s for s in p["services"] if s != "streamd"] + (["tsdb-read-main"] if main_reader else [])
     if start:
         stack.up(compose_path, project, start)
 
     summary = {
-        "project": project, "offset": offset, "prefix": prefix, "schema": schema, "compose": str(compose_path),
+        "project": project, "offset": offset, "prefix": prefix, "schema": schema, "exposed_schema": exposed,
+        "compose": str(compose_path),
         "services": start, "binaries": {s: str(b) for s, b in binaries.items()}, "copies": copies,
         "main_reader": main_reader is not None, "warnings": warnings, "index_gaps_vs_main": index_gaps,
         "capture": {"service": cap["service_name"], "venue": venue, "symbols": list(symbols), "seconds": seconds}
@@ -205,12 +212,18 @@ def main(argv):
     ap.add_argument("--venue")
     ap.add_argument("--seconds", type=int, default=DEFAULT_SECONDS)
     ap.add_argument("--confirm-size", action="store_true", help="Ryan agreed to copies over 70 GB")
+    ap.add_argument("--patch", action="append", default=[], metavar="SERVICE=FILE",
+                    help="merge a JSON file of non-secret config keys into SERVICE's run config")
     args = ap.parse_args(argv)
+    patches = {}
+    for item in args.patch:
+        service, _, path = item.partition("=")
+        patches[service] = json.loads(Path(path).read_text())
     Path(args.run_dir).mkdir(parents=True, exist_ok=True)
     try:
         summary = up(args.scope, args.plan, args.run_dir, args.session,
                      symbols=[s for s in args.symbols.split(",") if s], venue=args.venue, seconds=args.seconds,
-                     confirm_size=args.confirm_size)
+                     confirm_size=args.confirm_size, patches=patches)
     except Stop as exc:
         print(f"stop: {exc}", file=sys.stderr)
         sys.exit(exc.code)
