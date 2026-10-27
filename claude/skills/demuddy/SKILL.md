@@ -1,6 +1,6 @@
 ---
 name: demuddy
-description: Use when a plan, spec, or design doc has accumulated edits from multiple discussion rounds and is about to be handed to an implementing agent (or human) — symptoms include date-stamped decisions, "considered and rejected" passages, the same rule stated in several sections, bold "Verified:"/"Decision:" framing, or sections ordered by when they were added rather than build order. Trigger: /demuddy [path], "de-muddy", "editorial pass", "clean this plan for handover".
+description: Use when a plan, spec, or design doc has accumulated edits from multiple discussion rounds and is about to be handed to an implementing agent (or human) — symptoms include date-stamped decisions, "considered and rejected" passages, the same rule stated in several sections, bold "Verified:"/"Decision:" framing, or sections ordered by when they were added rather than build order. Also use when a code change has landed with comments that narrate the change ("now uses", "fixed per review", "Step 1:"), restate the code, or are too long or full of jargon for a newcomer to follow. Trigger: /demuddy [path], /demuddy comments [path|rev], "de-muddy", "editorial pass", "clean this plan for handover", "clean up the comments on this branch".
 ---
 
 # Demuddy — editorial pass for handover-ready plans
@@ -14,6 +14,10 @@ A plan that went through many editing rounds accretes conversation archaeology. 
 This is deliberately the inverse of "keep only instructions and facts". Plenty of load-bearing content is neither: the reason a deliberate deviation exists, an unresolved question, a negative result, a constraint that only ever got written down inside a rejected-alternative discussion. A delete-unless-instruction rule eats all of it. **When you cannot classify a sentence, it stays.**
 
 **Editorial residue** is the short list of things you may remove: decision framing and dates that carry no applicability (`**Decision, verified:**`, "(decided 2026-07-20)" on a rule with no expiry), politeness and hedging, restatements of a rule already stated in full elsewhere, transcript back-and-forth ("good catch — updated"), and section ordering that reflects when text was added.
+
+## Code comments
+
+`/demuddy comments [path|rev]` applies the same principle to the comments a code change left behind, and rewrites what stays so a reader without much context can follow it. Read [references/comments.md](references/comments.md) and follow it instead of the Target and Procedure sections below. The Protected list and the idempotency rule apply to both.
 
 ## Target
 
