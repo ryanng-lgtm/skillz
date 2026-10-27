@@ -487,7 +487,10 @@ Several indicators = ONE `chart_indicator_remove` call with `ids` on one pane (`
 | `chart_indicator_add` (`om chart indicator add`) | `add_indicator` | yes |
 | `chart_indicator_remove` (`om chart indicator remove`) | `remove_indicator` | yes |
 | `chart_indicator_update` (`om chart indicator update`) | `update_settings` | yes |
-| `chart_indicator_list` (`om chart indicator list`) | local (read-only) | no |
+| `chart_indicator_list` (`om chart indicator list`) | local catalog; with `--chart <n>` the pane's live rows (read-only) | no / yes |
+| `chart_indicator_schema` (`om chart indicator schema <type-or-id>`) | local (read-only); by id it reads the pane | no / yes |
+
+Settings by name: `chart_indicator_schema` answers the keys an indicator takes with each key's kind, default, range or options, by type (`RSI`, `VWAP`, an alias, `wrun/@scope/name/output`) or by a live id on a pane (then with its current values; a package answer lists its outputs' `__style__<output>__<property>` paint rows). An add or update sends a package's or a script's keys only after they are checked by name (a wrong one is refused with the valid keys named); a native's keys are the ones its pane lists (`chart_indicator_list` with `chartIndex`) and the chart warns about an unknown one. Call the schema only when a key, kind or range is unknown.
 
 All verbs are wired. `chartIndex` selects the multichart cell.
 
@@ -831,10 +834,12 @@ The wire contract lives in code, not a standalone doc: envelope shapes in `packa
 
 What each tool here fills in when a field is omitted — the defaults and omit-rules its schema states on top-level fields and one object level down; prose never restates them.
 
-- `chart_events` · `chart_grid` · `chart_indicator_add` · `chart_indicator_preview` · `chart_indicator_remove` · `chart_indicator_update` · `chart_interval` · `chart_layout` · `chart_open` · `chart_panel_push` · `chart_plot_type` · `chart_refresh` · `chart_scan_push` · `chart_screenshot` · `chart_series_push` · `chart_symbol` · `chart_sync` · `chart_view` · `chart_widget_push`
+- `chart_events` · `chart_grid` · `chart_indicator_add` · `chart_indicator_list` · `chart_indicator_preview` · `chart_indicator_remove` · `chart_indicator_schema` · `chart_indicator_update` · `chart_interval` · `chart_layout` · `chart_open` · `chart_panel_push` · `chart_plot_type` · `chart_refresh` · `chart_scan_push` · `chart_screenshot` · `chart_series_push` · `chart_symbol` · `chart_sync` · `chart_view` · `chart_widget_push`
   - `workspaceId` — OMIT to act on the user's ACTIVE workspace (the daemon resolves it live); omitting is the default and the correct call for 'my chart' / 'this workspace'.
 - `chart_indicator_add`
-  - `settings` — default {}
+  - `settings` — default {} — A package's or script's keys are checked by name before anything is sent (`chart_indicator_schema` lists keys, kinds, defaults, ranges and a package output's `__style__` paint rows)
+- `chart_indicator_list`
+  - `chartIndex` — Omit it for the catalog of addable types.
 - `chart_indicator_preview`
   - `params` — default {}
   - `bars` — default 300
@@ -931,6 +936,7 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om chart indicator list` (action: `chart_indicator_list`) — List every indicator type addable via `chart_indicator_add`: native types, script subtypes, and in `packages` the locally installed Indicator package outputs by metric id.
 - `om chart indicator preview` (action: `chart_indicator_preview`) — Draw a LOCALLY COMPUTED Indicator output on a chart pane as a PREVIEW line (works for unpublished packages installed locally).
 - `om chart indicator remove` (action: `chart_indicator_remove`) — Remove indicator overlays from a chart pane.
+- `om chart indicator schema` (action: `chart_indicator_schema`) — Show the settings an indicator takes: each key's kind, default, range or options, by indicator type (RSI, VWAP, wrun/@om-core/rsi/rsi, an alias) or by a live indicator id on a pane (then with its current values).
 - `om chart indicator update` (action: `chart_indicator_update`) — Tune an existing indicator's settings.
 - `om chart interval` (action: `chart_interval`) — Change a chart pane's candle interval (1m, 5m, 15m, 1h, 4h, 1d, 1w, ...).
 - `om chart keep` (action: `chart_keep`) — Keep the current scratch chart under a name.

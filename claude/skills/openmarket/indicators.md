@@ -77,7 +77,7 @@ A metadata name becomes its accessor by lowercasing and collapsing every run out
 - `./sdk/orderflow`: `delta`, `deltaPct`, `Cvd`, `VolumeProfile` (POC, value area), `BookImbalance`, `Absorption`, `LiquidationBurst`.
 - `./sdk/levels`: `PeriodLevels`, `SessionLevels`, `PivotPoints` (standard, fibonacci, camarilla, woodie), `roundLevels`, `SupportResistance`.
 - `./sdk/structure`: `Swings`, `MarketStructure` (BOS, CHoCH), `FairValueGaps`, `OrderBlocks`, `Divergence`, `candles.*` predicates.
-- `./sdk/options`: `OptionsChain(maxStrikes)` loads an `options_chain` block on the live bar (`load(cells, count, nowMs, spot, nearest, windowPct)`: expiries after `nowMs`, the `nearest` soonest, strikes within `windowPct` of spot) and answers per strike `strike`, `callOi`/`putOi`, `callGex`/`putGex`/`netGex`, and for the chain `totalCallGex`/`totalPutGex`/`totalNetGex`, `zeroGamma`, `callWall`, `putWall`, `maxPain`, `putCallRatio`, the Gamma Map template's math; `OPTIONS_TUPLE` (10) is the row width. Pine has no counterpart.
+- `./sdk/options`: `OptionsChain(maxStrikes)` loads an `options_chain` block on the live bar (`load(cells, count, nowMs, spot, nearest, windowPct)`: expiries after `nowMs`, the `nearest` soonest, strikes within `windowPct` of spot) and answers per strike `strike`, `callOi`/`putOi`, `callGex`/`putGex`/`netGex`, and for the chain `totalCallGex`/`totalPutGex`/`totalNetGex`, `zeroGamma`, `callWall`, `putWall`, `maxPain`, `putCallRatio`, the Strike Matrix template's math; `OPTIONS_TUPLE` (10) is the row width. Pine has no counterpart.
 
 The public reference is `docs/indicators/functions/` (text-formatting, time-and-sessions-kit, colors-kit, extra-indicators, order-flow-kit, levels-kit, market-structure-kit, options-kit), one worked sample per class.
 
@@ -146,13 +146,21 @@ is static and literal-only:
   `range`; an array of numbers for `list`; an `ohlcv.<field>` reference
   for `source`). Options, every key optional: `required`, `min`, `max`,
   `description`, `label`, `step`, `group` (`"Page"` or
-  `"Page/Section"`), `row`, `hint`, `when` (the NAME of a `param.bool`),
+  `"Page/Section"`), `row`, `hint`, `when` (the setting that opens the
+  row: `"name"` on, `"!name"` off, `"name=v"`, `"name!=v"` or
+  `"name in a,b"`, naming a `param.bool`, `param.choice`, `param.int`,
+  `param.number` or `param.multi`; a toggle holds 0 or 1, a choice its
+  option index; give one to every setting the code reads only inside a
+  branch another setting decides, or the build warns),
   `hide` (with `when`), `slider` (needs `min` and `max`), `unit` (an
   array from `"price"`, `"ticks"`, `"%"`, `"atr"`), `unit_default`,
   `confirm`, `visible_by` (`{ size_unit: [codes] }`, the size units
   0 to 3 of the markets where the dialog shows the row, each once;
   sheet-only, and an `output(...)` takes it too: no row mounts on any
-  other market), on `param.session` only `tz` (one of the 42 session
+  other market), on `param.choice` only `style_values` (one word a
+  choice, in the choices' order: the word the setting paints where a key
+  takes words, so the choices stay the dialog's labels; sheet-only), on
+  `param.session` only `tz` (one of the 42 session
   zones, `UTC`, `America/New_York`, `Asia/Kolkata`, `Europe/Paris` and
   `Pacific/Auckland` among them; Sessions and
   units lists each with its offset and
@@ -188,6 +196,10 @@ is static and literal-only:
   minute the trade day opens on the market's clock, 1020 on CME, 0
   midnight elsewhere; with the zone it feeds `sessionDayOpen`,
   `sessionTradeDate`, `sessionWeekOpen` and `sessionGapBefore`).
+  `market.dollar_multiplier()` (`p_market_dollar_multiplier()`) is the
+  dollars one size unit is worth at one unit of price: a CME root's point
+  value, 1 on a market priced in dollars or a dollar stablecoin, 0
+  unknown.
   `market.size_unit()` declares the kind, the point value and the zone for
   `sizeUnit(kind, pointValue, zone)` (0 units, 1 coins, 2 shares, 3
   contracts: a multiplier other than 1 or the Chicago zone first, then
@@ -203,8 +215,10 @@ is static and literal-only:
   `currency: "Auto"` (contracts on futures, dollars elsewhere, never
   beside a pin). A secondary scalar feed input whose rows only some
   markets need takes `needed_by: { size_unit: [codes] }` (its lane is
-  never fetched elsewhere and it reads its fill there; refused on the
-  first input, a `time.*` input, a celled input and a metric). A
+  never fetched elsewhere and it reads its fill there; a second
+  `tape.cells` input takes it too and reads zero prints there; refused on
+  the first input, a `time.*` input, every other celled input and a
+  metric). A
   secondary `trades.*` input takes `follow: "coin"` beside `exchange`
   (never beside `symbol`): the host reads that venue's main market for the
   chart's coin, and a venue that lists none reads the input's fill. A
@@ -223,7 +237,8 @@ is static and literal-only:
 - `"@<param>"` as the value of `color`, an entry of `colors`, or
   `line_style` (on an output, a `render.text`, a `render.label` or a
   `render.legend`) binds that spot to a `param.color` (or, for
-  `line_style`, a `param.choice` over `solid`, `dashed`, `dotted`); as the
+  `line_style`, a `param.choice` whose choices, or whose `style_values`,
+  are `solid`, `dashed`, `dotted`); as the
   value of `interval` or `symbol` on an input it binds the pin to a
   `param.timeframe` or a `param.symbol` (the exchange comes from the
   symbol's default unless the input names one). The build writes the
@@ -233,6 +248,14 @@ is static and literal-only:
   never depend on a setting. A data-only output refuses a paint binding
   (The Style page has the paint bindings,
   Picks, lanes, the cap the pins).
+- `axis_look` (`"pill"`, the default, `"quiet"` or `"words"`) on a guide
+  output (`role: "guide"`, `axis_label: true`) is the look of its axis
+  tag, refused on any other output; `"@<param>"` there binds it to a
+  `param.choice` whose choices, or whose `style_values`, are those words
+  (the sheet records the target `["outputs", <name>, "axis_look"]`). A
+  recipe or official package writes it only once the chart apps carry
+  kit scaffold 102: Fork re-derives a package's archived source with the
+  chart's installed kit, and an older kit refuses the word.
 - `page(title)`, `section(title, { toggle?, collapsed?, when? })`,
   `divider()` and `note(text)` lay the settings dialog out in source
   order (settings before the first page land on "General"; `toggle` and
@@ -420,7 +443,10 @@ automatically (scalar-only declarations keep the first contract):
   floor })`, the sheet recording the param's name (both or neither:
   `wrun_tape_floor_invalid`), and
   `history` (`"0"` by default, live only, or a duration of digits then
-  `s`, `m`, `h` or `d` up to `"30d"`). The large-print lane keeps prints
+  `s`, `m`, `h` or `d` up to `"30d"`). A second tape takes `needed_by`,
+  so two tapes with different floors split the markets (a dollar floor on
+  coins and shares, a contracts floor on futures, valued with
+  `market.dollar_multiplier()`). The large-print lane keeps prints
   of $10,000 or more on markets quoted in USD or a dollar stablecoin and
   the contracts floor on CME Group futures (10 ES, 5 NQ, 20 CL, 10 GC), so
   a lower floor reads history at the lane's; a `1s` chart and a
@@ -528,8 +554,10 @@ automatically (scalar-only declarations keep the first contract):
   law: "sqrt" | "linear", unit > 0, scale 1..10 }`, `opacity_pct`
   10..80, `look` (0 bubble, 1 soft dot, 2 ring, 3 square), `text: {
   mode (0 off, 1 the bar's largest mark, 2 all), field: "qty", format:
-  "compact" | "price" | "int", min_px (the smallest captioned diameter,
-  default 22) }`, `x` (0 the bar's centre, 1 the mark's own time).
+  "compact" | "price" | "int" | "usd" | "units", min_px (the smallest
+  captioned diameter, default 22) }`, `x` (0 the bar's centre, 1 the
+  mark's own time); `usd` prints "$12M", `units` a dollar `qty` over its
+  price times the market's dollar unit (the contracts or coins).
   Spans: `opacity` 0..1, `border: { width 0..4, opacity } | null`. Rays:
   `width` 0.5..8, `line_style`, `opacity`. A `tooltip` names record
   fields, `{{qty}}` or with a `text.format` word, `{{qty:compact}}`;
@@ -702,7 +730,7 @@ The `metadata` skeleton — `params` array, `inputSources` keyed by input name, 
 - `params` is an ARRAY of `{name, default, min?, max?}` objects with unique names; each compute param is read in `init()` through its `p_<name>()` accessor (underneath, values reach the module positionally in declaration order and the accessor pins that slot; a style knob keeps its position zero-filled, so its neighbours never shift).
 - `inputSources` is keyed BY INPUT NAME and each input must have a matching entry: `inputs[i].name` == the key. Feed sources need `field`. `inputs[i].index` is the slot `in_<name>()` reads; index 0 is the PRIMARY input and sets the grid every other input aligns to.
 - Scalar `source` must be one of: `ohlcv`, `trades`, `funding`, `oi`, `liquidations`, `implied_volatility`, `skew`, `token_supply`, `odds`, `metric`, `time`, `series` (there is no "market"/"price" source; close prices are `ohlcv`+`close`), or a chart-only class: `etf_flow`, `etf_holdings`, `etf_premium`, `volatility_index`, `long_short_ratio`, `options_oi`, `options_volume`, `ethena_positions`, `economic`, `treasury_balance`, `bitfinex_funding`. The chart's browser lane serves those eleven; the daemon and the hosted alerts lane refuse each by name (`wrun_<class>_unsupported`) before any fetch, and §"Source-declared indicators (code-first)" spells their knobs. A `time` input carries a fact of the primary bar (field `bar_open_sec`, its open in epoch seconds, the default; `trade_date`, epoch seconds at 00:00 UTC of its exchange trade date; `session`, 1 regular, 2 pre-market, 3 after-hours, 0 closed; never the primary input); the daemon refuses `trade_date` and `session` by name (`wrun_time_facts_unsupported`) on CME-group and US-equity venues, which the chart serves. A `series` input has `ref` instead of `field`, is never primary, and needs the daemon (§"Snapshots, panels and pane placement").
-- Celled classes (`cellType: "array"` + `max_cells` on the input, the sheet at `abi_version: "wrun-2"`), nine, with their tuple widths: `volume_profile` (`[low, high, buy, sell]`, 4), `book` (`[price, size, side]`, 3, `block_size` required), `tape` (`[offset_ms, price, size, side]`, 4, one floor required, `min_value` (dollars: `size` is then the print's dollar value) or `min_size` (stored size), a number or a param handle; `history` `"0"` or up to `"30d"`: the chart seeds it from the large-print lane, the daemon serves live prints only and refuses a non-zero `history` by name), `intrabar` (`[offset_ms, open, high, low, close, volume]`, 6), `trade_volume_by_size` (`[bucket, buy_usd, sell_usd, buy_count, sell_count]`, 5, `bucket` 1..7 by the USD size of an order), `options_chain` (ten values per listed contract, the live row only), `candles` (`[offset_ms, open, high, low, close, volume]`, 6) and the two streams on the `candles` rules, `oi_candles` (`[offset_ms, open, high, low, close]`, 5: the leg's open interest candles in the venue's own units, coins or contracts, unless `currency: "USD"`) and `volume_profile_candles` (`[offset_ms, low, high, buy, sell]`, 5: one tuple per price row of each closed leg candle, the rows of one candle sharing its `offset_ms`, ascending by price; `ticks_per_bar` and `currency` as on `volume_profile`; `max_cells` REQUIRED, at least `bars`: the rows one candle holds times `bars`); the chart serves every class; the daemon serves `intrabar`, the three streams (volume profiles in the venue's base buckets only: `ticks_per_bar` above 1 is refused by name, `wrun_volume_profile_ticks_unsupported`) and live `tape` and refuses `trade_volume_by_size` and `options_chain` by their own names; the hosted alerts lane refuses `oi_candles` and `volume_profile_candles` by their own names (`wrun_oi_candles_unsupported`, `wrun_volume_profile_candles_unsupported`). The option classes are the chart's browser lane's alone (the cloud, alerts and the daemon refuse each by its own name, `wrun_<class>_unsupported`, the strike rows by `wrun_options_chain_unsupported`). The chain classes `option_strikes` (12), `option_contract_state` (13, the live row only), `option_surface` (9 per expiry), `option_prints` (16, `min_premium` REQUIRED, `overflow: "largest"` keeps a busy bar's largest premiums), `option_contract_flow` (17), `option_prints_v2` (19: the prints with `block_key`, `rfq_key` and `legs`, `structure` `"all"`, `"blocks"` or `"rfq"`, its own refusal code) and the scalar `option_daily` and `option_stats_10m` read the chain their `venue` word picks on crypto, CME and US stock charts (the `options_chain` words; absent reads `"auto"`, the chart's own chain) and one book of it (`book`: `"auto"`, the book named like the coin, or one book's name such as `"BTC_USDC"`), one chain per indicator across all of them (`wrun_options_chain_one_venue`); the scalar `options_flow` reads the chart's own underlying on every plane, its scope words per plane and one book under `scope: "ticker"`; US listed options stay under the US options access rule; a crypto or CME print carries the taker's side; sizes are in coin on a crypto chain and in contracts on OPRA and CME, prices in USD per unit of the underlying, and `market.option_multiplier()` (100 on OPRA, the root's point value on CME, 1 on a crypto chain, 0 where the host does not know it: draw no premium then) turns size times price into USD. Every celled option tuple ends with a `present` mask (`hasBit`, `isPartial` for bit 14, the partial bar) and tickers ride as symbol codes (`decodeSymbol`). kScript `ltf()` -> `intrabar.cells`: `input("m1", intrabar.cells, { interval: "1m", max_cells: 60 })`, the `interval` REQUIRED and a whole divisor of the chart's from the eight interval words (finer than the chart's: a coarser leg is `ohlcv` with an `interval` and a `view`), the selector's own market or a `symbol` + `exchange` pin (kScript `ltf(interval, type, symbol, exchange)`), ohlcv only, `max_cells` at least the finer bars per chart bar (a 1h bar holds 60 1m bars, `wrun_intrabar_ratio_over_cap` names both numbers); the tuple carries `offset_ms` (kScript's `c[0]` = `in_time_sec() * 1000 + offset_ms`) and CLOSED finer bars only (an Indicator is FRESHER than the browser kScript lane, which froze `ltf` cells after the fetch); a covered bar with no finer bars reads 0 cells, a bar the finer history does not reach reads -1, blocks are never truncated. `candles.cells` is a leg's CLOSED candles as a stream: `interval` REQUIRED (any of the eight words: finer than, equal to or coarser than the chart's), `bars` the depth, the selector's market or a `symbol` + `exchange` pin; the first delivered row carries the backlog, each later one the candles that closed since; `max_cells` may be left out (the build declares max(bars, 2)); never index 0, so a lean file keeps a scalar `input` line above it. `oi_candles.cells` and `volume_profile_candles.cells` take the same `interval`, `bars`, `chart_interval_below` and pin, no `view` (the forming hour is the chart's own: a scalar `oi` input, the bar's `volume_profile.cells`). A scalar `oi` input reads dollars by default, or the venue's own units under `currency: "Coin"`. v1 limits: the daemon clamps leg history to what the key's data plan serves (about 365 days; 167 hours on Free) and puts a note naming the served start on the run, while the chart reaches <!-- caps: chart_history_bars chart_history_bars_1h chart_history_bars_30m chart_history_bars_5s chart_history_bars_1s -->15,000 candles per interval, 25,000 candles on `1h`, 50,000 candles on `30m`, 34,560 candles on `5s` and 172,800 candles on `1s`<!-- /caps -->; backtests and screens refuse every celled package, `intrabar` and the three streams included; an intraday `candles` leg pinned to a 24/7 market over a session-market chart can carry more than `max_cells` on the first row after a weekend (raise `max_cells`, or read in-bar candles through `intrabar`).
+- Celled classes (`cellType: "array"` + `max_cells` on the input, the sheet at `abi_version: "wrun-2"`), nine, with their tuple widths: `volume_profile` (`[low, high, buy, sell]`, 4), `book` (`[price, size, side]`, 3, `block_size` required), `tape` (`[offset_ms, price, size, side]`, 4, one floor required, `min_value` (dollars: `size` is then the print's dollar value) or `min_size` (stored size), a number or a param handle; `history` `"0"` or up to `"30d"`: the chart seeds it from the large-print lane, the daemon serves live prints only and refuses a non-zero `history` by name; a second tape may take `needed_by` and reads zero prints off its markets), `intrabar` (`[offset_ms, open, high, low, close, volume]`, 6), `trade_volume_by_size` (`[bucket, buy_usd, sell_usd, buy_count, sell_count]`, 5, `bucket` 1..7 by the USD size of an order), `options_chain` (ten values per listed contract, the live row only), `candles` (`[offset_ms, open, high, low, close, volume]`, 6) and the two streams on the `candles` rules, `oi_candles` (`[offset_ms, open, high, low, close]`, 5: the leg's open interest candles in the venue's own units, coins or contracts, unless `currency: "USD"`) and `volume_profile_candles` (`[offset_ms, low, high, buy, sell]`, 5: one tuple per price row of each closed leg candle, the rows of one candle sharing its `offset_ms`, ascending by price; `ticks_per_bar` and `currency` as on `volume_profile`; `max_cells` REQUIRED, at least `bars`: the rows one candle holds times `bars`); the chart serves every class; the daemon serves `intrabar`, the three streams (volume profiles in the venue's base buckets only: `ticks_per_bar` above 1 is refused by name, `wrun_volume_profile_ticks_unsupported`) and live `tape` and refuses `trade_volume_by_size` and `options_chain` by their own names; the hosted alerts lane refuses `oi_candles` and `volume_profile_candles` by their own names (`wrun_oi_candles_unsupported`, `wrun_volume_profile_candles_unsupported`). The option classes are the chart's browser lane's alone (the cloud, alerts and the daemon refuse each by its own name, `wrun_<class>_unsupported`, the strike rows by `wrun_options_chain_unsupported`). The chain classes `option_strikes` (12), `option_contract_state` (13, the live row only), `option_surface` (9 per expiry), `option_prints` (16, `min_premium` REQUIRED, `overflow: "largest"` keeps a busy bar's largest premiums), `option_contract_flow` (17), `option_prints_v2` (19: the prints with `block_key`, `rfq_key` and `legs`, `structure` `"all"`, `"blocks"` or `"rfq"`, its own refusal code) and the scalar `option_daily` and `option_stats_10m` read the chain their `venue` word picks on crypto, CME and US stock charts (the `options_chain` words; absent reads `"auto"`, the chart's own chain) and one book of it (`book`: `"auto"`, the book named like the coin, or one book's name such as `"BTC_USDC"`), one chain per indicator across all of them (`wrun_options_chain_one_venue`); the scalar `options_flow` reads the chart's own underlying on every plane, its scope words per plane and one book under `scope: "ticker"`; US listed options stay under the US options access rule; a crypto or CME print carries the taker's side; sizes are in coin on a crypto chain and in contracts on OPRA and CME, prices in USD per unit of the underlying, and `market.option_multiplier()` (100 on OPRA, the root's point value on CME, 1 on a crypto chain, 0 where the host does not know it: draw no premium then) turns size times price into USD. Every celled option tuple ends with a `present` mask (`hasBit`, `isPartial` for bit 14, the partial bar) and tickers ride as symbol codes (`decodeSymbol`). kScript `ltf()` -> `intrabar.cells`: `input("m1", intrabar.cells, { interval: "1m", max_cells: 60 })`, the `interval` REQUIRED and a whole divisor of the chart's from the eight interval words (finer than the chart's: a coarser leg is `ohlcv` with an `interval` and a `view`), the selector's own market or a `symbol` + `exchange` pin (kScript `ltf(interval, type, symbol, exchange)`), ohlcv only, `max_cells` at least the finer bars per chart bar (a 1h bar holds 60 1m bars, `wrun_intrabar_ratio_over_cap` names both numbers); the tuple carries `offset_ms` (kScript's `c[0]` = `in_time_sec() * 1000 + offset_ms`) and CLOSED finer bars only (an Indicator is FRESHER than the browser kScript lane, which froze `ltf` cells after the fetch); a covered bar with no finer bars reads 0 cells, a bar the finer history does not reach reads -1, blocks are never truncated. `candles.cells` is a leg's CLOSED candles as a stream: `interval` REQUIRED (any of the eight words: finer than, equal to or coarser than the chart's), `bars` the depth, the selector's market or a `symbol` + `exchange` pin; the first delivered row carries the backlog, each later one the candles that closed since; `max_cells` may be left out (the build declares max(bars, 2)); never index 0, so a lean file keeps a scalar `input` line above it. `oi_candles.cells` and `volume_profile_candles.cells` take the same `interval`, `bars`, `chart_interval_below` and pin, no `view` (the forming hour is the chart's own: a scalar `oi` input, the bar's `volume_profile.cells`). A scalar `oi` input reads dollars by default, or the venue's own units under `currency: "Coin"`. v1 limits: the daemon clamps leg history to what the key's data plan serves (about 365 days; 167 hours on Free) and puts a note naming the served start on the run, while the chart reaches <!-- caps: chart_history_bars chart_history_bars_1h chart_history_bars_30m chart_history_bars_5s chart_history_bars_1s -->15,000 candles per interval, 25,000 candles on `1h`, 50,000 candles on `30m`, 34,560 candles on `5s` and 172,800 candles on `1s`<!-- /caps -->; backtests and screens refuse every celled package, `intrabar` and the three streams included; an intraday `candles` leg pinned to a 24/7 market over a session-market chart can carry more than `max_cells` on the first row after a weekend (raise `max_cells`, or read in-bar candles through `intrabar`).
 - A `shape_where`/`color_by` gate must be a DIFFERENT output (usually `"plot": ""` data-only); an output cannot gate or color itself.
 
 ## Input pins

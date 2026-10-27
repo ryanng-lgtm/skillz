@@ -93,6 +93,8 @@ Cross-field invariants the bridge enforces locally (mirrors the server-side chec
 
 ## Style, and `chart_drawing_update`: restyle, move or relabel by id
 
+The `style` input on add and auto, the schema's style rows per tool, and `chart_drawing_update` by drawing id.
+
 `style` on `chart_drawing_add` and `chart_drawing_auto` sets the tool's look (colors, widths, line styles, fills,
 levels). `chart_drawing_schema` with the tool named lists its style keys with kind, default, and range or options
 (without a tool, every tool with its key names only); an unknown key or an out-of-range value is a
