@@ -64,7 +64,7 @@ commits, not edited by hand, and aren't listed.
 | Skill | Trigger | What it does |
 | --- | --- | --- |
 | `bump-rc` | `/bump-rc [version]` | Releases `@openmarket/rooms-client`: picks the bump from what actually changed, runs the release script, repins both GUI consumers. |
-| `demuddy` | `/demuddy [path]` | Editorial pass that turns a much-edited plan into a handover-ready one — strips decision archaeology, dedupes rules, reorders into build order, keeps every gotcha and cite. |
+| `demuddy` | `/demuddy [path]`, `/demuddy comments [path\|rev]` | Editorial pass that turns a much-edited plan into a handover-ready one — strips decision archaeology, dedupes rules, reorders into build order, keeps every gotcha and cite. `comments` mode does the same for the comments a code change left behind (change narration, restated code, filler) and rewrites the rest in plain language for a reader without much context. |
 | `graphify` | `/graphify` | Turns any input (code, docs, papers, images, video) into a persistent knowledge graph with god nodes and community detection; query/path/explain instead of grepping. |
 | `humanize` | `/humanize [light] [path]` | Rewrites Claude-authored text so it reads like Ryan wrote it — strips AI tells, matches voice per register. `light` keeps the structure and edits sentences only. |
 | `ivtg` | `/ivtg` | Investigator mode: issues fed one at a time, each investigated across the named repos and written into one dated plan file. Never implements. |

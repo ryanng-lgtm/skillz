@@ -103,7 +103,7 @@ The Protected list in SKILL.md applies in full. In code, also:
 ### Check A: code untouched
 
 ```bash
-git diff -U0 | grep -E '^[-+]' | grep -vE '^(---|\+\+\+) (a/|b/|/dev/null)' \
+git diff -U0 HEAD | grep -E '^[-+]' | grep -vE '^(---|\+\+\+) (a/|b/|/dev/null)' \
   | cut -c2- | grep -vE '^[[:space:]]*($|//|#|/\*|\*|--)'
 ```
 
@@ -115,7 +115,7 @@ changed on it.
 
 ```bash
 side() { # changed lines on one side of the diff: - or +
-  git diff -U0 | grep -E "^[$1]" | grep -vE '^(---|\+\+\+) (a/|b/|/dev/null)' | cut -c2-
+  git diff -U0 HEAD | grep -E "^[$1]" | grep -vE '^(---|\+\+\+) (a/|b/|/dev/null)' | cut -c2-
 }
 facts() { # load-bearing tokens in stdin, duplicates kept
   local t
