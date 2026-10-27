@@ -1,13 +1,15 @@
 ---
 name: regroup
-description: Use when a branch's commits need cleaning up for review — a finished run left many TDD-style commits (red/green, wip, "fix test") on a branch about to become an MR, commits mix tests and code, a commit is too big to review, or Ryan asks to squash, regroup, tidy or clean up commits. Works on any branch, whatever its commit count. Trigger: /regroup [--base REF].
+description: Use when a branch's commits or tests need cleaning up for review — a finished run left many TDD-style commits (red/green, wip, "fix test") or a pile of near-duplicate tests on a branch about to become an MR, commits mix tests and code, a commit is too big to review, or Ryan asks to squash, regroup, tidy or clean up commits or trim tests. Works on any branch, whatever its commit count. Trigger: /regroup [--base REF].
 ---
 
-# regroup — rewrite a branch's commits for the reviewer, code unchanged
+# regroup — trim a branch's tests and rewrite its commits for the reviewer
 
-The reviewer reads the MR commit by commit. `/regroup` rewrites `base..HEAD`
-into commits that each make one step of the change, in reading order, and
-proves the code at the tip is byte-identical to before.
+The reviewer reads the MR commit by commit, and CI runs every test the MR
+adds on every pipeline after it. `/regroup` trims the tests the branch adds
+to the ones that guard something, then rewrites `base..HEAD` into commits
+that each make one step of the change, in reading order. Only tests and
+testdata change; the script proves everything else at the tip unchanged.
 
 ```bash
 R=~/.claude/skills/regroup/scripts/regroup.py
@@ -37,11 +39,40 @@ git diff <base>..HEAD
 `stats` lists each commit's counted lines, kind (code, test, testdata,
 docs, generated, or mixed) and problems, then the layout problems, then
 every file the branch changes with its kind. Read what each commit does
-from its diff: old messages like `wip fix rounding` are often wrong. If
-`stats` shows no problems and the code commits each make one step, say so
-and stop.
+from its diff: old messages like `wip fix rounding` are often wrong.
 
-## 2. Plan
+## 2. Trim the tests
+
+**REQUIRED SUB-SKILL:** test-audit. Its authoring gate and junk patterns
+decide whether a test the branch adds is worth running on every pipeline.
+
+- Trim only test cases this branch adds. Cases already on the base stay,
+  even where the branch edits them (a rename) or they duplicate each other;
+  name the duplicates in the report.
+- Cases that feed different values through one code path: keep one, with a
+  value that tells a real result from a default (not 0 or empty). Cases
+  whose values each reach different code (a hand-written or generated
+  function per value): fold them into one table-driven test.
+- Keep each bug fix's regression test and each error path's only test.
+- Delete testdata that only the removed tests read.
+- Every changed code line the suite ran before the trim still runs after
+  it. Run the coverage tool before and after (Go `go test -coverprofile`,
+  TypeScript the runner's `--coverage`, Python `coverage run` or the
+  stdlib `trace` module) and check the code lines `git diff -U0 <base>`
+  lists. A line that stops running gets a test back, unless its only test
+  could not fail (it compares a value with itself, or asserts nothing):
+  drop that test and report the line as untested.
+- The trim changes tests and testdata only. Code it shows to be dead or
+  untested stays as it is; report it.
+
+Run the suite, then commit the trim on the branch with `/commit` before
+planning. The plan takes test files at the tip, so the trim folds into the
+one tests commit and `apply`'s tree check covers it.
+
+If `stats` showed no problems, the code commits each make one step and the
+trim removed nothing, say so and stop.
+
+## 3. Plan
 
 The layout, in this order:
 
@@ -87,10 +118,10 @@ Write the plan to the scratchpad:
 A bare path takes the file as it is at the tip; every changed file must end
 at its tip version.
 
-## 3. Apply
+## 4. Apply
 
 ```bash
-python3 -I $R apply plan.json --dry-run      # until it prints no problems
+python3 -I $R apply plan.json --dry-run      # until no "!" lines; "~" lines are notes
 python3 -I $R apply plan.json
 ```
 
@@ -101,39 +132,59 @@ layout is off (order; testdata, tests or docs spread over several commits).
 Only then does it save the old tip as `refs/regroup/<branch>/<UTC time>`
 and move the branch.
 
-## 4. Verify
+## 5. Verify
 
 ```bash
 python3 -I $R check --against refs/regroup/<branch>/<time> --exec "<build>" [--link node_modules]
 ```
 
 - `--against`: the tip's tree must match the backup's. Identical trees
-  mean the suite result at the old `HEAD` still holds; no rerun needed.
+  mean the suite result after the trim still holds; no rerun needed.
 - `--exec` runs at every commit in a temporary worktree. Give it the repo's
   build, not its tests: the code commits come before the tests commit, so
   tests the change updates fail until then. Go `go build ./...`,
-  TypeScript `npx tsc --noEmit`, Rust `cargo check`, Python an import of
-  every module the branch changes
-  (`python3 -I -c 'import calc.rates, calc.cli'`; `compileall` checks
-  syntax only). `--link` links ignored directories (`node_modules`) into
-  that worktree.
+  TypeScript `npx tsc --noEmit`, Rust `cargo check`. Python: import every
+  module the package has at that commit (`compileall` checks syntax only),
+  with plain `python3`; `-I` drops the repo root from the import path.
+  ```python
+  # <scratchpad>/build.py, run as --exec "python3 <scratchpad>/build.py"
+  import importlib, pkgutil, sys
+  sys.path.insert(0, "")
+  import calc
+  for m in pkgutil.walk_packages(calc.__path__, "calc."):
+      importlib.import_module(m.name)
+  ```
+  `--link` links ignored directories (`node_modules`) into that worktree.
 - A commit that fails the build needs a file from a later commit: move it
   earlier, then `git reset --keep <backup>` and apply again. A plan's
   `@<sha>` entries name the old commits, so always re-apply from the backup.
 
-## 5. Report
+## 6. Report
 
-Show Ryan the old and new `git log --oneline` with each commit's size
-(`stats` before and after), the backup ref and the check result. Never
-push. A branch that was already pushed goes up with
+Show Ryan:
+
+- the old and new `git log --oneline` with each commit's size (`stats`
+  before and after), the backup ref and the check result;
+- the tests removed or folded, a line per group on why, and the test count
+  and test lines before and after;
+- duplicate base tests left alone, dead code, and changed code lines no
+  test runs, whether the trim stopped them or they never ran.
+
+Never push. A branch that was already pushed goes up with
 `git push --force-with-lease` only on his go.
 
-Undo: `git reset --keep <backup>`. Backups stay under `refs/regroup/`, out
-of the branch list (`git for-each-ref refs/regroup`). Delete them with
-`git update-ref -d <ref>` once the MR has merged.
+Undo the regroup with `git reset --keep <backup>`; when there is a trim
+commit, `<backup>^` is the tip before the trim. Backups stay under
+`refs/regroup/`, out of the branch list (`git for-each-ref refs/regroup`).
+Delete them with `git update-ref -d <ref>` once the MR has merged.
 
 ## Common mistakes
 
+- Deleting per-value tests whose values each reach different code, then
+  calling the lines that stopped running "the same shape" as one that
+  still runs.
+- Trimming tests that were already on the base.
+- Trimming after `apply`, so the tests land in a second tests commit.
 - Making up a halfway version of one big file to get under 600 lines.
 - Running the test suite at every commit, then moving tests back into a
   code commit to make an intermediate commit pass.
