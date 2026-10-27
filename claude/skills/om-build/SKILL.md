@@ -317,14 +317,28 @@ grep VERSION dist/version.js
 Then build:
 
 ```bash
-cd ~/Documents/GitLab/openmarket-chat
-bun install
-bun run build
+GUI=~/Documents/GitLab/openmarket-chat
+bash ~/.claude/skills/om-build/scripts/gui-bun.sh "$GUI" install --frozen-lockfile
+bash ~/.claude/skills/om-build/scripts/gui-bun.sh "$GUI" run build
 ```
 
-`bun install` needs the granular npm token in `~/.npmrc` while
-`@openmarket/rooms-client` is private. If the install 404s, do not switch
-registries or accounts — use the link flow above, which bypasses npm.
+`bun install` reads the npm tokens from the GUI repo's gitignored `.env`
+(`NPM_READ_TOKEN` for the private `@openmarket` scope,
+`ORANGECHARTS_NPM_READ_TOKEN` for `@orangecharts`), which the GUI's
+`bunfig.toml` maps to those scopes. `~/.npmrc` is not used: `gui-bun.sh` runs
+bun from the GUI root so it loads `.env`, and points `XDG_CONFIG_HOME` at an
+empty dir so a user-level npmjs.org token cannot override the scope tokens. It
+refuses to run if the GUI repo has its own `.npmrc` with an npmjs.org token.
+A plain `bun install` in the GUI repo does read `~/.npmrc` and can 404 while
+the script succeeds, so test installs through `gui-bun.sh`.
+
+If the install 404s on `@openmarket/rooms-client`, the GUI `.env` is missing
+or its `NPM_READ_TOKEN` cannot read the package. Each GUI checkout
+(`openmarket-chat`, `om-chat-cloud`) needs its own `.env`. Check a token
+without printing it via `NPM_CONFIG_USERCONFIG=<tmp npmrc> npm view
+@openmarket/rooms-client version`. `npm whoami` fails on granular read tokens
+either way, so its result does not tell you anything. Do not switch
+registries or accounts.
 
 Note the `stamp-asset-versions OK: assets pinned to ?v=<stamp>` line the build
 prints. That stamp is what proves the swap landed in step 7.
@@ -483,7 +497,7 @@ worth reporting as such.
 | Skip gate says BUILD right after a `git pull`, with no code change | checkout rewrites mtimes to now | expected and conservative; say "source mtimes moved", not "code changed" |
 | `/rooms` shows an install-instructions page | stubs were compiled in | redo steps 1-3; check the stub marker gate in step 2 |
 | Daemon still on the old version | binary swapped, daemon not restarted | `om service restart` |
-| `bun install` 404s in openmarket-chat | `@openmarket/rooms-client` is private on npm | link from the monorepo (`rooms-client:link`), never a different registry |
+| `GUI bun install` 404s on `@openmarket/rooms-client` | GUI repo `.env` missing, or its `NPM_READ_TOKEN` is revoked or lacks read on the scope | create or fix the GUI `.env` (step 1); verify with `gui-bun.sh "$GUI" install --frozen-lockfile`, never a different registry |
 | GUI builds but behaves oddly against the daemon | rooms-client era mismatch | compare `dist/version.js` constants in step 1 — NOT the package number; link to source |
 | GUI carries the previous release's version constants | linked `rooms-client` `dist/` is stale; it does not rebuild when the monorepo moves | rebuild `packages/rooms-client` before the GUI build (step 1) |
 | `bun run build` in `rooms-client` exits 2 with `TS2835` | three extensionless relative imports in `src/shared/` (`attention.ts:18`, `read-state.ts:16,17`); `tsc` emits anyway | expected today — confirm `dist/` is fresh and continue |
