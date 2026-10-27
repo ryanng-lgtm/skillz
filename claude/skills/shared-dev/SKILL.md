@@ -175,10 +175,15 @@ To drive the FE yourself, sign in with an account from `~/.dev_creds`: each
 is an email line and a password line under its label. Pick by what the change
 touches: `// internal role acc` for internal-only features or role-gated
 behaviour, `// guest user` for what an ordinary user sees. A change to role
-gating needs both. Have the script or tool that fills the login form read the
-password from the file itself, so it never appears in a command line, a tool
-argument, a log, chat or the report; the report names the account by label
-only.
+gating needs both. `// production user` is only for the deployed FE, to
+compare what int (`https://chart.int.tharamine.com/chart`) or prod
+(`https://openmarket.xyz/chart`) shows against the local stack. Look, never
+change anything there: no orders, saved layouts, alerts or settings. Prod
+needs Ryan's go for that request, like prod reads.
+
+Have the script or tool that fills the login form read the password from the
+file itself, so it never appears in a command line, a tool argument, a log,
+chat or the report; the report names the account by label only.
 
 ## 8. Report
 
