@@ -12,8 +12,9 @@ skill gives each MR that review first: codex reviews it under the Panos brief,
 you verify every finding against the code, fix the real ones on the MR's
 branch, push, and report. Nothing is ever posted on the MR.
 
-The reviewer is codex `gpt-6.1-sol` at `xhigh` unless `--model` names another
-codex model.
+The reviewer is codex `gpt-6.1-sol` at `xhigh`. When sol is unavailable, it is
+Claude Fable 5.1, then Opus 5.5. `--model` sets the reviewer and turns the
+fallback off: another codex model, or `fable` / `opus`.
 
 ## Hard rules
 
@@ -32,8 +33,9 @@ codex model.
 - Design changes go to Ryan, not into the branch: splitting an MR, moving a
   component to its own deployment, changing rollout or merge order, changing a
   public contract.
-- If codex is missing, exits non-zero, times out (exit 124) or writes an empty
-  review, show the log's tail and ask. Never retry on a different model.
+- Change reviewer only because sol is unavailable (Phase 2). A review that
+  times out (exit 124), crashes or comes back empty: show the log's tail and
+  ask.
 
 ## Phase 0 — pick the MRs
 
@@ -113,7 +115,23 @@ into an edited copy of the brief.
 
 ## Phase 2 — run the reviews
 
-One codex run per MR, all in parallel, in the background:
+Pick the reviewer once, before any review starts. Without `--model`, probe sol
+from any selected MR's worktree:
+
+```bash
+timeout 120 codex exec -C "<path>" -m gpt-6.1-sol --sandbox read-only \
+  --output-last-message "<run dir>/probe.md" \
+  'Reply with the single word OK.' </dev/null > "<run dir>/probe.log" 2>&1
+```
+
+Sol is available only if this exits 0 and `probe.md` says OK. Anything else
+(codex missing, logged out, no access to the model, a usage limit, no answer
+in 120s) means unavailable: run every review on Claude, and carry the reason
+(exit code and the log's last line) into the report. A codex review whose log
+later shows the model became unavailable (usage limit, lost access) reruns on
+Claude the same way.
+
+**Codex:** one run per MR, all in parallel, in the background:
 
 ```bash
 mkdir -p "<run dir>/gocache"
@@ -125,10 +143,23 @@ GOCACHE="<run dir>/gocache" timeout 2400 codex exec -C "<path>" \
 ```
 
 The sandbox reads the whole disk, so sibling worktrees need no `--add-dir`;
-adding them would make them writable. Expect 10–30 minutes per MR. When a run
-ends, its worktree must be as clean as Phase 0 found it: delete leftover
-`zz_panos_probe_*` files, and report anything else the reviewer changed
-without discarding it.
+adding them would make them writable.
+
+**Claude:** one background `Agent` per MR, all in one message, with
+`subagent_type: general-purpose` and `model: fable`. If the call is refused
+because Fable is unavailable, use `model: opus`. The prompt:
+
+```
+Review the merge request described in <run dir>/prompt-<name>.md. The worktree is <path>.
+Write nothing except probe files named zz_panos_probe_* in the worktree and scratch files in <run dir>.
+Never commit, push, or touch the MR. Your final message is only the block the output contract describes.
+```
+
+Save each agent's final message as `<run dir>/review-<name>.md`.
+
+Expect 10–30 minutes per MR. When a run ends, its worktree must be as clean as
+Phase 0 found it: delete leftover `zz_panos_probe_*` files, and report
+anything else the reviewer changed without discarding it.
 
 ## Phase 3 — verify each finding
 
@@ -216,7 +247,8 @@ Per MR, a table:
 Outcome is `fixed in <sha>`, `declined: <evidence>`, `needs sync: <why>`, or
 `for Ryan: <question>`.
 
-Then: pushes (`branch old → new`), gates run, CI status, MR descriptions
+Then: the reviewer, with the reason when it fell back from sol; pushes
+(`branch old → new`), gates run, CI status, MR descriptions
 changed, the merge order (say "unchanged" explicitly when it is), and MRs
 behind their target (offer `/syncup`, never rebase here). End with "Nothing
 was posted on any MR." Save the report as `<run dir>/report.md`.
