@@ -82,6 +82,8 @@ Raw Grep/Glob is still fine for trivial single-file lookups where a graph query 
 
 Commit as you go: after each coherent unit of work, stage only task-owned changes and use the commit skill to create a local checkpoint without waiting for a separate request. Run the relevant checks first, state any incomplete validation honestly, and keep commits on the task branch. Do not push without explicit authorization.
 
+During a run, commit as often as TDD needs. When a run finishes with commits on a feature branch, run `python3 -I ~/.claude/skills/regroup/scripts/regroup.py stats`; if it says to offer `/regroup` (more than 9 commits over the target, or a commit with over 600 changed lines of code), offer it before the branch is pushed or its MR opened. If the branch is already pushed with an open MR, say that regrouping means a force push.
+
 Whenever a subagent makes a git commit, it must ALWAYS: first stage its changes (`git add`), then invoke the `/commit` skill to commit what's staged — no raw `git commit` from subagents. When dispatching any subagent that may commit, include this requirement explicitly in its prompt.
 
 ## Personal skills
@@ -99,3 +101,4 @@ When I type one of these slash triggers, invoke the Skill tool with that skill b
 - **panos** (`~/.claude/skills/panos/SKILL.md`) — once MRs have landed, review each one the way Panos (`pan26`) would, on codex `gpt-6.1-sol` (Claude Fable 5.1, then Opus 5.5, when sol is unavailable); verify every finding, fix and push the real ones. Never comments on the MR. Trigger: `/panos [MR ...] [--model MODEL]`
 - **shared-dev** (`~/.claude/skills/shared-dev/SKILL.md`) — bring up the backend services a session's change needs in shared-dev against the databases on Sean's PC, probe with real data, tear down. Never modifies the prod clones in `public`; prod reads only from tsdb2/pgmeta0 with my go. Trigger: `/shared-dev [repo ...] [--fe] [--keep]`, `/shared-dev down`, `/shared-dev rebaseline`
 - **bump-rc** (`~/.claude/skills/bump-rc/SKILL.md`) — release a new `@openmarket/rooms-client`: pick the bump from what actually changed, run the release script, update both GUI consumers' pins. Trigger: `/bump-rc [version]`
+- **regroup** (`~/.claude/skills/regroup/SKILL.md`) — rewrite a branch's commits for the reviewer with the code byte-identical: code commits grouped by concern and within 600 changed lines each, then one testdata, one tests and one docs commit of any size. Any branch, any commit count. Trigger: `/regroup [--base REF]`
