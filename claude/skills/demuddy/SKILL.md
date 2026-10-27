@@ -17,7 +17,7 @@ This is deliberately the inverse of "keep only instructions and facts". Plenty o
 
 ## Code comments
 
-`/demuddy comments [path|rev]` applies the same principle to the comments a code change left behind, and rewrites what stays so a reader without much context can follow it. Read [references/comments.md](references/comments.md) and follow it instead of the Target and Procedure sections below. The Protected list and the idempotency rule apply to both.
+`/demuddy comments [path|rev]` applies the same principle to the comments a code change left behind, and rewrites what stays so a reader without much context can follow it, never making a comment longer. Read [references/comments.md](references/comments.md) and follow it instead of the Target and Procedure sections below. The Protected list and the idempotency rule apply to both.
 
 ## Target
 

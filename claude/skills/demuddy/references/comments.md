@@ -52,22 +52,29 @@ have much technical background.
 ## Readability
 
 Write for a reader who is new to this code and not deeply technical: a
-reviewer from another team, a new hire, someone following a bug report.
+reviewer from another team, a new hire, someone following a bug report. A
+rewritten comment is never longer than the one it replaces; plainer comes
+from swapping and cutting words, never from adding them.
 
 - Short sentences, everyday words, one idea each. Cut a long comment to what
   the reader needs at that line.
-- Say why as what would go wrong: "If two workers save at once, one overwrites
-  the other" beats "prevents a race".
-- Use plain words for jargon when no meaning is lost: "safe to run twice" for
-  idempotent, "fill in" for hydrate, "remember the result" for memoize.
-- Spell out acronyms and team shorthand the first time they appear in a file,
-  unless everyone knows them (HTTP, URL, ID, API, JSON). Once per file, so a
-  second pass adds nothing.
+- Swap jargon for a plain word of about the same length: "safe to repeat" for
+  idempotent, "drops duplicates" for dedupes, "transaction" for tx. When no
+  short plain word exists, keep the term. Never add a gloss or a spelled-out
+  acronym beside it.
+- Never add an explanation the original did not have.
 - Names stay exactly as written: identifiers, file names, flags, config keys,
   error strings. They are how a reader searches.
 - Plain never beats precise. Numbers, units, conditions and exceptions stay
-  exact. When the plain word would drop a condition, keep the technical term
-  and add a few words that explain it.
+  exact; when the plain word would drop one, keep the technical term.
+
+Before: `Retry is idempotent: the PK on (venue, symbol) dedupes, so callers
+must never wrap it in a tx — the lock escalates under SSI. Fixed: previously
+this retried forever.`
+
+After: `Retry is safe to repeat: the primary key on (venue, symbol) drops
+duplicates. Callers must never wrap it in a transaction; under SSI the lock
+escalates.`
 
 ## Protected
 
@@ -91,14 +98,14 @@ The Protected list in SKILL.md applies in full. In code, also:
 1. List the target hunks. Read the whole function around each comment before
    touching it.
 2. Edit the comments.
-3. Run Check A and Check B. If one fails, fix the edit, never the check.
+3. Run Checks A, B and C. If one fails, fix the edit, never the check.
 4. Run the repo's build and lint; directives and doc linters read comments.
 5. Read the diff as a reviewer, not as the author.
 6. Commit with the commit skill.
 7. Report five lists: **Removed** (each residue class, with a count),
    **Rewritten for readability**, **Kept** (what an anxious reader would fear
    losing), **Reported, not touched** (ticketless TODOs, commented-out code),
-   and **Checks** (the output of A and B).
+   and **Checks** (the output of A, B and C).
 
 ### Check A: code untouched
 
@@ -137,6 +144,22 @@ comm -23 <(side - | facts) <(side + | facts)
 Every printed token was in a removed comment and is in no added one. Put it
 back, or give the reason it may go in the report. A lost `?` is the cheap
 detector for a question that was deleted or silently answered.
+
+### Check C: no comment got longer
+
+```bash
+git diff -U0 HEAD | awk '
+  function check() { if (a > r) printf "%s %s grew: %d -> %d chars\n", file, hunk, r, a }
+  /^\+\+\+ (b\/|\/dev\/null)/ { file = $2; next }
+  /^--- (a\/|\/dev\/null)/ { next }
+  /^@@/ { check(); hunk = $2; r = a = 0; next }
+  /^-/ { r += length($0) - 1; next }
+  /^\+/ { a += length($0) - 1 }
+  END { check() }'
+```
+
+Empty output passes. Each printed hunk has more comment text than before;
+shorten it.
 
 ## Idempotency
 
