@@ -203,7 +203,10 @@ How fixes land:
 Before any push, run what CI runs. Read `.gitlab-ci.yml` and every file it
 `include:`s (fetch remote includes with `glab api
 "projects/<urlencoded project>/repository/files/<urlencoded path>/raw?ref=<ref>"`),
-then run the same tasks locally, without their `--fix` flags. At minimum:
+then run the same tasks locally, without their `--fix` flags. Send each task's
+output to `<run dir>/gates/<name>-<task>.log` and read only its exit code and,
+when it fails, the failing lines; never read a whole gate log into the
+session. At minimum:
 
 - Go: `go build ./...`, `go vet ./...`, tests for the touched packages,
   `go mod vendor` when the repo vendors, and `golangci-lint` over the module
