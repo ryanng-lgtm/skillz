@@ -38,8 +38,8 @@ Prod clones and probes: `references/prod-access.md`.
 - **Credentials**: never read or print `connections.env`, `kcat.conf`,
   `~/.pgpass`, `~/.pg_service.conf`, `~/.config/shared-dev/config/*`,
   `<run dir>/config/*` or `state/guard.secret`, and never put a DB URL in a
-  command line. Use `run.py query` for SQL. The one credential a run may use
-  is the FE guest login in `~/.dev_creds` (section 7).
+  command line. Use `run.py query` for SQL. The only credentials a run may
+  use are the FE logins in `~/.dev_creds` (section 7).
 - **Never** start `zmeta_local`, `pipeline.sh` or any local TimescaleDB; never
   run `configure.py`; never write files into `~/.config/shared-dev` yourself.
 - **Never stop, restart or recreate containers this run did not claim.**
@@ -171,11 +171,14 @@ the change and which process to restart to point it at local tsdb-api or
 tsdb-read (host ports in `up.json`), then confirm the requests reach the
 local gateway in its logs.
 
-To drive the FE yourself, sign in as the guest user in `~/.dev_creds`: the
-email and password lines under `// guest user`. Never use the internal role
-account above it. Have the script or tool that fills the login form read the
+To drive the FE yourself, sign in with an account from `~/.dev_creds`: each
+is an email line and a password line under its label. Pick by what the change
+touches: `// internal role acc` for internal-only features or role-gated
+behaviour, `// guest user` for what an ordinary user sees. A change to role
+gating needs both. Have the script or tool that fills the login form read the
 password from the file itself, so it never appears in a command line, a tool
-argument, a log, chat or the report.
+argument, a log, chat or the report; the report names the account by label
+only.
 
 ## 8. Report
 
