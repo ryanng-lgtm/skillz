@@ -34,6 +34,7 @@ from pathlib import Path, PurePosixPath
 
 MAX_LINES = 600
 MAX_COMMITS = 9
+MIN_TEST_LINES = 200
 EMPTY = "0" * 40
 
 KINDS = ("code", "test", "testdata", "docs", "generated")
@@ -194,13 +195,18 @@ def layout_problems(report):
     return out
 
 
-def offer_reasons(report, max_lines):
+def offer_reasons(report, files, max_lines):
+    """Why to offer /regroup: too many commits, an oversize commit, or tests that outweigh the code."""
     reasons = []
     if len(report) > MAX_COMMITS:
         reasons.append(f"{len(report)} commits > {MAX_COMMITS}")
     over = sum(1 for c in report if c["oversize"])
     if over:
         reasons.append(f"{over} commit{'s' if over > 1 else ''} over {max_lines} changed lines")
+    tests = sum(f["added"] for f in files if f["kind"] == "test" and not f["binary"])
+    code = sum(f["added"] + f["deleted"] for f in files if f["kind"] == "code" and not f["binary"])
+    if tests >= MIN_TEST_LINES and tests > code:
+        reasons.append(f"tests add {tests} lines against {code} changed lines of code")
     return reasons
 
 
@@ -324,7 +330,7 @@ def run_each(repo, shas, cmd, links, timeout):
 def _print_review(report):
     for c in report:
         print(f"  {c['sha'][:8]}  {c['kind']:<9} {c['counted']:>5}  {c['subject']}"
-              + (f"  (+{c['excluded']} generated)" if c["excluded"] else ""))
+              + (f"  (+{c['excluded']} not counted)" if c["excluded"] else ""))
         for p in c["problems"]:
             print(f"            ! {p}")
         for n in c["notes"]:
@@ -364,9 +370,10 @@ def main(argv):
         report = review(repo, base, "HEAD", args.max_lines, rules)
         layout = layout_problems(report)
         if args.cmd == "stats":
+            branch_files = _files(repo, base, "HEAD", rules)
             files = [{"path": f["path"], "kind": f["kind"], "lines": f["added"] + f["deleted"]}
-                     for f in _files(repo, base, "HEAD", rules)]
-            reasons = offer_reasons(report, args.max_lines)
+                     for f in branch_files]
+            reasons = offer_reasons(report, branch_files, args.max_lines)
             if args.json:
                 print(json.dumps({"base": base, "commits": report, "offer": reasons, "layout": layout,
                                   "files": files}, indent=2))
