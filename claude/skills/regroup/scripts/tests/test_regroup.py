@@ -203,11 +203,22 @@ class OfferTests(unittest.TestCase):
         r = Repo(self)
         for i in range(9):
             r.commit({f"f{i}.py": lines(3)}, f"c{i}")
-        report = regroup.review(r.path, r.base, r.head(), 600, RULES)
-        self.assertEqual(regroup.offer_reasons(report, 600), [])
+        self.assertEqual(self.reasons(r), [])
         r.commit({"a.py": lines(400), "b.py": lines(300)}, "big")
-        reasons = regroup.offer_reasons(regroup.review(r.path, r.base, r.head(), 600, RULES), 600)
-        self.assertEqual(reasons, ["10 commits > 9", "1 commit over 600 changed lines"])
+        self.assertEqual(self.reasons(r), ["10 commits > 9", "1 commit over 600 changed lines"])
+
+    def test_tests_that_outweigh_the_code(self):
+        r = Repo(self)
+        r.commit({"a.py": lines(50), "tests/test_a.py": lines(150)}, "small")
+        self.assertEqual(self.reasons(r), [])
+        r.commit({"tests/test_a.py": lines(250)}, "more tests")
+        self.assertEqual(self.reasons(r), ["tests add 250 lines against 50 changed lines of code"])
+        r.commit({"b.py": lines(250)}, "more code")
+        self.assertEqual(self.reasons(r), [])
+
+    def reasons(self, r):
+        report = regroup.review(r.path, r.base, r.head(), 600, RULES)
+        return regroup.offer_reasons(report, regroup._files(r.path, r.base, r.head(), RULES), 600)
 
 
 class BuildTests(unittest.TestCase):
@@ -359,6 +370,14 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["layout"], [])
         self.assertEqual(data["files"], [{"path": "a.py", "kind": "code", "lines": 3},
                                          {"path": "tests/test_a.py", "kind": "test", "lines": 2}])
+
+    def test_stats_marks_uncounted_lines(self):
+        r = Repo(self)
+        r.commit({"tests/testdata/a.json": lines(2)}, "data")
+        out = subprocess.run(["python3", "-I", str(Path(regroup.__file__)), "stats"], cwd=r.path,
+                             capture_output=True, text=True, env={**os.environ})
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("(+2 not counted)", out.stdout)
 
 
 if __name__ == "__main__":
