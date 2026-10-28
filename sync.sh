@@ -218,7 +218,7 @@ if [ "$(git rev-parse HEAD)" != "$before" ]; then
   # registration. --no-renames reports a moved skill as an add and a delete,
   # which a rename filter would miss.
   if [ -n "$(git diff --no-renames --name-only --diff-filter=AD "$before" HEAD -- \
-    'claude/skills/*/SKILL.md' 'codex/skills/*')" ]; then
+    'claude/skills/*/SKILL.md' 'setup/*/SKILL.md' 'codex/skills/*')" ]; then
     "$REPO/install.sh" --links-only >>"$LOG" 2>&1 9>&- || log "install.sh --links-only failed"
   fi
 fi

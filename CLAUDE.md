@@ -5,7 +5,8 @@ This repository is the single source of truth for Ryan's agent setup: skills and
 ## Layout
 
 - `claude/skills/<name>/SKILL.md` — a Claude skill, plus any scripts or references it ships. `install.sh` links only directories that contain a `SKILL.md`. A slash command is a skill too: Claude Code gives every skill a `/name`, so do not add a `commands/` directory.
-- `codex/skills/<name>` — a Codex skill. A skill that works the same under both agents is stored once in `claude/skills/`, with a relative symlink here (`../../claude/skills/<name>`), and written for both agents (name both triggers, `/name` and `$name`). It can carry `agents/openai.yaml` for Codex's skill list. Keep a separate copy only when the Codex version has to differ.
+- `setup/<name>/SKILL.md` — a one-time setup skill: something done once per machine or repo, such as installing a tool or a setting. It installs like any other skill. Give it `disable-model-invocation: true` so it runs only when invoked, and list it in the README's one-time setup table instead of the skill index.
+- `codex/skills/<name>` — a Codex skill. A skill that works the same under both agents is stored once in `claude/skills/`, with a relative symlink here (`../../claude/skills/<name>`, or `../../setup/<name>`), and written for both agents (name both triggers, `/name` and `$name`). It can carry `agents/openai.yaml` for Codex's skill list. Keep a separate copy only when the Codex version has to differ.
 - `claude/CLAUDE.md` and `codex/AGENTS.md` — global instructions, linked to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`. They load in every project, so guidance about this repo belongs in this file, not there. They carry the same rules in each agent's terms; change one, change the other.
 
 Every skill follows `templates/skill-template.md` for its frontmatter, body, and supporting files. Read it before writing a skill or restructuring one.
@@ -14,7 +15,7 @@ Every skill follows `templates/skill-template.md` for its frontmatter, body, and
 
 ## Adding, removing, or renaming a skill
 
-Update the skill's row in the `README.md` skill index in the same change. The index is the only full list; a skill missing from it is invisible. The vendored `openmarket` and `om-chat` are the one exception.
+Update the skill's row in the `README.md` skill index, or its one-time setup table, in the same change. Those tables are the only full list; a skill missing from them is invisible. The vendored `openmarket` and `om-chat` are the one exception.
 
 On a rename or removal, also update every mention of the old name in `claude/CLAUDE.md`, `codex/AGENTS.md`, and other skills, and remove the Codex symlink if there is one. `install.sh` drops the dead links it leaves under `~/.claude` and `~/.codex`.
 

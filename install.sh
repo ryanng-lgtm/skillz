@@ -96,10 +96,11 @@ prune "$CLAUDE_HOME/skills"
 prune "$CLAUDE_HOME/commands"
 link "$REPO/claude/CLAUDE.md" "$CLAUDE_HOME/CLAUDE.md"
 
-for d in "$REPO"/claude/skills/*/; do
+# setup/ holds one-time setup skills; they install the same way.
+for d in "$REPO"/claude/skills/*/ "$REPO"/setup/*/; do
   name="$(basename "$d")"
   [ -f "$d/SKILL.md" ] || continue
-  link "$REPO/claude/skills/$name" "$CLAUDE_HOME/skills/$name"
+  link "${d%/}" "$CLAUDE_HOME/skills/$name"
 done
 echo "  $linked linked, $adopted adopted, $skipped skipped"
 
@@ -133,7 +134,7 @@ if [ -d "$WORK_SKILLS" ]; then
     name="$(basename "$d")"
     [ -f "$d/SKILL.md" ] || continue
     # A repo-owned skill of the same name wins; don't fight over it.
-    [ -e "$REPO/claude/skills/$name" ] && continue
+    [ -e "$REPO/claude/skills/$name" ] || [ -e "$REPO/setup/$name" ] && continue
     link "$WORK_SKILLS/$name" "$CLAUDE_HOME/skills/$name"
     [ -e "$REPO/codex/skills/$name" ] || link "$WORK_SKILLS/$name" "$CODEX_HOME/skills/$name"
   done

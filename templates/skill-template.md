@@ -1,6 +1,6 @@
 # Skill template
 
-The reference for writing a skill in this repo. It is not a skill and is not installed: read it, then write `claude/skills/<name>/SKILL.md` from the skeleton at the end. Where a skill goes, how it is shared with Codex, and the upkeep that comes with adding one are in the root `CLAUDE.md`.
+The reference for writing a skill in this repo. It is not a skill and is not installed: read it, then write `claude/skills/<name>/SKILL.md` (or `setup/<name>/SKILL.md` for a one-time setup) from the skeleton at the end. Where a skill goes, how it is shared with Codex, and the upkeep that comes with adding one are in the root `CLAUDE.md`.
 
 ## Frontmatter
 

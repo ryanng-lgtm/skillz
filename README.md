@@ -23,7 +23,6 @@ Ryan's agent skills and global instructions, shared across machines. One source 
 | [`regroup`](claude/skills/regroup/SKILL.md) | Claude | Trims a branch's tests to the necessary ones and rewrites its commits for review, leaving the code byte-identical. |
 | [`shared-dev`](claude/skills/shared-dev/SKILL.md) | Claude | Brings up the backend services a change needs in shared-dev, probes main against the branch with real data, and tears down. |
 | [`socratic-teacher`](claude/skills/socratic-teacher/SKILL.md) | Claude, Codex | Teaching mode: one guiding question per turn, never the full solution. |
-| [`status-line`](claude/skills/status-line/SKILL.md) | Claude | One-time setup of the Claude Code status line (model, folder, branch, context, usage limits, effort), changing only `statusLine` in `settings.json`. |
 | [`syncup`](claude/skills/syncup/SKILL.md) | Claude, Codex | Rebases the working branch and every behind MR or PR onto its target, resolving conflicts and keeping uncommitted work. |
 | [`test-audit`](claude/skills/test-audit/SKILL.md) | Claude | Gates new or changed tests on the behaviour they protect, and sweeps out low-value ones. |
 | [`testing-harness`](claude/skills/testing-harness/SKILL.md) | Claude, Codex | Proves a change in the running OM Chat GUI with cloud-versus-local visual diffs and browser probes. |
@@ -31,6 +30,14 @@ Ryan's agent skills and global instructions, shared across machines. One source 
 | [`world-todo`](claude/skills/world-todo/SKILL.md) | Claude, Codex | Plans every OM World service change before implementation, however small. |
 
 `openmarket` and `om-chat` ship with the `om` CLI and are vendored here so both agents get the same copy; they are not listed. `socratic-teacher`, `docs-knowledge-base` and the skill template are adapted from [wooneusean/skills](https://github.com/wooneusean/skills).
+
+## One-time setup
+
+Skills that set something up once per machine or repo. They live in `setup/` and install like any other skill, but only run when you invoke them.
+
+| Skill | Agents | What it does |
+| --- | --- | --- |
+| [`status-line`](setup/status-line/SKILL.md) | Claude | Sets the Claude Code status line (model, folder, branch, context, usage limits, effort), changing only `statusLine` in `settings.json`. |
 
 ## Structure
 
@@ -41,7 +48,8 @@ skillz/
 │   └── skills/        # every skill → ~/.claude/skills/<name>
 ├── codex/
 │   ├── AGENTS.md      # the same instructions for Codex → ~/.codex/AGENTS.md
-│   └── skills/        # links into claude/skills, plus Codex-only copies → ~/.codex/skills/<name>
+│   └── skills/        # links into claude/skills and setup, plus Codex-only copies → ~/.codex/skills/<name>
+├── setup/             # one-time setup skills → ~/.claude/skills/<name>
 ├── templates/         # skill-template.md, the layout every skill follows
 ├── CLAUDE.md          # how agents work in this repo
 ├── install.sh         # links everything into place
@@ -81,9 +89,9 @@ Invoke a skill as `/name` in Claude Code or `$name` in Codex, or describe the ta
 
 ## Adding a skill
 
-1. Write `claude/skills/<name>/SKILL.md` from [`templates/skill-template.md`](templates/skill-template.md).
-2. If it works the same under Codex, link it: `ln -s ../../claude/skills/<name> codex/skills/<name>`.
-3. Add its row to the [skill index](#skill-index).
+1. Write `claude/skills/<name>/SKILL.md` from [`templates/skill-template.md`](templates/skill-template.md), or `setup/<name>/SKILL.md` for a one-time setup.
+2. If it works the same under Codex, link it: `ln -s ../../claude/skills/<name> codex/skills/<name>` (or `../../setup/<name>`).
+3. Add its row to the [skill index](#skill-index) or the [one-time setup](#one-time-setup) table.
 4. Run `python3 -I check.py` and `./install.sh --links-only`.
 
 [`CLAUDE.md`](CLAUDE.md) has the full rules agents follow here.
