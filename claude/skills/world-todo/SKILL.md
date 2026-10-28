@@ -1,13 +1,15 @@
 ---
 name: world-todo
 description: >-
-  Plan OM World service tasks, features, and fixes with frontier-agent
-  drafting and review, demuddy, a shared OpenScape handoff, and Task Index
-  updates. Apply to every such change, however small, unless the user
-  explicitly overrides the workflow. Trigger: $world-todo or /world-todo.
+  Use when planning an OM World service task, feature, or fix — om-world-service
+  work and related changes in neighboring repos — before implementation. Apply
+  to every such change, however small, unless the user explicitly overrides
+  the workflow. Trigger: /world-todo, $world-todo.
 ---
 
-# World Todo
+# world-todo — plan OM World tasks before implementation
+
+## Overview
 
 Every OM World task gets the five steps below before implementation.
 Scale detail to the task, never skip steps because the change is small.
@@ -24,6 +26,8 @@ current source and tests, rather than carrying forward architecture claims.
 Read `demuddy`, `ivtg`, or `llm-council` from the active host's skills directory
 when invoked. Search for a missing skill before reporting a blocked step.
 Never claim a substitute ran as the named skill.
+
+**Core principle: Every OM World task gets the five steps below before implementation. Scale detail to the task, never skip steps because the change is small.**
 
 ## Route and clarify
 
@@ -143,6 +147,16 @@ changes; surface conflicts rather than overwriting them. Repeated runs must
 not duplicate documents, index entries, or links. Do not infer remote sync
 completion from a successful local write.
 
+## Finish
+
+Verify the dated final plan, the real Docs copy, consistent owner/index
+status, and affected links. Compare plan content between copies; explain any
+publication-only link adjustments. Report the plan and handoff paths, task
+ID/status, review outcome, and blockers. Do not claim checks ran when merely
+planned. Preserve the current authorization boundary, including ivtg's
+plan-only endpoint. After authorized implementation, update task status and
+record validation against the actual build in Archive as the local map asks.
+
 ## Agent budget and difficult decisions
 
 Keep the whole task within five agents, counting the coordinator and all
@@ -163,13 +177,3 @@ role passes rather than spawning new reviewers/chairmen. Disclose reduced
 independence from reused contexts. Never silently upgrade council cost.
 If cheaper models are unavailable, report that limitation and ask how to
 proceed. A council recommendation does not replace user specification approval.
-
-## Finish
-
-Verify the dated final plan, the real Docs copy, consistent owner/index
-status, and affected links. Compare plan content between copies; explain any
-publication-only link adjustments. Report the plan and handoff paths, task
-ID/status, review outcome, and blockers. Do not claim checks ran when merely
-planned. Preserve the current authorization boundary, including ivtg's
-plan-only endpoint. After authorized implementation, update task status and
-record validation against the actual build in Archive as the local map asks.
