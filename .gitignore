@@ -4,6 +4,7 @@
 .sync.log
 .sync.lock
 .sync-conflict
+.sync-check
 .sync-hold
 
 # never track credentials or per-machine state, even if copied in by mistake

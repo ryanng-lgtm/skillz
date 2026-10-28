@@ -11,6 +11,9 @@
 # another. On a rebase conflict it stops, restores the working tree, and leaves
 # a note in .sync-conflict for you to resolve.
 #
+# Commits and pushes nothing while check.py fails, and leaves its report in
+# .sync-check.
+#
 set -uo pipefail
 
 PULL=0
@@ -140,9 +143,33 @@ Synced from $(hostname -s)."
 
 unpushed() { [ -n "$(git rev-list '@{upstream}..HEAD' 2>/dev/null)" ]; }
 
+# Publish nothing that fails check.py. It checks the whole tree, so a failure
+# holds back earlier local commits as well as this turn's edits.
+check_ok=1
+if [ -f "$REPO/check.py" ] && ! report="$(python3 -I "$REPO/check.py" 2>&1)"; then
+  check_ok=0
+  {
+    echo "check.py failed at $(date), so sync committed and pushed nothing."
+    echo "Fix what it reports; the next sync after that goes out as usual:"
+    echo "  cd $REPO && python3 -I check.py"
+    echo
+    echo "$report"
+  } >"$REPO/.sync-check"
+  log "check.py failed — commit and push held back, see .sync-check"
+else
+  rm -f "$REPO/.sync-check"
+fi
+
 changed=""
-if [ -n "$(git status --porcelain)" ]; then
+if [ "$check_ok" = 1 ] && [ -n "$(git status --porcelain)" ]; then
   commit_changes || exit 1
+fi
+
+# A failed check still pulls on --pull when the tree is clean, so a fix pushed
+# from another machine can arrive. A dirty tree would need the autostash, which
+# can leave conflict markers in uncommitted work.
+if [ "$check_ok" = 0 ]; then
+  [ "$PULL" = 1 ] && [ -z "$(git status --porcelain)" ] || exit 1
 fi
 
 # A clean tree still pushes commits an earlier run left local (a commit made
@@ -196,6 +223,7 @@ if [ "$(git rev-parse HEAD)" != "$before" ]; then
   fi
 fi
 
+[ "$check_ok" = 1 ] || exit 1
 unpushed || exit 0
 
 if ! git push -q 2>>"$LOG"; then

@@ -139,7 +139,12 @@ used to be registered, kept for running the sync from a tool call by hand.
 `sync.sh` never force-pushes. It rebases onto the remote first; on a conflict it
 stops, keeps your commit local, and writes `.sync-conflict` with instructions.
 A pull that can't reach the remote (offline, no ssh key) is logged in
-`.sync.log` instead and retried on the next sync. Run it by hand any time:
+`.sync.log` instead and retried on the next sync.
+
+While `check.py` reports a problem, `sync.sh` commits and pushes nothing and
+writes the report to `.sync-check`; the next sync after the fix goes out as
+usual. `--pull` still pulls when the tree is clean, so a fix pushed from another
+machine can arrive. Run `sync.sh` by hand any time:
 
 ```bash
 ./sync.sh

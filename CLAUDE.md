@@ -28,6 +28,7 @@ A Claude Code `Stop` hook runs `sync.sh` at the end of every turn. It stages eve
 
 - Anything left in the working tree when a turn ends is published. Keep scratch files outside the repo.
 - Commit a finished change yourself with the `commit` skill, so it gets a real message. Otherwise sync commits it as `skills(<name>): update (…)`.
+- While `check.py` reports a problem, sync commits and pushes nothing and writes the report to `.sync-check`. Fix what it lists and the next sync goes out.
 - `touch .sync-hold` pauses syncing; `rm .sync-hold` resumes it.
 - Never force-push. Other machines push here too. On a rebase conflict, sync leaves a `.sync-conflict` note; resolve it as the note says.
 
