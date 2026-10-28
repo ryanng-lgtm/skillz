@@ -1,10 +1,12 @@
 ---
 name: om-build
 description: >-
-  Use when an OM Chat GUI has to be built from source and put in front of Ryan — the daemon-embedded `/rooms` GUI when `om upgrade` cannot fetch a release (openmarket-releases 404s) or a local change has to reach the running daemon, the hosted `/chat/` cloud fork when it has to be built, validated, and served locally, or the OpenFloor iOS app when the simulator must show exactly the branch checked out in the openmarket-chat-app main worktree. Covers all three targets and the swap onto the live install. Trigger: /om-build [--hosted|--cloud|--mobile] [--no-gui]
+  Use when an OM Chat GUI has to be built from source and put in front of Ryan — the daemon-embedded `/rooms` GUI when `om upgrade` cannot fetch a release (openmarket-releases 404s) or a local change has to reach the running daemon, the hosted `/chat/` cloud fork when it has to be built, validated, and served locally, or the OpenFloor iOS app when the simulator must show exactly the branch checked out in the openmarket-chat-app main worktree. Trigger: /om-build [--hosted|--cloud|--mobile] [--no-gui], $om-build.
 ---
 
 # om-build — build an OM Chat GUI from source
+
+## Overview
 
 Two different products live behind this skill. Pick the target before doing
 anything; they share no build, no artifact shape, and no verification.
@@ -46,6 +48,8 @@ feature worktree, they have to say so and you stop first.
 If either fork's copy of a file in `tools/parity-manifest.json` was edited,
 run `bun tools/sync-shared.ts --diff` before building. It is the only
 cross-fork alarm that exists; both forks can be green while drifting.
+
+**Core principle: Every target builds from the main worktree, never a linked one.**
 
 ---
 
@@ -96,7 +100,7 @@ about someone else's repo, so it reports and stops rather than acting:
   stops the service before compiling (the compile output *is* the running
   binary); anything else gets the version-directory install and a symlink flip.
 
-### Hard rules
+### Rules
 
 - **The staged GUI assets are never committed.** They are a working-tree
   overwrite of committed stubs. Restore them in step 6 — including when the
@@ -488,7 +492,7 @@ grep "<the error text>" ~/.openmarket/runner.log | head -1   # first occurrence
 A count that stops growing after the restart means the new version FIXED it —
 worth reporting as such.
 
-### Traps (`--hosted`)
+### Common mistakes — traps (`--hosted`)
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -676,7 +680,7 @@ on public repos). Mention it when this target runs more than once.
 in front of Ryan on a local port. It is **not** an upgrade path for anything and
 it never goes near the daemon.
 
-### Hard rules
+### Rules
 
 - **Never deploy, push, or publish an image.** Deployment is GitOps and
   controller-owned (`docs/CLOUD_HOSTING.md`): Reflectful + ArgoCD apply
@@ -806,7 +810,7 @@ and on which ports, whether each still runs or was killed, `check:dist` and
 gate results, parity drift from step 0, and anything left for Ryan. Never
 report a deploy — this target does not do one.
 
-### Traps (`--cloud`)
+### Common mistakes — traps (`--cloud`)
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -840,7 +844,7 @@ PORT=${OM_MOBILE_PORT:-8081}
 BUNDLE_ID=sh.openmarket.openfloor
 ```
 
-### Hard rules
+### Rules
 
 - **Always build from the main worktree — never a linked one.** House rule, no
   exceptions. Build whatever is checked out there, working tree and all; never
@@ -1049,7 +1053,7 @@ After a checkout that crosses a SQLite migration, wipe the app's data
 (`xcrun simctl uninstall` then reinstall, or clear from the app) instead of
 debugging a database the current code did not create.
 
-### Traps (`--mobile`)
+### Common mistakes — traps (`--mobile`)
 
 | Symptom | Cause | Fix |
 |---|---|---|
