@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 #
-# mrs.sh — map your open GitLab MRs to local clones and say which need a rebase.
+# mrs.sh — map your open GitLab MRs and GitHub PRs to local clones and say
+# which need a rebase.
 #
-# Lists your open MRs, maps each to local clones under the root (ROOT/* and
-# ROOT/meta_repo/*) by origin URL, fetches the MR's branches, and prints one
-# TSV row per (MR, local clone):
+# Lists your open MRs (glab) and PRs (gh), maps each to local clones under the
+# roots (ROOT/* and ROOT/meta_repo/*) by origin URL, fetches its branches, and
+# prints one TSV row per (MR, local clone):
 #   path  mr  source  target  behind  needs  worktree  local  merge_status  fetch
 #
+# mr        group/project!123 for a GitLab MR, owner/repo#123 for a GitHub PR.
 # behind    commits on origin/<target> missing from origin/<source>; "?" when
 #           either branch is missing on origin (an MR from a fork, say).
 # needs     rebase   behind > 0
@@ -22,23 +24,32 @@
 #           failed means the counts come from refs that could not be
 #           refreshed, so treat the row as stale, exactly like scan.sh.
 #
-# An MR with no local clone is printed with path "-".
+# An MR with no local clone is printed with path "-". A forge whose CLI is
+# missing or not logged in is reported on stderr and skipped; the script fails
+# only when no forge answered.
 #
 # Usage:
-#   mrs.sh [--root DIR]
+#   mrs.sh [--root DIR ...]
+#
+# Roots default to $SYNCUP_ROOT, a colon-separated list, else
+# ~/Documents/GitLab and ~/Documents/github. --root, given once or more,
+# replaces them.
 
 set -uo pipefail
 
-ROOT="${SYNCUP_ROOT:-$HOME/Documents/GitLab}"
+IFS=: read -r -a ROOTS <<<"${SYNCUP_ROOT:-$HOME/Documents/GitLab:$HOME/Documents/github}"
+roots_from_args=0
 
 usage() {
-	sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--root)
-		ROOT="$2"
+		[ "$roots_from_args" = 1 ] || ROOTS=()
+		roots_from_args=1
+		ROOTS+=("${2%/}")
 		shift 2
 		;;
 	-h | --help)
@@ -52,7 +63,7 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
-# Reduce any GitLab remote URL to "group/sub/project".
+# Reduce any GitLab or GitHub remote URL to "group/sub/project".
 project_of() {
 	printf '%s\n' "$1" | sed -E 's#^(git@[^:]+:|[a-z+]+://([^@/]+@)?[^/]+/)##; s#\.git$##'
 }
@@ -90,64 +101,105 @@ local_state() {
 	fi
 }
 
-mrs_json="$(glab api 'merge_requests?scope=created_by_me&state=opened&per_page=100' 2>&1)" || {
-	printf 'mrs.sh: glab api failed: %s\n' "$mrs_json" >&2
-	printf 'mrs.sh: check auth first:  glab auth status\n' >&2
-	exit 1
+# Every open MR and PR as "project  ref  source  target  merge_status".
+answered=0
+list_gitlab() {
+	local json
+	command -v glab >/dev/null || {
+		printf 'mrs.sh: glab not installed, GitLab MRs skipped\n' >&2
+		return
+	}
+	json="$(glab api 'merge_requests?scope=created_by_me&state=opened&per_page=100' 2>&1)" || {
+		printf 'mrs.sh: glab api failed, GitLab MRs skipped: %s\n' "$json" >&2
+		printf 'mrs.sh: check auth first:  glab auth status\n' >&2
+		return
+	}
+	answered=1
+	printf '%s' "$json" |
+		jq -r '.[] | [(.references.full | sub("!.*$"; "")), .references.full, .source_branch, .target_branch, (.detailed_merge_status // "-")] | @tsv'
 }
+list_github() {
+	local json
+	command -v gh >/dev/null || {
+		printf 'mrs.sh: gh not installed, GitHub PRs skipped\n' >&2
+		return
+	}
+	# gh search prs has no branch fields; the GraphQL search does.
+	json="$(gh api graphql -f query='query {
+		search(query: "is:pr is:open author:@me archived:false", type: ISSUE, first: 100) {
+			nodes { ... on PullRequest {
+				number headRefName baseRefName mergeStateStatus
+				repository { nameWithOwner }
+			} }
+		}
+	}' 2>&1)" || {
+		printf 'mrs.sh: gh api failed, GitHub PRs skipped: %s\n' "$json" >&2
+		printf 'mrs.sh: check auth first:  gh auth status\n' >&2
+		return
+	}
+	answered=1
+	printf '%s' "$json" |
+		jq -r '.data.search.nodes[] | [.repository.nameWithOwner, "\(.repository.nameWithOwner)#\(.number)", .headRefName, .baseRefName, (.mergeStateStatus // "-")] | @tsv'
+}
+# Not in a $(...): answered has to survive into this shell.
+list_file="$(mktemp)"
+trap 'rm -f "$list_file"' EXIT
+list_gitlab >>"$list_file"
+list_github >>"$list_file"
+[ "$answered" = 1 ] || exit 1
 
 # project -> local clone paths (a project can be cloned in more than one place).
 clones="$(
-	for d in "$ROOT"/*/ "$ROOT"/meta_repo/*/; do
-		d="${d%/}"
-		[ -e "$d/.git" ] || continue
-		url="$(git -C "$d" remote get-url origin 2>/dev/null)" || continue
-		printf '%s\t%s\n' "$(project_of "$url")" "$d"
+	for root in "${ROOTS[@]}"; do
+		for d in "$root"/*/ "$root"/meta_repo/*/; do
+			d="${d%/}"
+			[ -e "$d/.git" ] || continue
+			url="$(git -C "$d" remote get-url origin 2>/dev/null)" || continue
+			printf '%s\t%s\n' "$(project_of "$url")" "$d"
+		done
 	done
 )"
 
 # Rows are collected first because needs=restack depends on the other MRs.
 # Each row carries its project as a leading column, dropped on output.
 rows="$(
-	printf '%s' "$mrs_json" |
-		jq -r '.[] | [(.references.full | sub("!.*$"; "")), .references.full, .source_branch, .target_branch, (.detailed_merge_status // "-")] | @tsv' |
-		while IFS=$'\t' read -r project ref src tgt status; do
-			paths="$(printf '%s\n' "$clones" | awk -F'\t' -v p="$project" '$1 == p { print $2 }')"
-			if [ -z "$paths" ]; then
-				printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$project" - "$ref" "$src" "$tgt" "?" "?" - - "$status" -
-				continue
+	while IFS=$'\t' read -r project ref src tgt status; do
+		paths="$(printf '%s\n' "$clones" | awk -F'\t' -v p="$project" '$1 == p { print $2 }')"
+		if [ -z "$paths" ]; then
+			printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$project" - "$ref" "$src" "$tgt" "?" "?" - - "$status" -
+			continue
+		fi
+		while IFS= read -r path; do
+			fetch=ok
+			# </dev/null: git and ssh would otherwise swallow the rest of the MR list from stdin.
+			if ! git -C "$path" fetch --quiet origin "$src" "$tgt" </dev/null >/dev/null 2>&1; then
+				# A source branch missing on origin (a fork MR) is not an auth problem.
+				if git -C "$path" fetch --quiet origin "$tgt" </dev/null >/dev/null 2>&1; then
+					fetch=no-source
+				else
+					fetch=failed
+				fi
 			fi
-			while IFS= read -r path; do
-				fetch=ok
-				# </dev/null: git and ssh would otherwise swallow the rest of the MR list from stdin.
-				if ! git -C "$path" fetch --quiet origin "$src" "$tgt" </dev/null >/dev/null 2>&1; then
-					# A source branch missing on origin (a fork MR) is not an auth problem.
-					if git -C "$path" fetch --quiet origin "$tgt" </dev/null >/dev/null 2>&1; then
-						fetch=no-source
-					else
-						fetch=failed
-					fi
-				fi
-				if [ "$fetch" = no-source ]; then
-					behind="?"
-				else
-					behind="$(git -C "$path" rev-list --count "origin/$src..origin/$tgt" </dev/null 2>/dev/null)" || behind="?"
-					[ -n "$behind" ] || behind="?"
-				fi
-				case "$behind" in
-				"?") needs="?" ;;
-				0) needs=ok ;;
-				*) needs=rebase ;;
-				esac
-				if [ "$behind" = "?" ]; then
-					lstate="?"
-				else
-					lstate="$(local_state "$path" "$src" </dev/null)"
-				fi
-				wt="$(worktree_of "$path" "$src" </dev/null)"
-				printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$project" "$path" "$ref" "$src" "$tgt" "$behind" "$needs" "$wt" "$lstate" "$status" "$fetch"
-			done <<<"$paths"
-		done
+			if [ "$fetch" = no-source ]; then
+				behind="?"
+			else
+				behind="$(git -C "$path" rev-list --count "origin/$src..origin/$tgt" </dev/null 2>/dev/null)" || behind="?"
+				[ -n "$behind" ] || behind="?"
+			fi
+			case "$behind" in
+			"?") needs="?" ;;
+			0) needs=ok ;;
+			*) needs=rebase ;;
+			esac
+			if [ "$behind" = "?" ]; then
+				lstate="?"
+			else
+				lstate="$(local_state "$path" "$src" </dev/null)"
+			fi
+			wt="$(worktree_of "$path" "$src" </dev/null)"
+			printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$project" "$path" "$ref" "$src" "$tgt" "$behind" "$needs" "$wt" "$lstate" "$status" "$fetch"
+		done <<<"$paths"
+	done <"$list_file"
 )"
 
 [ -n "$rows" ] || exit 0

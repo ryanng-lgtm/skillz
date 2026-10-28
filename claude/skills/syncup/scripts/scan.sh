@@ -11,27 +11,32 @@
 #   blocked  cannot be synced unattended (see reason in the branch column)
 #
 # Usage:
-#   scan.sh [--root DIR] [--no-fetch] [--jobs N] [--all] [REPO_PATH ...]
+#   scan.sh [--root DIR ...] [--no-fetch] [--jobs N] [--all] [REPO_PATH ...]
 #
 # With REPO_PATHs, only those repos are scanned; otherwise every repo directly
-# under the root.
+# under the roots. Roots default to $SYNCUP_ROOT, a colon-separated list, else
+# ~/Documents/GitLab and ~/Documents/github. --root, given once or more,
+# replaces them.
 
 set -uo pipefail
 
-ROOT="${SYNCUP_ROOT:-$HOME/Documents/GitLab}"
+IFS=: read -r -a ROOTS <<<"${SYNCUP_ROOT:-$HOME/Documents/GitLab:$HOME/Documents/github}"
+roots_from_args=0
 DO_FETCH=1
 JOBS=8
 SHOW_ALL=0
 PATHS=()
 
 usage() {
-	sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--root)
-		ROOT="$2"
+		[ "$roots_from_args" = 1 ] || ROOTS=()
+		roots_from_args=1
+		ROOTS+=("${2%/}")
 		shift 2
 		;;
 	--no-fetch)
@@ -61,11 +66,6 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
-if [ ! -d "$ROOT" ]; then
-	printf 'scan.sh: root not found: %s\n' "$ROOT" >&2
-	exit 2
-fi
-
 # Collect candidate repo paths (a worktree has .git as a file, not a dir).
 repos=()
 if [ "${#PATHS[@]}" -gt 0 ]; then
@@ -77,22 +77,29 @@ if [ "${#PATHS[@]}" -gt 0 ]; then
 		fi
 	done
 else
-	for d in "$ROOT"/*/; do
-		d="${d%/}"
-		if [ -e "$d/.git" ]; then
-			repos+=("$d")
+	for root in "${ROOTS[@]}"; do
+		if [ ! -d "$root" ]; then
+			printf 'scan.sh: root not found, skipping: %s\n' "$root" >&2
+			continue
 		fi
+		for d in "$root"/*/; do
+			d="${d%/}"
+			if [ -e "$d/.git" ]; then
+				repos+=("$d")
+			fi
+		done
 	done
 fi
 
 if [ "${#repos[@]}" -eq 0 ]; then
-	printf 'scan.sh: no git repos under %s\n' "$ROOT" >&2
+	printf 'scan.sh: no git repos under %s\n' "${ROOTS[*]}" >&2
 	exit 1
 fi
 
 # A failed fetch is not a warning, it is a correctness problem: every ahead/behind
 # count below would be measured against stale refs and silently understate drift.
-# Failures are recorded per repo and surfaced as state=stale.
+# Failures are recorded per repo and surfaced as state=stale. The marker is
+# named after the repo's path, since two roots can hold repos of the same name.
 FAIL_DIR=""
 if [ "$DO_FETCH" -eq 1 ]; then
 	FAIL_DIR="$(mktemp -d)"
@@ -102,14 +109,14 @@ if [ "$DO_FETCH" -eq 1 ]; then
 	printf '%s\n' "${repos[@]}" |
 		xargs -P "$JOBS" -I{} sh -c '
 			if ! git -C "$1" fetch --quiet --prune origin >/dev/null 2>&1; then
-				: >"$2/$(basename "$1")"
+				: >"$2/$(printf %s "$1" | tr / %)"
 			fi
 		' _ {} "$FAIL_DIR"
 
 	nfail="$(find "$FAIL_DIR" -type f | grep -c '^' | tr -d ' ')"
 	if [ "$nfail" -gt 0 ]; then
 		printf 'scan.sh: fetch FAILED for %s repo(s) — their counts are from stale refs.\n' "$nfail" >&2
-		printf 'scan.sh: check auth first:  ssh-add -l  &&  ssh -T git@gitlab.com\n' >&2
+		printf 'scan.sh: check auth first:  ssh-add -l  &&  ssh -T git@gitlab.com  (or git@github.com)\n' >&2
 	fi
 fi
 
@@ -118,7 +125,7 @@ fetch_state() {
 		printf 'skipped\n'
 		return
 	}
-	if [ -f "$FAIL_DIR/$1" ]; then printf 'failed\n'; else printf 'ok\n'; fi
+	if [ -f "$FAIL_DIR/$(printf %s "$1" | tr / %)" ]; then printf 'failed\n'; else printf 'ok\n'; fi
 }
 
 default_branch() {
@@ -151,7 +158,7 @@ in_progress() {
 # Columns 1-8 are stable; the fetch column is appended as 9 so callers that
 # index $8 for the path keep working.
 emit() {
-	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$@" "$(fetch_state "$1")"
+	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$@" "$(fetch_state "$8")"
 }
 
 for repo in "${repos[@]}"; do
@@ -203,7 +210,7 @@ for repo in "${repos[@]}"; do
 	fi
 
 	# Counts computed from refs we could not refresh are not evidence of anything.
-	if [ "$(fetch_state "$name")" = failed ]; then
+	if [ "$(fetch_state "$repo")" = failed ]; then
 		state=stale
 	fi
 

@@ -1,6 +1,6 @@
 ---
 name: syncup
-description: Use when the user wants one or more local repos brought up to date with their default branch, or their open GitLab MRs rebased onto their target branches — refresh main from origin, rebase the working branch onto it, resolve every conflict, including when the worktree has uncommitted changes, and push the rebased MR branches. Picks candidates from the current session and from the user's open MRs that have fallen behind, or from a named stack (om-chat, fe, tc, be). Trigger: /syncup [repo|stack ...], "sync up my repos", "sync the FE stack", "rebase everything on main", "get me on latest main", "update my MRs", "rebase my MRs".
+description: Use when the user wants one or more local repos brought up to date with their default branch, or their open GitLab MRs or GitHub PRs rebased onto their target branches — refresh main from origin, rebase the working branch onto it, resolve every conflict, including when the worktree has uncommitted changes, and push the rebased MR branches. Picks candidates from the current session and from the user's open MRs that have fallen behind, or from a named stack (om-chat, fe, tc, be). Trigger: /syncup [repo|stack ...], "sync up my repos", "sync the FE stack", "rebase everything on main", "get me on latest main", "update my MRs", "rebase my MRs", "rebase my PRs".
 ---
 
 # syncup — bring selected repos and MRs up to date
@@ -20,7 +20,11 @@ unstaged/staged as it started, and push the unit if it is an MR. Units are proce
 time, sequentially**, inline in the main thread — never via subagents, because conflict resolution
 needs the full session context.
 
-Default repo root: `~/Documents/GitLab`. Override with `--root DIR` or `SYNCUP_ROOT`.
+An MR here is a GitLab MR or a GitHub PR. The scripts find both, and every phase treats them the
+same.
+
+Repo roots: `~/Documents/GitLab` and `~/Documents/github`. Override with `--root DIR`, given once
+or more, or `SYNCUP_ROOT`, a colon-separated list.
 
 The Bash tool runs zsh, where `$VAR:r…` is a modifier: always brace a variable followed by `:`
 (`"${SHA}:refs/heads/${SRC}"`), as every snippet below does.
@@ -46,7 +50,7 @@ The Bash tool runs zsh, where `$VAR:r…` is a modifier: always brace a variable
 
 ## Stacks
 
-Named groups of repos that ship together. Paths are relative to the root.
+Named groups of repos that ship together. Paths are relative to `~/Documents/GitLab`.
 
 | stack | repos |
 |---|---|
@@ -57,6 +61,7 @@ Named groups of repos that ship together. Paths are relative to the root.
 
 - `om-chat-cloud` is the GitLab `openmarket-chat`. The top-level `openmarket-chat` dir is the GitHub
   repo and is not in the stack.
+- `openmarket-internal` is a GitHub repo, so its PRs come from `gh`, not `glab`.
 - The `be` repos also have top-level clones (`tsdb-gateway`, `streamd`, ...). The stack means the
   `meta_repo/` ones.
 
@@ -69,7 +74,7 @@ the whole root only when the user asks for everything (`/syncup all`, "sync all 
 1. **Arguments.** If the user named repos or stacks, expand the stacks and use exactly that set.
    Resolve each repo to a path under the root, and ask for the path if one does not resolve. Skip
    step 2.
-2. **Session repos.** Look back over this conversation for repos under the root that were worked on:
+2. **Session repos.** Look back over this conversation for repos under the roots that were worked on:
    files read or edited, commands run in them, commits or branches made. Use the summary if the
    session was compacted. Mentioning a repo by name is not enough. Record why each repo qualifies,
    in a few words.
@@ -79,9 +84,12 @@ the whole root only when the user asks for everything (`/syncup all`, "sync all 
    bash ~/.claude/skills/syncup/scripts/mrs.sh
    ```
 
-   It lists the user's open GitLab MRs mapped to their local clones, one TSV row per MR and clone:
+   It lists the user's open GitLab MRs (`glab`) and GitHub PRs (`gh`) mapped to their local clones,
+   one TSV row per MR and clone:
    `path  mr  source  target  behind  needs  worktree  local  merge_status  fetch`. `--help`
    defines every column. With arguments, keep only the rows whose `path` is in the argument set.
+   When a forge cannot be reached, it is named on stderr and its MRs are missing from the list:
+   say so in the report, never present them as up to date.
    - Every row with `needs=rebase` or `needs=restack` is an **MR unit**, whether or not its branch
      is checked out. When two clones match one MR, use the one whose `worktree` is set, else the
      first.
@@ -103,7 +111,7 @@ the whole root only when the user asks for everything (`/syncup all`, "sync all 
    bash ~/.claude/skills/syncup/scripts/scan.sh <path> ...
    ```
 
-   With no paths it scans every repo directly under the root, which is the `/syncup all` case only. It
+   With no paths it scans every repo directly under each root, which is the `/syncup all` case only. It
    fetches in parallel (`--no-fetch` skips the fetch) and prints TSV:
    `name  branch  default  ahead  behind  dirty  state  path  fetch`. Only repos that need work are
    listed (`--all` includes clean ones). A repo the user named that comes back clean is reported as
@@ -140,8 +148,8 @@ built on stale refs.
 5. **Ask.** Skip this step when the user passed arguments. Otherwise use one `AskUserQuestion`
    call, every question `multiSelect: true`:
    - **Detected:** the MR units and the `state=sync` default-branch units from steps 2–4, sorted
-     dirty-first, then by `behind` descending. Label is the repo name, plus `!<iid>` for an MR
-     unit. Description is the reason and state, e.g.
+     dirty-first, then by `behind` descending. Label is the repo name, plus the MR's number for
+     an MR unit (`!2402`, or `#1917` for a GitHub PR). Description is the reason and state, e.g.
      `MR !2402 → main · 5 behind · 3 uncommitted · will force-push`,
      `MR !2410 → feat/base · restack · not checked out · will force-push`, or
      `edited this session · 12 behind`. With two or more candidates, the first option is **All**,
@@ -401,7 +409,7 @@ The lease is the Phase 1 SHA, not the remote-tracking ref: an editor's backgroun
 `origin/<source>` and silently widen a bare `--force-with-lease`. A push also updates
 `origin/<source>`, which is what the restack units stacked on this one rebase onto.
 
-A rejected lease (someone pushed since Phase 1), a failing pre-push hook, or GitLab refusing a
+A rejected lease (someone pushed since Phase 1), a failing pre-push hook, or the server refusing a
 force-push to a protected branch makes the unit `needs-you`. Leave the local rebase in place,
 report the error, and never retry with `--force` or `--no-verify`.
 
