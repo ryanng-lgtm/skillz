@@ -1,15 +1,20 @@
 ---
 name: commit
-description: Commit the currently staged git changes only. Use when the user invokes /commit or $commit, asks to commit staged changes, or when instructions say to commit through the commit skill — a concise commit from the existing index, without staging additional files.
+description: >-
+  Use when the user invokes /commit or $commit, asks to commit staged changes,
+  or when instructions say to commit through the commit skill. Trigger: /commit,
+  $commit.
 ---
 
-# Commit
+# commit — commit only what is already staged
 
 ## Overview
 
 Create one or more git commits from the current staged changes only. Do not stage unrelated files or include unstaged work unless the user explicitly changes the request.
 
-## Workflow
+**Core principle: commit from the current staged changes only.**
+
+## Procedure
 
 1. Run `git diff --cached --stat`.
    - If nothing is staged, tell the user and stop.
