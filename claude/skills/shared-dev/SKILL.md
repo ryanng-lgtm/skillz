@@ -1,6 +1,13 @@
 ---
 name: shared-dev
-description: Use when a backend change (tsdb-gateway, metadata-instrument, streamd, stream-deduplicated, live-feed, kiyotaka-go, replayer) has to be tested locally against real data — "let's test this locally", "spin up shared-dev", "probe this end to end", "check it against the clones", "pull more data from prod for this probe" — or a shared-dev run has to be torn down, or public on the dev tsdb brought up to main. Trigger: /shared-dev [repo ...] [--fe] [--keep] | /shared-dev down | /shared-dev rebaseline.
+description: >-
+  Use when a backend change (tsdb-gateway, metadata-instrument, streamd,
+  stream-deduplicated, live-feed, kiyotaka-go, replayer) has to be tested
+  locally against real data — "let's test this locally", "spin up shared-dev",
+  "probe this end to end", "check it against the clones", "pull more data from
+  prod for this probe" — or a shared-dev run has to be torn down, or public on
+  the dev tsdb brought up to main. Trigger: /shared-dev [repo ...] [--fe]
+  [--keep] | /shared-dev down | /shared-dev rebaseline.
 ---
 
 # shared-dev — run the change against real data, probe it, tear down
@@ -13,6 +20,8 @@ services up in the shared-dev Docker stack against Ryan's databases on
 Sean's PC, probes, reports, and tears down. DB queries are the main
 evidence; FE validation only with `--fe`.
 
+**Core principle: `public` on `data` holds prod clones and a run never changes it.**
+
 Every command below runs as:
 
 ```bash
@@ -23,29 +32,6 @@ $P -I $S/run.py <module> ...        # bash scripts: bash $S/<name>.sh
 
 Facts about the bundle, Sean's PC and the repos: `references/environment.md`.
 Prod clones and probes: `references/prod-access.md`.
-
-## Hard rules
-
-- **`public` on `data` holds prod clones and a run never changes it**: no
-  writes, migrations, indexes, REFRESH or continuous aggregates. A run's
-  migrations and writes land in its own `sd_<slug>` schema through the
-  `sd_guard` role; `up` and the scripts enforce this. The one exception is
-  `rebaseline apply --yes`, and only after Ryan approves that run.
-- **Prod reads** go only through `run.py clone` (tsdb2 for tsdb data, pgmeta0
-  for metadata), each with Ryan's go for that request; tsdb0–3 only when he
-  names them; never in an unattended run.
-- **Over 70 GB** of copies, per table or per run: stop and ask.
-- **Credentials**: never read or print `connections.env`, `kcat.conf`,
-  `~/.pgpass`, `~/.pg_service.conf`, `~/.config/shared-dev/config/*`,
-  `<run dir>/config/*` or `state/guard.secret`, and never put a DB URL in a
-  command line. Use `run.py query` for SQL. The only credentials a run may
-  use are the FE logins in `~/.dev_creds` (section 7).
-- **Never** start `zmeta_local`, `pipeline.sh` or any local TimescaleDB; never
-  run `configure.py`; never write files into `~/.config/shared-dev` yourself.
-- **Never stop, restart or recreate containers this run did not claim.**
-- A denied tool call or classifier block: stop and tell Ryan.
-- Lint is report-only (`task lint` rewrites files).
-- Tear down at the end unless `--keep`.
 
 ## Arguments
 
@@ -228,15 +214,38 @@ every run warns until it is applied by hand after the upgrade. On 2026-10-26
 `1791976706` (volume profile v4, needs kiyotaka_toolkit 32.0.0) was skipped
 this way; the dev DB has 30.1.0.
 
+## Rules
+
+- **`public` on `data` holds prod clones and a run never changes it**: no
+  writes, migrations, indexes, REFRESH or continuous aggregates. A run's
+  migrations and writes land in its own `sd_<slug>` schema through the
+  `sd_guard` role; `up` and the scripts enforce this. The one exception is
+  `rebaseline apply --yes`, and only after Ryan approves that run.
+- **Prod reads** go only through `run.py clone` (tsdb2 for tsdb data, pgmeta0
+  for metadata), each with Ryan's go for that request; tsdb0–3 only when he
+  names them; never in an unattended run.
+- **Over 70 GB** of copies, per table or per run: stop and ask.
+- **Credentials**: never read or print `connections.env`, `kcat.conf`,
+  `~/.pgpass`, `~/.pg_service.conf`, `~/.config/shared-dev/config/*`,
+  `<run dir>/config/*` or `state/guard.secret`, and never put a DB URL in a
+  command line. Use `run.py query` for SQL. The only credentials a run may
+  use are the FE logins in `~/.dev_creds` (section 7).
+- **Never** start `zmeta_local`, `pipeline.sh` or any local TimescaleDB; never
+  run `configure.py`; never write files into `~/.config/shared-dev` yourself.
+- **Never stop, restart or recreate containers this run did not claim.**
+- A denied tool call or classifier block: stop and tell Ryan.
+- Lint is report-only (`task lint` rewrites files).
+- Tear down at the end unless `--keep`.
+
 ## Common mistakes
 
-- Running a branch migration, `REFRESH MATERIALIZED VIEW` or an `INSERT`
-  against `public` "just to test" — every baseline agent did, and so did a
+- **Running a branch migration, `REFRESH MATERIALIZED VIEW` or an `INSERT`
+  against `public` "just to test"** — every baseline agent did, and so did a
   real session on 2026-10-26.
-- `docker compose -p kiyotaka-shared-dev stop` or `--force-recreate` on a
-  stack someone else started.
-- Writing `compose.<feature>.yaml`, config copies or binaries into
-  `~/.config/shared-dev`.
-- Overriding the prod profile's 30 s cap, or reading all four tsdb nodes.
-- Leaving the stack, its schema or its topics behind.
-- Sourcing `connections.env` and putting `$TIMESCALE_URL` on a command line.
+- **`docker compose -p kiyotaka-shared-dev stop` or `--force-recreate` on a
+  stack someone else started.**
+- **Writing `compose.<feature>.yaml`, config copies or binaries into
+  `~/.config/shared-dev`.**
+- **Overriding the prod profile's 30 s cap, or reading all four tsdb nodes.**
+- **Leaving the stack, its schema or its topics behind.**
+- **Sourcing `connections.env` and putting `$TIMESCALE_URL` on a command line.**
