@@ -14,7 +14,7 @@ Every skill follows `templates/skill-template.md` for its frontmatter, body, and
 
 ## Adding, removing, or renaming a skill
 
-Update the matching table in `README.md` (Claude or Codex) in the same change. The tables are the only full list; a skill missing from them is invisible. The vendored skills are the one exception.
+Update the skill's row in the `README.md` skill index in the same change. The index is the only full list; a skill missing from it is invisible. The vendored `openmarket` and `om-chat` are the one exception.
 
 On a rename or removal, also update every mention of the old name in `claude/CLAUDE.md`, `codex/AGENTS.md`, and other skills, and remove the Codex symlink if there is one. `install.sh` drops the dead links it leaves under `~/.claude` and `~/.codex`.
 
@@ -34,6 +34,6 @@ A Claude Code `Stop` hook runs `sync.sh` at the end of every turn. It stages eve
 
 ## Verifying a change
 
-- After changing a skill, `README.md`, or a global instruction file, run `python3 -I check.py`. It checks every skill against the template, the Codex symlinks, the README tables, and the `~/.claude/skills/...` paths that docs and scripts name. It must print no problems.
+- After changing a skill, `README.md`, or a global instruction file, run `python3 -I check.py`. It checks every skill against the template, the Codex symlinks, the README skill index, and the `~/.claude/skills/...` paths that docs and scripts name. It must print no problems.
 - After adding, renaming, or removing a skill, run `./install.sh --links-only`. It must report no `SKIP` lines, and the new links under `~/.claude/skills/` and `~/.codex/skills/` must resolve into this repo. Run plain `./install.sh` after changing `install.sh` or `hook-install.sh`.
 - A skill that ships tests keeps them in `scripts/tests/`. After changing that skill, run `python3 -m unittest discover -s tests` from its `scripts/` directory.

@@ -1,10 +1,55 @@
 # skillz
 
-Agent skills and instructions, shared across machines. One source of truth for
-Claude Code (`~/.claude`) and Codex (`~/.codex`); each machine symlinks into it
-rather than keeping its own copy.
+Ryan's agent skills and global instructions, shared across machines. One source of truth for Claude Code (`~/.claude`) and Codex (`~/.codex`): each machine symlinks into this repo instead of keeping its own copy.
 
-## Setup on a new machine
+## Skill index
+
+| Skill | Agents | What it does |
+| --- | --- | --- |
+| [`bump-rc`](claude/skills/bump-rc/SKILL.md) | Claude, Codex | Releases `@openmarket/rooms-client`, choosing the version bump from what changed, and repins both GUI consumers. |
+| [`commit`](claude/skills/commit/SKILL.md) | Claude, Codex | Commits only what is already staged, with a short message in the repo's style. |
+| [`demuddy`](claude/skills/demuddy/SKILL.md) | Claude, Codex | Makes a much-edited plan handover-ready, or cleans up the comments a code change left behind, keeping every gotcha and cite. |
+| [`graphify`](claude/skills/graphify/SKILL.md) | Claude, Codex (own copy) | Turns code, docs, papers, images or video into a knowledge graph to query instead of grepping. |
+| [`humanize`](claude/skills/humanize/SKILL.md) | Claude, Codex | Rewrites Claude-authored text so it reads like Ryan wrote it. |
+| [`ivtg`](claude/skills/ivtg/SKILL.md) | Claude, Codex | Investigates issues one at a time across the named repos and writes each up as a fix plan. Never implements. |
+| [`llm-council`](claude/skills/llm-council/SKILL.md) | Claude, Codex | Runs a decision past five advisors who analyse it independently, review each other anonymously, and synthesise a verdict. |
+| [`loop-me-in`](claude/skills/loop-me-in/SKILL.md) | Claude, Codex (own copy) | Turns an approved plan into a brief a fresh session can run unattended and prove its own changes landed. |
+| [`mr-markdown`](claude/skills/mr-markdown/SKILL.md) | Claude, Codex | Writes the MR description for the current branch: a full draft, cut to 200 words, then stripped of jargon. |
+| [`om-build`](claude/skills/om-build/SKILL.md) | Claude, Codex | Builds an OM Chat GUI from source (the daemon's `/rooms` GUI, the hosted `/chat/` fork, or the OpenFloor iOS app) and swaps it onto the live install or the simulator. |
+| [`om-glab`](claude/skills/om-glab/SKILL.md) | Claude, Codex | Builds and installs the local daemon with the GitLab chat GUI instead of `om-build`'s GitHub default. |
+| [`panos`](claude/skills/panos/SKILL.md) | Claude | Reviews landed MRs the way Panos would, verifies every finding, and fixes and pushes the real ones. |
+| [`prompt-ready`](claude/skills/prompt-ready/SKILL.md) | Claude, Codex | Turns raw requests into self-contained, copy-paste-ready prompts for another session. |
+| [`regroup`](claude/skills/regroup/SKILL.md) | Claude | Trims a branch's tests to the necessary ones and rewrites its commits for review, leaving the code byte-identical. |
+| [`shared-dev`](claude/skills/shared-dev/SKILL.md) | Claude | Brings up the backend services a change needs in shared-dev, probes main against the branch with real data, and tears down. |
+| [`socratic-teacher`](claude/skills/socratic-teacher/SKILL.md) | Claude, Codex | Teaching mode: one guiding question per turn, never the full solution. |
+| [`syncup`](claude/skills/syncup/SKILL.md) | Claude, Codex | Rebases the working branch and every behind MR or PR onto its target, resolving conflicts and keeping uncommitted work. |
+| [`test-audit`](claude/skills/test-audit/SKILL.md) | Claude | Gates new or changed tests on the behaviour they protect, and sweeps out low-value ones. |
+| [`testing-harness`](claude/skills/testing-harness/SKILL.md) | Claude, Codex | Proves a change in the running OM Chat GUI with cloud-versus-local visual diffs and browser probes. |
+| [`war-diary`](claude/skills/war-diary/SKILL.md) | Claude, Codex | Turns a day's GitLab activity and Claude Code sessions into War Diaries notes and Kanban cards. |
+| [`world-todo`](claude/skills/world-todo/SKILL.md) | Claude, Codex | Plans every OM World service change before implementation, however small. |
+
+`openmarket` and `om-chat` ship with the `om` CLI and are vendored here so both agents get the same copy; they are not listed. `socratic-teacher` and the skill template are adapted from [wooneusean/skills](https://github.com/wooneusean/skills).
+
+## Structure
+
+```
+skillz/
+├── claude/
+│   ├── CLAUDE.md      # global instructions → ~/.claude/CLAUDE.md
+│   └── skills/        # every skill → ~/.claude/skills/<name>
+├── codex/
+│   ├── AGENTS.md      # the same instructions for Codex → ~/.codex/AGENTS.md
+│   └── skills/        # links into claude/skills, plus Codex-only copies → ~/.codex/skills/<name>
+├── templates/         # skill-template.md, the layout every skill follows
+├── CLAUDE.md          # how agents work in this repo
+├── install.sh         # links everything into place
+├── hook-install.sh    # registers the sync hooks; install.sh runs it
+├── hook.sh            # runs sync.sh for an edit inside the repo, for a tool hook
+├── sync.sh            # commits and pushes each turn, pulls at session start
+└── check.py           # checks skills, Codex links, the index and skill paths agree
+```
+
+## Installation
 
 ```bash
 git clone git@github.com:ryanng-lgtm/skillz.git ~/Documents/github/skillz
@@ -12,167 +57,54 @@ cd ~/Documents/github/skillz
 ./install.sh
 ```
 
-That links every skill and instruction file into `~/.claude` and
-`~/.codex`, and registers the auto-sync hook. Re-run it any time — it refreshes
-links and never touches skills this repo doesn't own.
+`install.sh` links every skill and both instruction files into `~/.claude` and `~/.codex`, registers the sync hooks, and installs the Codex plugins below. It also:
 
-If a skill directory already exists as real files on that machine, `install.sh`
-adopts it when the contents match and reports it otherwise. `--force` replaces
-it, keeping a `.local-<timestamp>` backup alongside.
+- points `~/.claude/plans` and `~/.codex/plans` at the iCloud Obsidian folder `Obsidian/Claude Plans` (override with `PLANS_VAULT_DIR`);
+- links the daemon build commands `om-hosted` (GitHub chat GUI) and `om-glab` (GitLab chat GUI) into `~/.local/bin`;
+- links the work skills in `~/repos/llm/skills` when that checkout is present.
 
-## Layout
+Re-running is safe. It refreshes links, removes links to skills the repo dropped, and never touches skills it doesn't own. A real directory where a link should go is adopted when its contents match and reported otherwise; `--force` replaces it and keeps a `.local-<timestamp>` backup.
 
-```
-claude/
-  CLAUDE.md      global instructions        → ~/.claude/CLAUDE.md
-  skills/        skills                     → ~/.claude/skills/<name>
-codex/
-  AGENTS.md      global instructions        → ~/.codex/AGENTS.md
-  skills/        skills                     → ~/.codex/skills/<name>
-templates/
-  skill-template.md                         not linked anywhere
-```
+### Codex plugins
 
-`templates/skill-template.md` is the reference agents follow when writing a
-skill here, adapted from
-[wooneusean/skills](https://github.com/wooneusean/skills/blob/main/templates/skill-template.md).
-`python3 -I check.py` checks that every skill follows it, that the skill tables
-below match `claude/skills/` and `codex/skills/`, and that every skill path a doc
-or script names exists.
+`install.sh` registers each plugin's marketplace and installs the plugin; Codex records both in its per-machine `config.toml`.
 
-`install.sh` also points `~/.claude/plans` and `~/.codex/plans` at the same
-iCloud-synced Obsidian folder (`Obsidian/Claude Plans`), so plan files from
-either agent land in one vault. Override the folder with `PLANS_VAULT_DIR`.
-
-The local daemon build commands are `om-hosted` (GitHub chat GUI) and
-`om-glab` (GitLab chat GUI), linked into `~/.local/bin`. Both use
-`openmarket-internal` and install into the same local daemon; the latest
-successful build determines its GUI. `OM_GUI` and `OM_MONO` override source
-paths, and `--gate` checks without installing.
-
-Most of `codex/skills/` is relative symlinks into `claude/skills/`: a skill that
-works the same under both agents is stored once. `graphify` and `loop-me-in` differ
-between them and are stored separately. A shared skill can carry
-`agents/openai.yaml` for Codex's skill list; Claude ignores it. There is no
-separate commands directory: Claude Code gives every skill a `/name`, so a slash
-command is written as a skill. `codex/AGENTS.md` carries the same rules as
-`claude/CLAUDE.md` in Codex terms (`$skill` triggers, no plan-mode pinning) —
-change one, change the other.
-
-## Skills
-
-Everything below is authored here except `socratic-teacher`, adapted from
-[wooneusean/skills](https://github.com/wooneusean/skills/blob/main/learning/socratic-teacher.md)
-into a session toggle.
-The `openmarket` and `om-chat` skills ship
-with the `om` CLI and are only vendored into this repo so both agents get the
-same copy — they're synced by `skills: sync om-bundled docs from om <version>`
-commits, not edited by hand, and aren't listed.
-
-### Claude (`claude/skills/` → `~/.claude/skills/`)
-
-| Skill | Trigger | What it does |
+| Plugin | Source | What it does |
 | --- | --- | --- |
-| `bump-rc` | `/bump-rc [version]` | Releases `@openmarket/rooms-client`: picks the bump from what actually changed, runs the release script, repins both GUI consumers. |
-| `commit` | `/commit` | Commits the currently staged changes only, with a short message matched to the repo's style. Never stages anything extra. |
-| `demuddy` | `/demuddy [path]`, `/demuddy comments [path\|rev]` | Editorial pass that turns a much-edited plan into a handover-ready one — strips decision archaeology, dedupes rules, reorders into build order, keeps every gotcha and cite. `comments` mode does the same for the comments a code change left behind (change narration, restated code, filler) and rewrites the rest in plain language for a reader without much context. |
-| `graphify` | `/graphify` | Turns any input (code, docs, papers, images, video) into a persistent knowledge graph with god nodes and community detection; query/path/explain instead of grepping. |
-| `humanize` | `/humanize [light] [path]` | Rewrites Claude-authored text so it reads like Ryan wrote it — strips AI tells, matches voice per register. `light` keeps the structure and edits sentences only. |
-| `ivtg` | `/ivtg` | Investigator mode: issues fed one at a time, each investigated across the named repos and written into one dated plan file. Never implements. |
-| `llm-council` | "council this", "pressure-test this" | Runs a question through 5 AI advisors who analyse it independently, peer-review each other anonymously, then synthesise a verdict. |
-| `loop-me-in` | `/loop-me-in [path]` | Turns an approved plan into a brief a fresh session can execute unattended — elicits the expected result of every change first, writes it as a spec before the code, and gates the run on those specs. |
-| `mr-markdown` | `/mr-markdown` | Writes the MR description for the current branch in three stages: a full draft (with a Dependencies section linking related MRs when there are any), a cut to 200 words, and a rewrite that removes jargon and AI tells. |
-| `om-build` | `/om-build [--hosted\|--cloud\|--mobile] [--no-gui]` | Builds an OM Chat GUI from source — the daemon-embedded `/rooms` GUI, the hosted `/chat/` cloud fork, or the OpenFloor iOS app in the simulator — including the swap onto the live install. |
-| `om-glab` | `/om-glab` | Runs the daemon build/install workflow with the GitLab chat GUI and openmarket-internal. `om-build` keeps its GitHub default. |
-| `panos` | `/panos [MR ...]` | Once MRs have landed, reviews each one the way Panos would (codex `gpt-6.1-sol`, or Claude Fable 5.1 then Opus 5.5 when sol is unavailable, on a brief distilled from Panos's real review threads), verifies every finding against the code, then fixes and pushes the real ones. Never comments on the MR. |
-| `prompt-ready` | `/prompt-ready` | Persistent mode that turns raw, natural-language requests into clean, self-contained, copy-paste-ready prompts for a different session. |
-| `regroup` | `/regroup [--base REF]` | Trims the tests a branch adds to the necessary ones, then rewrites its commits for review: code commits grouped by concern and within 600 changed lines each, then one testdata, one tests and one docs commit, with everything but tests byte-identical. |
-| `shared-dev` | `/shared-dev [repo ...]` | Takes the worktrees a session touched, builds the branch's binaries, brings up only the backend services the change needs in shared-dev against the databases on Sean's PC, probes with real data (main against branch), reports, and tears down. Runs every migration and write in a per-run scratch schema behind a guard role, never on the prod clones; prod reads only from tsdb2/pgmeta0 in short batches. |
-| `socratic-teacher` | `/socratic-teacher [topic]` | Session toggle for teaching mode: one guiding question per turn with at least one reference, never the full solution; partial hints only after 3+ stuck attempts. Stays on until "stop socratic mode". |
-| `syncup` | `/syncup [repo ...]` | Refreshes main from origin, rebases the working branch onto it and every behind GitLab MR or GitHub PR onto its target branch, resolves every conflict, and hands uncommitted work back intact. Force-pushes the rebased MR branches, with a lease, and nothing else. |
-| `test-audit` | `/test-audit`, or any time tests are written, changed, reviewed or swept | Gates every new or changed test against a value bar at write time, and sweeps for low-value, implementation-coupled or duplicative tests and the test-only production seams they demand. |
-| `testing-harness` | `/testing-harness` | Proves a change in the real running app rather than in tests. `--parity-check` diffs the cloud deployment against the local daemon visually; `--regression` (designed, not yet built) checks the running app against invariants and a baseline. |
-| `war-diary` | — | Turns a day of GitLab `.atom` activity plus the day's Claude Code sessions into Frontend War Diaries daily-log notes and matching Kanban cards. |
-| `world-todo` | `/world-todo` | Plans every OM World service task, feature or fix before implementation, however small: frontier-agent drafting and review, demuddy, a shared OpenScape handoff and Task Index updates. |
+| `caveman@caveman-repo` | [yibie/caveman-codex](https://github.com/yibie/caveman-codex) | Terse internal reasoning, `$caveman [lite\|full\|ultra]`. Only `$caveman` works: the plugin copy drops the symlinks its `compress` skill needs. Upgrade with `codex plugin marketplace upgrade`. |
 
-### Codex (`codex/skills/` → `~/.codex/skills/`)
+## Using skills
 
-Every Claude skill above except `panos`, `regroup`, `shared-dev` and
-`test-audit` is also available here, invoked as `$name` (Codex's skill mention
-syntax), e.g. `$demuddy path/to/plan.md`. Most share the Claude source; these
-have independent Codex implementations:
+Invoke a skill as `/name` in Claude Code or `$name` in Codex, or describe the task. Each skill's `description` says when it applies and lists its arguments and trigger phrases.
 
-| Skill | Trigger | What it does |
-| --- | --- | --- |
-| `graphify` | `$graphify` | The Codex build of graphify. Genuinely differs from the Claude one, so it's stored separately rather than symlinked. |
-| `loop-me-in` | `$loop-me-in [path]` | Builds a runnable brief for native Codex goals, with acceptance gates, bounded recovery, evidence, and repository completion checks. Stored separately so Codex adaptations leave Claude unchanged. |
+## Adding a skill
 
-#### Codex plugins
+1. Write `claude/skills/<name>/SKILL.md` from [`templates/skill-template.md`](templates/skill-template.md).
+2. If it works the same under Codex, link it: `ln -s ../../claude/skills/<name> codex/skills/<name>`.
+3. Add its row to the [skill index](#skill-index).
+4. Run `python3 -I check.py` and `./install.sh --links-only`.
 
-Third-party Codex plugins live in Codex's own marketplace cache, not in this
-repo. `install.sh` registers each marketplace and installs the plugin; Codex
-records both in `config.toml` (per machine, not tracked here).
-
-| Plugin | Source | Trigger | What it does |
-| --- | --- | --- | --- |
-| `caveman@caveman-repo` | [yibie/caveman-codex](https://github.com/yibie/caveman-codex) | `$caveman [lite\|full\|ultra]` | Codex port of the caveman plugin used on the Claude side — terse internal reasoning, same rules. Its bundled `compress` skill ships as symlinks the plugin copy drops, so only `$caveman` works. Upgrade with `codex plugin marketplace upgrade`. |
+[`CLAUDE.md`](CLAUDE.md) has the full rules agents follow here.
 
 ## Sync
 
-`sync.sh` runs as a Claude Code `Stop` hook, so a session commits and pushes
-once, in the background, when it finishes answering — not once per edit. It
-sweeps the whole repo with `git add -A`, so anything a turn changed under here
-goes out together, including edits made through the `~/.claude/skills`
-symlinks. A turn that changed nothing exits immediately, unless an earlier run
-left commits local (a commit made by hand, a push that failed): those it pushes.
+Two Claude Code hooks keep every machine on the same version:
 
-Every new, resumed or cleared session also runs `sync.sh --pull` from a
-`SessionStart` hook, so it starts on whatever the other machines pushed. When
-that pull adds or removes a skill, it runs `install.sh --links-only` to link
-it or drop its dead link, which skips the Codex plugin step and the hook
-registration.
+- **Stop** runs `sync.sh` when a turn ends. It commits everything in the repo, rebases onto `origin/main`, and pushes.
+- **SessionStart** runs `sync.sh --pull`, then links any skill the pull added and drops links to any it removed.
 
-`hook-install.sh` registers both hooks per machine and migrates an older
-`PostToolUse` registration across; `hook.sh` is the per-edit entry point that
-used to be registered, kept for running the sync from a tool call by hand.
+`sync.sh` never force-pushes. It pushes nothing and leaves a note when:
 
-`sync.sh` never force-pushes. It rebases onto the remote first; on a conflict it
-stops, keeps your commit local, and writes `.sync-conflict` with instructions.
-A pull that can't reach the remote (offline, no ssh key) is logged in
-`.sync.log` instead and retried on the next sync.
+| Note | Cause |
+| --- | --- |
+| `.sync-conflict` | The rebase conflicted. The commit stays local; the note says how to resolve it. |
+| `.sync-check` | `check.py` failed. Nothing is committed until its report is fixed. |
 
-While `check.py` reports a problem, `sync.sh` commits and pushes nothing and
-writes the report to `.sync-check`; the next sync after the fix goes out as
-usual. `--pull` still pulls when the tree is clean, so a fix pushed from another
-machine can arrive. Run `sync.sh` by hand any time:
+A pull or push that can't reach the remote is logged in `.sync.log` and retried on the next sync. `touch .sync-hold` pauses syncing on a machine and `rm .sync-hold` resumes it. Edits made outside Claude Code go out with the next session's first sync, or run `./sync.sh` by hand.
 
-```bash
-./sync.sh
-```
+## Not in this repo
 
-Changes made outside a Claude Code session (a text editor, another CLI) don't
-trip the hook on their own, though the next session's first turn sweeps them up.
-Run `./sync.sh` after those if you want them out sooner.
-
-To pause automatic pushing on a machine — working offline, or mid-way through a
-change you don't want published yet:
-
-```bash
-touch .sync-hold     # sync.sh becomes a no-op
-rm .sync-hold        # resume
-```
-
-## Deliberately not in this repo
-
-- **`settings.json` / `config.toml`** — they accumulate machine-local permission
-  entries and project paths, and Claude Code rewrites `settings.json` constantly.
-  Auto-pushing that would republish local paths on every permission approval.
-  `install.sh` injects the sync hook into the local file instead.
-- **Credentials** — `~/.codex/auth.json` and anything like it. `.gitignore`
-  blocks the obvious filenames as a backstop.
-- **Work skills** — the ~25 skills in `~/repos/llm/skills` have their own remote
-  and stay there. `install.sh` relinks them when that checkout is present and
-  skips them silently when it isn't.
-- **State** — sessions, transcripts, caches, logs, plugin caches. Plugins are
-  declared in `settings.json` (`enabledPlugins`, `extraKnownMarketplaces`), so
-  they reinstall themselves on a new machine.
+- `settings.json` and `config.toml`. They fill up with machine-local permissions and paths, so `install.sh` adds the sync hooks to the local `settings.json` instead.
+- Credentials such as `~/.codex/auth.json`. `.gitignore` blocks the usual filenames as a backstop.
+- Work skills in `~/repos/llm/skills`, which have their own remote.
+- Sessions, transcripts, caches, logs and plugin caches.

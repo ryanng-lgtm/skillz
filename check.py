@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Check that the skills, the README tables and the skill paths agree.
+"""Check that the skills, the README skill index and the skill paths agree.
 
 usage: python3 -I check.py
 
 Prints one line per problem and exits 1 when there is any:
   layout   each skill follows templates/skill-template.md
   links    each Codex symlink points at the Claude skill of the same name
-  readme   the skill tables and the Claude-only list match the skill dirs
+  readme   the README skill index lists every skill, in order, with its
+           SKILL.md link and the agents that have it
   paths    each ~/.claude/skills/... or ~/.codex/skills/... path a doc or
            script names exists in this repo, or in the work skills checkout
            when that is present
@@ -114,50 +115,42 @@ def check_skills(claude, codex):
     return linked
 
 
-def section(lines, heading, stop):
-    start = lines.index(heading) + 1
-    for i in range(start, len(lines)):
-        if lines[i].startswith(stop):
-            return lines[start:i]
-    return lines[start:]
-
-
-def table_names(lines):
-    return [
-        m.group(1) for l in lines
-        if (m := re.match(r"\| `([^`]+)` \|", l))
-    ]
+def agents(name, claude, codex, linked):
+    if name not in codex:
+        return "Claude"
+    if name not in claude:
+        return "Codex"
+    return "Claude, Codex" if name in linked else "Claude, Codex (own copy)"
 
 
 def check_readme(claude, codex, linked):
     with open(os.path.join(REPO, "README.md")) as fh:
         lines = fh.read().splitlines()
-    claude_rows = table_names(
-        section(lines, "### Claude (`claude/skills/` → `~/.claude/skills/`)", "### ")
-    )
-    want = [n for n in claude if n not in UNLISTED]
-    for n in sorted(set(want) - set(claude_rows)):
-        report("README.md", f"Claude table is missing {n}")
-    for n in sorted(set(claude_rows) - set(want)):
-        report("README.md", f"Claude table lists {n}, which claude/skills does not have")
-    if claude_rows != sorted(claude_rows):
-        report("README.md", "Claude table is not in alphabetical order")
+    if "## Skill index" not in lines:
+        report("README.md", "no '## Skill index' section")
+        return
+    rows, start = {}, lines.index("## Skill index") + 1
+    for line in lines[start:]:
+        if line.startswith("## "):
+            break
+        if m := re.match(r"\| \[`([^`]+)`\]\(([^)]+)\) \| ([^|]+) \|", line):
+            rows[m.group(1)] = (m.group(2), m.group(3).strip())
 
-    codex_lines = section(
-        lines, "### Codex (`codex/skills/` → `~/.codex/skills/`)", "#### "
-    )
-    copies = sorted(set(codex) - linked)
-    if sorted(table_names(codex_lines)) != copies:
-        report("README.md", f"Codex table should list exactly {', '.join(copies)}")
-    prose = " ".join(l for l in codex_lines if not l.startswith("|"))
-    named = set(re.findall(r"`([a-z0-9-]+)`", prose)) & set(claude)
-    claude_only = set(claude) - set(codex)
-    if named != claude_only:
-        report(
-            "README.md",
-            "Codex section should name the Claude-only skills "
-            + ", ".join(sorted(claude_only)),
-        )
+    want = (set(claude) | set(codex)) - UNLISTED
+    for n in sorted(want - set(rows)):
+        report("README.md", f"skill index is missing {n}")
+    for n in sorted(set(rows) - want):
+        report("README.md", f"skill index lists {n}, which no skills dir has")
+    if list(rows) != sorted(rows):
+        report("README.md", "skill index is not in alphabetical order")
+    for n in sorted(want & set(rows)):
+        link, cell = rows[n]
+        home = "claude" if n in claude else "codex"
+        if link != f"{home}/skills/{n}/SKILL.md":
+            report("README.md", f"{n} links to {link}, not {home}/skills/{n}/SKILL.md")
+        expected = agents(n, claude, codex, linked)
+        if cell != expected:
+            report("README.md", f"{n} lists agents {cell!r}, not {expected!r}")
 
 
 def text_files():
