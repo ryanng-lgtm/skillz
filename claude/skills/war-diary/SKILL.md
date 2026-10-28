@@ -1,9 +1,16 @@
 ---
 name: war-diary
-description: Use when updating the Frontend War Diaries from a GitLab activity .atom export and the day's Claude Code sessions — turning a day's GitLab work (pushes, MRs, approvals), in-session work (analysis, planning, docs), and undocumented work into Team/<Name>/ daily-log notes (filed by status into Today/Completed/Investigations and Plans/Running Work) and matching Kanban cards.
+description: >-
+  Use when updating the Frontend War Diaries from a GitLab activity .atom
+  export and the day's Claude Code sessions — the user provides a GitLab
+  `.atom` export and asks to update their war diary or board, or wants a day's
+  GitLab work (pushes, MRs, approvals), in-session work (analysis, planning,
+  docs), and undocumented work logged as daily-log notes and Kanban cards.
+  Trigger: /war-diary <file>.atom, $war-diary, "update my war diary",
+  "log my day".
 ---
 
-# War Diary
+# war-diary — log a day's work onto the War Diaries board
 
 ## Overview
 
@@ -65,7 +72,7 @@ Wikilinks resolve by **filename**, so a note keeps the same `[[name]]` and the s
 board card no matter which subfolder it sits in — moving between folders never breaks
 the link.
 
-## Process
+## Procedure
 
 ### 0. Reconcile board ↔ notes first (notes are the source of truth)
 The Kanban plugin / Obsidian sync periodically rewrites, trims, or fully reverts
