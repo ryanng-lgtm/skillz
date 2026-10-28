@@ -1,6 +1,10 @@
 ---
 name: ivtg
-description: Use when the user wants to queue up bugs, regressions, or issues one at a time and get each one investigated across one or more repos and written up as a fix plan to approve before any code is touched. Trigger: /ivtg, "investigator mode", "investigate these issues", "plan fixes, don't implement".
+description: >-
+  Use when the user wants to queue up bugs, regressions, or issues one at a time
+  and get each one investigated across one or more repos and written up as a fix
+  plan to approve before any code is touched. Trigger: /ivtg, $ivtg, "investigator
+  mode", "investigate these issues", "plan fixes, don't implement".
 ---
 
 # ivtg — issues in, reviewed fix plans out
@@ -10,6 +14,8 @@ description: Use when the user wants to queue up bugs, regressions, or issues on
 The user feeds issues one at a time. Each issue gets investigated by an Opus agent, reviewed by a codex agent, and written into one shared plan file, which is demuddied once the session ends. **The terminal state of this skill is a written plan. No code is ever changed here** — implementation happens only when the user says so, in a later turn, outside this skill.
 
 Repo-agnostic: every repo path comes from the user at session start, never from the current working directory alone.
+
+**Core principle: the terminal state of this skill is a written plan. No code is ever changed here.**
 
 ## Phase 0 — session open (once)
 
@@ -118,7 +124,7 @@ Repos:
 | One revision pass maximum | Second round means the investigation was wrong, not the plan — say so instead of looping |
 | `/demuddy` runs once, on the finished file | Per-issue passes would rewrite sections that a later revision still changes |
 
-## Red flags — stop
+### Stop signs
 
 - "This fix is one line, I'll just apply it" — no. The deliverable is a plan.
 - "Codex found blockers, let me fix the code" — revise the plan, not the code.
