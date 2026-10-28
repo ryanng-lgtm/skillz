@@ -1,3 +1,10 @@
+---
+name: mr-markdown
+description: Generate a condensed MR markdown for the changes on the current branch. Use when the user invokes /mr-markdown or $mr-markdown, or asks for an MR/PR description for the branch — a single copyable code block with title, Summary, Problem, Solution, and How to test.
+---
+
+# MR markdown
+
 Generate a condensed MR markdown for the changes on the current branch.
 
 Rules:
@@ -33,7 +40,7 @@ Steps:
    - A semicolon, or a dash used as punctuation (`—`, `–`, ` - `). Make it two sentences, or use a comma or parentheses.
    - Ultra-condensed wording: dropped articles, fragments standing in for sentences, colon-chained lists, arrows, `w/`, `&` or `+` for "and", slash pairs such as `read/write`, made-up abbreviations. "A fraction, like the other ratios. Under two bars: NULL." becomes "Like the other ratios it is a fraction, and it is NULL for a market with fewer than two bars."
    - Jargon a reviewer from another team would stop at. Use the plain word. File, symbol and flag names stay exact.
-   - AI prose: "ensure", "robust", "seamless", "leverage", "comprehensive", "not just X but Y", lists of three, a trailing ", ensuring …" clause, a closing recap. The full list is in `~/.claude/skills/humanize/references/tells.md`, and the doc register in `voice.md` beside it is how Ryan writes MRs.
+   - AI prose: "ensure", "robust", "seamless", "leverage", "comprehensive", "not just X but Y", lists of three, a trailing ", ensuring …" clause, a closing recap. The full list is in the `humanize` skill's `references/tells.md`, and the doc register in `voice.md` beside it is how Ryan writes MRs.
 
    Then the stage 2 count on `3-final.md` is still 200 or less, and this prints nothing (code is skipped):
 

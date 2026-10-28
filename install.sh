@@ -70,19 +70,31 @@ link() {
   ln -sfn "$src" "$dest"; linked=$((linked + 1))
 }
 
+# prune DIR — remove links in DIR that point into this repo at something that
+# no longer exists, left behind when a skill is renamed or removed. Links to
+# anywhere else are not this repo's to remove.
+prune() {
+  local dir="$1" dest
+  for dest in "$dir"/*; do
+    [ -L "$dest" ] && [ ! -e "$dest" ] || continue
+    case "$(readlink "$dest")" in
+      "$REPO"/*) rm "$dest"; echo "  REMOVED ${dest##*/} — gone from the repo" ;;
+    esac
+  done
+}
+
 echo "skillz → $CLAUDE_HOME and $CODEX_HOME"
 echo
 
 # ---- Claude ----------------------------------------------------------------
-mkdir -p "$CLAUDE_HOME/skills" "$CLAUDE_HOME/commands"
+mkdir -p "$CLAUDE_HOME/skills"
 
 echo "Claude:"
+# Slash commands are skills; ~/.claude/commands only holds links from when
+# this repo kept them separately.
+prune "$CLAUDE_HOME/skills"
+prune "$CLAUDE_HOME/commands"
 link "$REPO/claude/CLAUDE.md" "$CLAUDE_HOME/CLAUDE.md"
-
-for f in "$REPO"/claude/commands/*.md; do
-  [ -e "$f" ] || continue
-  link "$f" "$CLAUDE_HOME/commands/$(basename "$f")"
-done
 
 for d in "$REPO"/claude/skills/*/; do
   name="$(basename "$d")"
@@ -96,6 +108,7 @@ linked=0 skipped=0 adopted=0
 mkdir -p "$CODEX_HOME/skills"
 
 echo "Codex:"
+prune "$CODEX_HOME/skills"
 link "$REPO/codex/AGENTS.md" "$CODEX_HOME/AGENTS.md"
 
 for d in "$REPO"/codex/skills/*/; do

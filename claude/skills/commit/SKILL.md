@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Commit the currently staged git changes only. Use when the user invokes /commit, asks to commit staged changes, or requests a concise commit from the existing index without staging additional files.
+description: Commit the currently staged git changes only. Use when the user invokes /commit or $commit, asks to commit staged changes, or when instructions say to commit through the commit skill — a concise commit from the existing index, without staging additional files.
 ---
 
 # Commit
@@ -23,4 +23,4 @@ Create one or more git commits from the current staged changes only. Do not stag
 
 ## Commit Message
 
-Use one summary line plus a body with at most three bullet points. Keep every line brief and direct. Do not add AI, co-authored-by, generated-by, or other watermark text.
+Use one summary line plus a body with at most three bullet points. Keep every line brief and direct, with no fluff. Do not add AI, co-authored-by, generated-by, or other watermark text.

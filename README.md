@@ -12,7 +12,7 @@ cd ~/Documents/github/skillz
 ./install.sh
 ```
 
-That links every skill, command, and instruction file into `~/.claude` and
+That links every skill and instruction file into `~/.claude` and
 `~/.codex`, and registers the auto-sync hook. Re-run it any time — it refreshes
 links and never touches skills this repo doesn't own.
 
@@ -25,7 +25,6 @@ it, keeping a `.local-<timestamp>` backup alongside.
 ```
 claude/
   CLAUDE.md      global instructions        → ~/.claude/CLAUDE.md
-  commands/      slash commands             → ~/.claude/commands/
   skills/        skills                     → ~/.claude/skills/<name>
 codex/
   AGENTS.md      global instructions        → ~/.codex/AGENTS.md
@@ -44,8 +43,10 @@ paths, and `--gate` checks without installing.
 
 Most of `codex/skills/` is relative symlinks into `claude/skills/`: a skill that
 works the same under both agents is stored once. `graphify` and `loop-me-in` differ
-between them and are stored separately; `commit` and `mr-markdown` are Codex skill
-ports of the Claude slash commands. `codex/AGENTS.md` carries the same rules as
+between them and are stored separately. A shared skill can carry
+`agents/openai.yaml` for Codex's skill list; Claude ignores it. There is no
+separate commands directory: Claude Code gives every skill a `/name`, so a slash
+command is written as a skill. `codex/AGENTS.md` carries the same rules as
 `claude/CLAUDE.md` in Codex terms (`$skill` triggers, no plan-mode pinning) —
 change one, change the other.
 
@@ -64,12 +65,14 @@ commits, not edited by hand, and aren't listed.
 | Skill | Trigger | What it does |
 | --- | --- | --- |
 | `bump-rc` | `/bump-rc [version]` | Releases `@openmarket/rooms-client`: picks the bump from what actually changed, runs the release script, repins both GUI consumers. |
+| `commit` | `/commit` | Commits the currently staged changes only, with a short message matched to the repo's style. Never stages anything extra. |
 | `demuddy` | `/demuddy [path]`, `/demuddy comments [path\|rev]` | Editorial pass that turns a much-edited plan into a handover-ready one — strips decision archaeology, dedupes rules, reorders into build order, keeps every gotcha and cite. `comments` mode does the same for the comments a code change left behind (change narration, restated code, filler) and rewrites the rest in plain language for a reader without much context. |
 | `graphify` | `/graphify` | Turns any input (code, docs, papers, images, video) into a persistent knowledge graph with god nodes and community detection; query/path/explain instead of grepping. |
 | `humanize` | `/humanize [light] [path]` | Rewrites Claude-authored text so it reads like Ryan wrote it — strips AI tells, matches voice per register. `light` keeps the structure and edits sentences only. |
 | `ivtg` | `/ivtg` | Investigator mode: issues fed one at a time, each investigated across the named repos and written into one dated plan file. Never implements. |
 | `llm-council` | "council this", "pressure-test this" | Runs a question through 5 AI advisors who analyse it independently, peer-review each other anonymously, then synthesise a verdict. |
 | `loop-me-in` | `/loop-me-in [path]` | Turns an approved plan into a brief a fresh session can execute unattended — elicits the expected result of every change first, writes it as a spec before the code, and gates the run on those specs. |
+| `mr-markdown` | `/mr-markdown` | Writes the MR description for the current branch in three stages: a full draft (with a Dependencies section linking related MRs when there are any), a cut to 200 words, and a rewrite that removes jargon and AI tells. |
 | `om-build` | `/om-build [--hosted\|--cloud]` | Builds an OM Chat GUI from source — the daemon-embedded `/rooms` GUI or the hosted `/chat/` cloud fork — including the swap onto the live install. |
 | `om-glab` | `/om-glab` | Runs the daemon build/install workflow with the GitLab chat GUI and openmarket-internal. `om-build` keeps its GitHub default. |
 | `panos` | `/panos [MR ...]` | Once MRs have landed, reviews each one the way Panos would (codex `gpt-6.1-sol`, or Claude Fable 5.1 then Opus 5.5 when sol is unavailable, on a brief distilled from Panos's real review threads), verifies every finding against the code, then fixes and pushes the real ones. Never comments on the MR. |
@@ -88,8 +91,6 @@ source; these have independent Codex implementations:
 
 | Skill | Trigger | What it does |
 | --- | --- | --- |
-| `commit` | `$commit` | Commits the currently staged changes only — concise message from the existing index, never stages anything extra. |
-| `mr-markdown` | `$mr-markdown` | Codex port of the `/mr-markdown` command: the MR description for the current branch in one copyable code block, drafted in full, cut to 200 words, then rewritten to read like a person wrote it. |
 | `graphify` | `$graphify` | The Codex build of graphify. Genuinely differs from the Claude one, so it's stored separately rather than symlinked. |
 | `loop-me-in` | `$loop-me-in [path]` | Builds a runnable brief for native Codex goals, with acceptance gates, bounded recovery, evidence, and repository completion checks. Stored separately so Codex adaptations leave Claude unchanged. |
 
@@ -103,13 +104,6 @@ records both in `config.toml` (per machine, not tracked here).
 | --- | --- | --- | --- |
 | `caveman@caveman-repo` | [yibie/caveman-codex](https://github.com/yibie/caveman-codex) | `$caveman [lite\|full\|ultra]` | Codex port of the caveman plugin used on the Claude side — terse internal reasoning, same rules. Its bundled `compress` skill ships as symlinks the plugin copy drops, so only `$caveman` works. Upgrade with `codex plugin marketplace upgrade`. |
 
-### Commands (`claude/commands/` → `~/.claude/commands/`)
-
-| Command | What it does |
-| --- | --- |
-| `/commit` | Commits the currently staged changes. |
-| `/mr-markdown` | Writes the MR description for the current branch in three stages: a full draft (with a Dependencies section linking related MRs when there are any), a cut to 200 words, and a rewrite that removes jargon and AI tells. |
-
 ## Sync
 
 `sync.sh` runs as a Claude Code `Stop` hook, so a session commits and pushes
@@ -121,8 +115,9 @@ left commits local (a commit made by hand, a push that failed): those it pushes.
 
 Every new, resumed or cleared session also runs `sync.sh --pull` from a
 `SessionStart` hook, so it starts on whatever the other machines pushed. When
-that pull adds a skill or command, it runs `install.sh --links-only` to link
-it, which skips the Codex plugin step and the hook registration.
+that pull adds or removes a skill, it runs `install.sh --links-only` to link
+it or drop its dead link, which skips the Codex plugin step and the hook
+registration.
 
 `hook-install.sh` registers both hooks per machine and migrates an older
 `PostToolUse` registration across; `hook.sh` is the per-edit entry point that

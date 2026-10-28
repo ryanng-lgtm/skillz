@@ -5,7 +5,7 @@
 #
 # --pull also brings in what other machines pushed when nothing changed here.
 # The SessionStart hook runs it that way, so a session starts on the latest
-# skills, and links any skill or command the pull added.
+# skills, links any skill the pull added, and drops links to any it removed.
 #
 # Never force-pushes: a force from one machine would destroy commits made on
 # another. On a rebase conflict it stops, restores the working tree, and leaves
@@ -185,11 +185,12 @@ rm -f "$REPO/.sync-conflict"
 
 if [ "$(git rev-parse HEAD)" != "$before" ]; then
   log "pulled $(git rev-list --count "$before..HEAD") commits"
-  # Skills and commands are linked one by one, so one another machine added
-  # has no link here until install.sh runs. --links-only skips the Codex
-  # plugin step, which can hang, and the hook registration.
-  if [ -n "$(git diff --name-only --diff-filter=A "$before" HEAD -- \
-    'claude/skills/*/SKILL.md' 'claude/commands/*' 'codex/skills/*')" ]; then
+  # Skills are linked one by one, so one another machine added has no link
+  # here, and one it removed leaves a dead link, until install.sh runs.
+  # --links-only skips the Codex plugin step, which can hang, and the hook
+  # registration.
+  if [ -n "$(git diff --name-only --diff-filter=AD "$before" HEAD -- \
+    'claude/skills/*/SKILL.md' 'codex/skills/*')" ]; then
     "$REPO/install.sh" --links-only >>"$LOG" 2>&1 9>&- || log "install.sh --links-only failed"
   fi
 fi
