@@ -1,9 +1,20 @@
 ---
 name: demuddy
-description: Use when a plan, spec, or design doc has accumulated edits from multiple discussion rounds and is about to be handed to an implementing agent (or human) — symptoms include date-stamped decisions, "considered and rejected" passages, the same rule stated in several sections, bold "Verified:"/"Decision:" framing, or sections ordered by when they were added rather than build order. Also use when a code change has landed with comments that narrate the change ("now uses", "fixed per review", "Step 1:"), restate the code, or are too long or full of jargon for a newcomer to follow. Trigger: /demuddy [path], /demuddy comments [path|rev], "de-muddy", "editorial pass", "clean this plan for handover", "clean up the comments on this branch".
+description: >-
+  Use when a plan, spec, or design doc has accumulated edits from multiple
+  discussion rounds and is about to be handed to an implementing agent (or
+  human) — symptoms include date-stamped decisions, "considered and rejected"
+  passages, the same rule stated in several sections, bold
+  "Verified:"/"Decision:" framing, or sections ordered by when they were added
+  rather than build order. Also use when a code change has landed with
+  comments that narrate the change ("now uses", "fixed per review", "Step
+  1:"), restate the code, or are too long or full of jargon for a newcomer to
+  follow. Trigger: /demuddy [path], /demuddy comments [path|rev], $demuddy
+  [path], $demuddy comments [path|rev], "de-muddy", "editorial pass", "clean
+  this plan for handover", "clean up the comments on this branch".
 ---
 
-# Demuddy — editorial pass for handover-ready plans
+# demuddy — editorial pass for handover-ready plans
 
 ## Overview
 
@@ -95,10 +106,10 @@ A compliant output is a **fixed point**: running demuddy again produces no subst
 - **Deleting rationale because it isn't an instruction.** The sentence explaining why a deviation is deliberate is what stops the next implementer reverting it. Highest-value content in the file, and the easiest to classify as noise.
 - **Emptying a Risks or Open questions section while keeping its heading.** Passes every structural check and destroys what the downstream run depends on.
 - **Answering an open question in passing.** An editorial pass has no authority to resolve one.
-- Over-trimming a "do not correct this deliberate deviation" warning.
-- Leaving "decided/accepted" ghosts inside invariants and risks after cleaning the fix sections.
-- Broadening a verification claim to cover cites that were never checked.
-- Merging two rules that differ by actor, scope, or exception.
-- Reordering sections but not the cross-references, anchors, or the title — or moving a hazard after the irreversible step it guards.
-- Compressing a verification matrix into vagueness — matrices are instructions; keep every cell.
-- Rewriting in place before the coverage check, in a vault with no version control.
+- **Over-trimming a "do not correct this deliberate deviation" warning.**
+- **Leaving "decided/accepted" ghosts inside invariants and risks after cleaning the fix sections.**
+- **Broadening a verification claim to cover cites that were never checked.**
+- **Merging two rules that differ by actor, scope, or exception.**
+- **Reordering sections but not the cross-references, anchors, or the title — or moving a hazard after the irreversible step it guards.**
+- **Compressing a verification matrix into vagueness** — matrices are instructions; keep every cell.
+- **Rewriting in place before the coverage check**, in a vault with no version control.
