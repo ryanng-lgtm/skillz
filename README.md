@@ -116,15 +116,22 @@ records both in `config.toml` (per machine, not tracked here).
 once, in the background, when it finishes answering — not once per edit. It
 sweeps the whole repo with `git add -A`, so anything a turn changed under here
 goes out together, including edits made through the `~/.claude/skills`
-symlinks. On a turn that changed nothing it exits immediately.
+symlinks. A turn that changed nothing exits immediately, unless an earlier run
+left commits local (a commit made by hand, a push that failed): those it pushes.
 
-`hook-install.sh` registers it per machine and migrates an older `PostToolUse`
-registration across; `hook.sh` is the per-edit entry point that used to be
-registered, kept for running the sync from a tool call by hand.
+Every new, resumed or cleared session also runs `sync.sh --pull` from a
+`SessionStart` hook, so it starts on whatever the other machines pushed. When
+that pull adds a skill or command, it runs `install.sh --links-only` to link
+it, which skips the Codex plugin step and the hook registration.
+
+`hook-install.sh` registers both hooks per machine and migrates an older
+`PostToolUse` registration across; `hook.sh` is the per-edit entry point that
+used to be registered, kept for running the sync from a tool call by hand.
 
 `sync.sh` never force-pushes. It rebases onto the remote first; on a conflict it
 stops, keeps your commit local, and writes `.sync-conflict` with instructions.
-Run it by hand any time:
+A pull that can't reach the remote (offline, no ssh key) is logged in
+`.sync.log` instead and retried on the next sync. Run it by hand any time:
 
 ```bash
 ./sync.sh

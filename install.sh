@@ -7,7 +7,8 @@
 #
 # Flags:
 #   --force    replace a conflicting real directory (backed up first) with the repo link
-#   --no-hook  skip installing the auto-sync hook into ~/.claude/settings.json
+#   --no-hook  skip installing the auto-sync hooks into ~/.claude/settings.json
+#   --links-only  refresh links only: no Codex plugins, no hooks (used by sync.sh)
 #
 # @file install.sh
 # @brief Link shared agent configuration and install declared Codex plugins.
@@ -24,11 +25,13 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 
 FORCE=0
 INSTALL_HOOK=1
+INSTALL_PLUGINS=1
 for arg in "$@"; do
   case "$arg" in
     --force)   FORCE=1 ;;
     --no-hook) INSTALL_HOOK=0 ;;
-    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
+    --links-only) INSTALL_HOOK=0 INSTALL_PLUGINS=0 ;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
     *) echo "unknown flag: $arg" >&2; exit 2 ;;
   esac
 done
@@ -163,7 +166,9 @@ fi
 CODEX_PLUGINS="
 caveman@caveman-repo=https://github.com/yibie/caveman-codex
 "
-if command -v codex >/dev/null 2>&1; then
+if [ "$INSTALL_PLUGINS" = 0 ]; then
+  : # --links-only
+elif command -v codex >/dev/null 2>&1; then
   echo
   echo "Codex plugins:"
   for entry in $CODEX_PLUGINS; do
