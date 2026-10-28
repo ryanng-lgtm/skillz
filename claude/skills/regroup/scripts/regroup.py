@@ -34,7 +34,7 @@ from pathlib import Path, PurePosixPath
 
 MAX_LINES = 600
 MAX_COMMITS = 9
-MIN_TEST_LINES = 200
+MIN_TEST_LINES = 100
 EMPTY = "0" * 40
 
 KINDS = ("code", "test", "testdata", "docs", "generated")
@@ -196,7 +196,7 @@ def layout_problems(report):
 
 
 def offer_reasons(report, files, max_lines):
-    """Why to offer /regroup: too many commits, an oversize commit, or tests that outweigh the code."""
+    """Why to offer /regroup: too many commits, an oversize commit, or tests to trim."""
     reasons = []
     if len(report) > MAX_COMMITS:
         reasons.append(f"{len(report)} commits > {MAX_COMMITS}")
@@ -204,9 +204,8 @@ def offer_reasons(report, files, max_lines):
     if over:
         reasons.append(f"{over} commit{'s' if over > 1 else ''} over {max_lines} changed lines")
     tests = sum(f["added"] for f in files if f["kind"] == "test" and not f["binary"])
-    code = sum(f["added"] + f["deleted"] for f in files if f["kind"] == "code" and not f["binary"])
-    if tests >= MIN_TEST_LINES and tests > code:
-        reasons.append(f"tests add {tests} lines against {code} changed lines of code")
+    if tests >= MIN_TEST_LINES:
+        reasons.append(f"tests add {tests} lines; trim them to the necessary ones")
     return reasons
 
 
