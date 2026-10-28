@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent.parent / "build-index.py"
-MARKERS = "<!-- BEGIN GENERATED (scripts/build-index.py) -->\n<!-- END GENERATED -->\n"
+CONTENTS = "## Contents\n"
 
 
 def doc(body, tags="[svc, deploy]"):
@@ -27,10 +27,10 @@ class ObsidianVaultTests(unittest.TestCase):
             "assets/diagram.png": "",
             "bin/Runbook": "",  # a binary named like a note: not a match for [[Runbook]]
             "Other/Runbook.md": "# Runbook\n",
-            "GO Backend/INDEX.md": "# Docs\n\n" + MARKERS,
-            "GO Backend/svc/INDEX.md": '---\ndescription: "Services."\ntags: [svc]\n---\n\n' + MARKERS,
+            "GO Backend/INDEX.md": "# Docs\n\n" + CONTENTS,
+            "GO Backend/svc/INDEX.md": '---\ndescription: "Services."\ntags: [svc]\n---\n\n' + CONTENTS,
             "GO Backend/svc/001 Overview.md": doc("Service overview."),
-            "GO Backend/db/INDEX.md": '---\ndescription: "Databases."\ntags: [db]\n---\n\n' + MARKERS,
+            "GO Backend/db/INDEX.md": '---\ndescription: "Databases."\ntags: [db]\n---\n\n' + CONTENTS,
             "GO Backend/db/001 Overview.md": doc("Database overview.", "[db]"),
         }
         for rel, text in files.items():
@@ -78,6 +78,23 @@ class ObsidianVaultTests(unittest.TestCase):
             "003 Empty.md: frontmatter missing 'description'",
         ):
             self.assertIn(needle, out)
+
+    def test_contents_table_is_set_off_and_prose_after_it_kept(self):
+        index = self.docs / "svc" / "INDEX.md"
+        index.write_text(index.read_text() + "## Later\n\nHand-written notes.\n")
+        code, out = self.run_script("Deploy steps.")
+        self.assertEqual(code, 0, out)
+        text = index.read_text()
+        # Obsidian renders a table only when blank lines separate it from its neighbours.
+        section = text.split("## Contents\n", 1)[1]
+        self.assertTrue(section.startswith("\n|"), section)
+        table, after = section[1:].split("\n\n", 1)
+        self.assertIn("002 Deploy", table)
+        self.assertTrue(all(line.startswith("|") for line in table.splitlines()), table)
+        self.assertEqual(after, "## Later\n\nHand-written notes.\n")
+        check = subprocess.run([sys.executable, "-I", str(SCRIPT), "--root", str(self.docs), "--check"],
+                               capture_output=True, text=True)
+        self.assertEqual(check.returncode, 0, check.stdout)
 
     def test_plain_docs_dir_resolves_markdown_links_relatively(self):
         (self.vault / ".obsidian" / "app.json").unlink()

@@ -23,10 +23,7 @@ infra decision), record it in the same turn:
 The area table is **generated** from each area's `INDEX.md` frontmatter by
 `python3 scripts/build-index.py`, so don't edit it by hand.
 
-## Areas
-
-<!-- BEGIN GENERATED (scripts/build-index.py) -->
-<!-- END GENERATED -->
+## Contents
 
 ## Without an area folder yet
 

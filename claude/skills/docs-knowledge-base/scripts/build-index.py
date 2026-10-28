@@ -18,8 +18,8 @@ Layout:
       host: myhost (...)         # optional
       ---
 
-Only the block between the GENERATED markers is rewritten; everything else in an
-INDEX.md is left alone. Also checks: every doc has description/tags/status/updated,
+Only the `## Contents` section (up to the next # or ## heading) is rewritten; everything
+else in an INDEX.md is left alone. Also checks: every doc has description/tags/status/updated,
 every [ref] has a definition, every markdown link and wikilink resolves (inside an
 Obsidian vault, the way Obsidian resolves it), and an area's optional
 `improvement:` field is one of IMPROVEMENT_MODES (a typo must not silently disable it), and a
@@ -46,7 +46,7 @@ def resolve_root(argv: list[str]) -> Path:
 
 
 DOCS = resolve_root(sys.argv)
-BEGIN, END = "<!-- BEGIN GENERATED (scripts/build-index.py) -->", "<!-- END GENERATED -->"
+CONTENTS = "## Contents"  # heading of the generated section; a plain heading, so Obsidian shows no markers
 DOC_RE = re.compile(r"^\d{3} .+\.md$")
 REQUIRED = ("description", "tags", "status", "updated")
 IMPROVEMENT_MODES = ("continuous", "off")  # area INDEX.md `improvement:`; absent = off. Rules: <docs>/CLAUDE.md
@@ -91,14 +91,15 @@ def replace_generated(index: Path, generated: str, check: bool) -> None:
         problems.append(f"{index.relative_to(DOCS)}: missing (copy templates/INDEX.md)")
         return
     text = index.read_text()
-    if BEGIN not in text or END not in text:
-        problems.append(f"{index.relative_to(DOCS)}: missing GENERATED markers")
+    start = re.search(rf"^{re.escape(CONTENTS)}[ \t]*$", text, flags=re.M)
+    if not start:
+        problems.append(f"{index.relative_to(DOCS)}: missing '{CONTENTS}' heading")
         return
-    head, rest = text.split(BEGIN, 1)
-    _, tail = rest.split(END, 1)
-    # Blank lines around the table: Obsidian won't render a table that touches the comment markers.
-    body = f"\n\n{generated.strip()}\n\n" if generated.strip() else "\n"
-    new = f"{head}{BEGIN}{body}{END}{tail}"
+    nxt = re.search(r"^#{1,2} ", text[start.end():], flags=re.M)
+    tail = text[start.end() + nxt.start():] if nxt else ""
+    # Blank lines around the table: Obsidian won't render a table that touches its neighbours.
+    body = f"\n\n{generated.strip()}\n" if generated.strip() else "\n"
+    new = f"{text[:start.end()]}{body}{chr(10) if tail else ''}{tail}"
     if new != text:
         if check:
             problems.append(f"{index.relative_to(DOCS)}: out of date (run build-index.py)")

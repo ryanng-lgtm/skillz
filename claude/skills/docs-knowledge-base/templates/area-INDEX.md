@@ -11,5 +11,4 @@ related: "skill `some-skill` · cron job `Some Job` · repo `~/workspace/some-re
 Reading order in a line or two: which doc to read first, and which doc to read
 before which kind of task.
 
-<!-- BEGIN GENERATED (scripts/build-index.py) -->
-<!-- END GENERATED -->
+## Contents

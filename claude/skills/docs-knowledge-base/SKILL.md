@@ -56,11 +56,11 @@ from frontmatter, never edited by hand.**
 
 ```
 <docs>/
-  INDEX.md                 how to look things up + GENERATED area table
+  INDEX.md                 how to look things up + generated area table
   ABOUT.md                 the owner's personal context and working preferences
   CLAUDE.md                conventions (frontmatter spec, numbering, links)
   scripts/build-index.py   regenerates every INDEX table; --check validates
-  <area>/INDEX.md          area frontmatter + reading order + GENERATED doc table
+  <area>/INDEX.md          area frontmatter + reading order + generated doc table
   <area>/NNN Title.md      docs, numbered per area from 001
   <area>/TMP Title.md      temporary handoffs: no number, no frontmatter
   <area>/<sub>/...         optional sub-area: same shape, own INDEX.md and numbering
@@ -128,8 +128,8 @@ host: myhost (192.168.0.10)   # optional
 Area `INDEX.md`: `description`, `tags`, `related:` (skills, cron jobs, URLs,
 repo paths as one quoted string), and optionally `improvement:` and
 `tooling:` (see "Continuous improvement" in `CLAUDE.md`). Under it go a line
-or two of reading order ("read 002 before any deploy") and the GENERATED
-markers.
+or two of reading order ("read 002 before any deploy") and the `## Contents`
+heading the table is generated under.
 
 - **`description` matters most.** Write it for a reader who doesn't know the
   doc exists, naming the concrete terms they'd search for. Rewrite it in the
@@ -183,18 +183,19 @@ folder first.
 ## The script
 
 ```bash
-python3 <docs>/scripts/build-index.py            # rewrite the GENERATED tables
+python3 <docs>/scripts/build-index.py            # rewrite the generated tables
 python3 <docs>/scripts/build-index.py --check    # validate only, write nothing
 python3 build-index.py --root ~/somewhere/docs   # or DOCS_ROOT=...; default = parent of scripts/
 ```
 
-It only rewrites the text between `<!-- BEGIN GENERATED
-(scripts/build-index.py) -->` and `<!-- END GENERATED -->`, so hand-written
-prose in an `INDEX.md` is safe. It exits 1 and prints `PROBLEM:` lines for:
+It only rewrites the `## Contents` section of an `INDEX.md`, up to the next
+`#` or `##` heading, so hand-written prose elsewhere is safe. A plain heading
+rather than comment markers, because Obsidian shows HTML comments in Live
+Preview. It exits 1 and prints `PROBLEM:` lines for:
 
 - a doc with no frontmatter, or missing `description`/`tags`/`status`/
   `updated`
-- an area `INDEX.md` missing `description`/`tags`, or missing the markers
+- an area `INDEX.md` missing `description`/`tags`, or missing `## Contents`
 - an `[NNN]` or `[area/NNN]` used but not defined (fenced and inline code
   are ignored)
 - a markdown link or wikilink whose target doesn't exist, or a bare name

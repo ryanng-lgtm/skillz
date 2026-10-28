@@ -74,7 +74,7 @@ python3 <docs>/scripts/build-index.py          # rewrite the tables
 python3 <docs>/scripts/build-index.py --check  # validate only
 ```
 
-The script rewrites only what's between the `BEGIN/END GENERATED` markers. It
+The script rewrites only the `## Contents` section, up to the next heading. It
 fails on:
 
 - missing frontmatter fields
