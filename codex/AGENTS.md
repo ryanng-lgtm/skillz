@@ -47,7 +47,7 @@ When a task fans out to subagents or parallel agents: **5 agents maximum per tas
 Before reaching for `rg`/`find` (or explore-style subagents) to answer a question about a codebase, use graphify:
 
 - If `graphify-out/graph.json` exists in the project root and is current, answer via `graphify query` instead of raw greps/globs.
-- If the project has no graph, do not build one unprompted — ask me to provide the install.md, then proceed from that.
+- If the project has no graph, do not build one unprompted — ask me, and on my go follow the `graphify-setup` skill.
 - If the graph exists but is out of date (source files changed since it was built), run `$graphify <path> --update` first, then query.
 
 Raw `rg`/`find` is still fine for trivial single-file lookups where a graph query adds nothing.

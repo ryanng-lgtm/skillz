@@ -43,7 +43,7 @@ If the Workflow tool is used (including under ultracode): **5 agents maximum per
 Before reaching for Grep/Glob (or Explore-style subagents) to answer a question about a codebase, use graphify:
 
 - If `graphify-out/graph.json` exists in the project root and is current, answer via `graphify query` instead of raw greps/globs.
-- If the project has no graph, do not build one unprompted — ask me to provide the install.md, then proceed from that.
+- If the project has no graph, do not build one unprompted — ask me, and on my go run the `graphify-setup` skill.
 - If the graph exists but is out of date (source files changed since it was built), run `/graphify <path> --update` first, then query.
 
 Raw Grep/Glob is still fine for trivial single-file lookups where a graph query adds nothing.

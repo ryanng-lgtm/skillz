@@ -37,6 +37,7 @@ Skills that set something up once per machine or repo. They live in `setup/` and
 
 | Skill | Agents | What it does |
 | --- | --- | --- |
+| [`graphify-setup`](setup/graphify-setup/SKILL.md) | Claude, Codex | Installs graphify and builds a never-committed graph for one repo or several merged ones, with git hooks that keep it current. |
 | [`status-line`](setup/status-line/SKILL.md) | Claude | Sets the Claude Code status line (model, folder, branch, context, usage limits, effort), changing only `statusLine` in `settings.json`. |
 
 ## Structure
