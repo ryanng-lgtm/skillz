@@ -1,10 +1,19 @@
 ---
 name: testing-harness
-description: Use when a change has to be proven in the real running product rather than in tests — visually diffing the cloud deployment against the local daemon, sweeping the running app for regressions after a change, screenshotting a route, sending or reading a DM through the real UI, checking whether the local daemon is serving the working tree, writing a one-off browser probe against a logged-in session, or walking an end-to-end journey through the GUI. Trigger: /testing-harness.
+description: >-
+  Use when a change has to be proven in the real running product rather than in
+  tests — visually diffing the cloud deployment against the local daemon,
+  sweeping the running app for regressions after a change, screenshotting a
+  route, sending or reading a DM through the real UI, checking whether the local
+  daemon is serving the working tree, writing a one-off browser probe against a
+  logged-in session, or walking an end-to-end journey through the GUI. Trigger:
+  /testing-harness, $testing-harness.
 user-invocable: true
 ---
 
-# testing-harness
+# testing-harness — prove a change landed in the running product through a real browser
+
+## Overview
 
 The browser rig for proving a change landed in the running product. It spawns a
 real Chromium against a real `om` build with a real logged-in session, so it
@@ -13,6 +22,8 @@ project's `node_modules`.
 
 **Scope today: the OM Chat GUI** — the cloud deployment and the local daemon's
 `/rooms`. Everything below is specific to those two surfaces.
+
+**Core principle: everything downstream is a claim about which code was running — verify the wiring before trusting any verdict.**
 
 ```sh
 node ~/.claude/skills/testing-harness/scripts/om-chat.mjs <command> [flags]
@@ -38,7 +49,9 @@ journeys. They are complementary; a change that ships clean on both is proven.
 > a regression verdict from this skill until that mode exists; use an ad-hoc
 > probe and say it was a probe.
 
-## Run doctor first — both modes
+## Procedure
+
+### 1. Run doctor first — both modes
 
 ```sh
 doctor            # verify the wiring before trusting any verdict
@@ -57,7 +70,7 @@ the real cause was a stale bundle or the wrong daemon. Doctor reports:
 Doctor is also the right first move before a probe, for the same reason:
 everything downstream is a claim about which code was running.
 
-## `--parity-check`
+### 2. `--parity-check`
 
 The two surfaces:
 
@@ -84,7 +97,7 @@ route gets side-by-side, a drag slider, a blink toggle, and a client-side
 pixel-diff heatmap. The header stamps both repos' branch and commit, so two
 builds of the same code can never be silently compared.
 
-## `--regression`
+### 3. `--regression`
 
 Targeted at the latest changes rather than at one intended visual delta. Four
 legs, over one shared run artifact:
@@ -115,23 +128,7 @@ staleness rules, and the open questions still to settle — is in
 [references/regression-mode.md](references/regression-mode.md). Read it before
 implementing or extending this mode.
 
-## Utility verbs
-
-Not modes — tools both modes use, and useful on their own.
-
-```sh
-login   --target cloud                   # establish or refresh the saved session
-whoami  --target local
-people  --target cloud                   # list DM candidates
-read    --to <handle> --n 20
-send    --to <handle> --text "..."       # sends, then confirms it rendered
-```
-
-Flags: `--target cloud|local`, `--account prod|plus|guest`, `--viewport 1440x900`,
-`--full-page`, `--headed`, `--note "what changed"`, `--out <path>`, `--open`,
-`--force`, `--confirm-real`.
-
-## Ad-hoc probes
+### 4. Ad-hoc probes
 
 A probe answers one question once against a live, already-logged-in page, then
 gets thrown away. Reach for one when the question is about the DOM or the
@@ -159,7 +156,7 @@ what `login` wrote, so the page comes up authenticated with no login step.
 defaults, or an output format, the question was repeatable — it belongs in a
 `--regression` leg instead.
 
-### Selectors that are known-good
+#### Selectors that are known-good
 
 Read off the real components, not guessed. `om-chat.mjs` keeps the same set in
 its `SEL` block; reuse from there rather than re-deriving.
@@ -176,7 +173,7 @@ Wait on `textarea[data-composer-input], .message-row` rather than a fixed sleep:
 the shell hydrates fast but rooms arrive over the websocket afterwards, so a
 timeout tuned on a warm run goes flaky on a cold one.
 
-### Journey rules
+#### Journey rules
 
 These govern the critical-journeys leg and any hand-written journey probe:
 
@@ -190,6 +187,52 @@ These govern the critical-journeys leg and any hand-written journey probe:
 - **Run it against both targets when the claim is a regression.** "Broken on
   local" is only a regression if it works on cloud; the same journey pointed at
   `https://openmarket.xyz/chat/` is the control.
+
+## Rules
+
+`send` drives a real identity against the production backend. Any recipient that
+is not one of the known throwaway accounts is refused unless `--confirm-real` is
+passed. **Get the user's approval on both the recipient and the message text
+before using that flag.** "Sent" is only reported after the message is observed
+in the rendered thread.
+
+A probe or a journey bypasses that guard entirely — it is raw Playwright against
+a logged-in production session. The same approval rule applies to anything a
+probe, a journey, or a regression leg posts, reacts to, or deletes.
+
+## Common mistakes
+
+- **Setting `OM_ROOMS_GUI_DEV_URL` on a compiled binary.** The dev proxy dies on a compiled binary. It is triple-gated
+  (`runner/http/proxy/rooms-gui-dev.ts`) and gate 1 is `isDevExecPath()` — running
+  from source under `bun`. Run `./packages/cli/dist/om` and `OM_ROOMS_GUI_DEV_URL`
+  is silently ignored, leaving the placeholder shell at `/rooms` unless
+  `OM_ROOMS_GUI_DIR` is set. Doctor catches this.
+- **Capturing the wrong daemon.** Two daemons, two ports. `31417` is the usual source-run rig; the installed
+  daemon listens on `31337`. Capturing the wrong one is the quiet way to "prove" a
+  change that is not there — set `OM_CHAT_LOCAL_PORT` to whichever daemon is
+  actually serving the branch under test. Note that two daemons sharing one
+  `OM_HOME` share one database and one credential store, so a second daemon needs
+  its own isolated home.
+- **Relinking rooms-client to a stale checkout.** Only `openmarket-internal` is live. The `openmarket` and `openmarket-main`
+  checkouts of the same remote are stale, and `tools/link-rooms-client.ts` defaults
+  to exactly those two. Always relink with
+  `OM_REPO=~/Documents/GitLab/openmarket-internal bun run rooms-client:link`.
+
+## Utility verbs
+
+Not modes — tools both modes use, and useful on their own.
+
+```sh
+login   --target cloud                   # establish or refresh the saved session
+whoami  --target local
+people  --target cloud                   # list DM candidates
+read    --to <handle> --n 20
+send    --to <handle> --text "..."       # sends, then confirms it rendered
+```
+
+Flags: `--target cloud|local`, `--account prod|plus|guest`, `--viewport 1440x900`,
+`--full-page`, `--headed`, `--note "what changed"`, `--out <path>`, `--open`,
+`--force`, `--confirm-real`.
 
 ## What this rig does NOT duplicate
 
@@ -212,24 +255,6 @@ here.
 committed `packages/cli/assets/rooms-gui/` files are stubs that only the release
 workflow overwrites.
 
-**The dev proxy dies on a compiled binary.** It is triple-gated
-(`runner/http/proxy/rooms-gui-dev.ts`) and gate 1 is `isDevExecPath()` — running
-from source under `bun`. Run `./packages/cli/dist/om` and `OM_ROOMS_GUI_DEV_URL`
-is silently ignored, leaving the placeholder shell at `/rooms` unless
-`OM_ROOMS_GUI_DIR` is set. Doctor catches this.
-
-**Two daemons, two ports.** `31417` is the usual source-run rig; the installed
-daemon listens on `31337`. Capturing the wrong one is the quiet way to "prove" a
-change that is not there — set `OM_CHAT_LOCAL_PORT` to whichever daemon is
-actually serving the branch under test. Note that two daemons sharing one
-`OM_HOME` share one database and one credential store, so a second daemon needs
-its own isolated home.
-
-**Only `openmarket-internal` is live.** The `openmarket` and `openmarket-main`
-checkouts of the same remote are stale, and `tools/link-rooms-client.ts` defaults
-to exactly those two. Always relink with
-`OM_REPO=~/Documents/GitLab/openmarket-internal bun run rooms-client:link`.
-
 **Cloud login detours through the chart app.** `openmarket.xyz/chat/` bounces a
 logged-out visitor to `/chart/`, login happens there, and the redirect back is
 broken so the harness navigates to `/chat/` by hand. That bounce is also the
@@ -249,18 +274,6 @@ Sessions persist per account and target under
 `~/.claude/state/testing-harness/profiles/`, so login happens once and probes
 inherit it. Delete a profile directory to revoke. A profile still sitting at the
 old `~/.claude/state/om-chat-web/` path is honoured as a fallback.
-
-## Sending is guarded
-
-`send` drives a real identity against the production backend. Any recipient that
-is not one of the known throwaway accounts is refused unless `--confirm-real` is
-passed. **Get the user's approval on both the recipient and the message text
-before using that flag.** "Sent" is only reported after the message is observed
-in the rendered thread.
-
-A probe or a journey bypasses that guard entirely — it is raw Playwright against
-a logged-in production session. The same approval rule applies to anything a
-probe, a journey, or a regression leg posts, reacts to, or deletes.
 
 ## Environment
 
