@@ -94,9 +94,10 @@ commits, not edited by hand, and aren't listed.
 
 ### Codex (`codex/skills/` → `~/.codex/skills/`)
 
-The Claude skills above are also available here and invoked as `$name` (Codex's
-skill mention syntax), e.g. `$demuddy path/to/plan.md`. Most share the Claude
-source; these have independent Codex implementations:
+Every Claude skill above except `panos`, `regroup`, `shared-dev` and
+`test-audit` is also available here, invoked as `$name` (Codex's skill mention
+syntax), e.g. `$demuddy path/to/plan.md`. Most share the Claude source; these
+have independent Codex implementations:
 
 | Skill | Trigger | What it does |
 | --- | --- | --- |
