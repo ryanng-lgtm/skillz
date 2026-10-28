@@ -207,14 +207,12 @@ class OfferTests(unittest.TestCase):
         r.commit({"a.py": lines(400), "b.py": lines(300)}, "big")
         self.assertEqual(self.reasons(r), ["10 commits > 9", "1 commit over 600 changed lines"])
 
-    def test_tests_that_outweigh_the_code(self):
+    def test_branches_that_add_tests(self):
         r = Repo(self)
-        r.commit({"a.py": lines(50), "tests/test_a.py": lines(150)}, "small")
+        r.commit({"a.py": lines(500), "tests/test_a.py": lines(99)}, "small")
         self.assertEqual(self.reasons(r), [])
-        r.commit({"tests/test_a.py": lines(250)}, "more tests")
-        self.assertEqual(self.reasons(r), ["tests add 250 lines against 50 changed lines of code"])
-        r.commit({"b.py": lines(250)}, "more code")
-        self.assertEqual(self.reasons(r), [])
+        r.commit({"tests/test_a.py": lines(100)}, "more tests")
+        self.assertEqual(self.reasons(r), ["tests add 100 lines; trim them to the necessary ones"])
 
     def reasons(self, r):
         report = regroup.review(r.path, r.base, r.head(), 600, RULES)
