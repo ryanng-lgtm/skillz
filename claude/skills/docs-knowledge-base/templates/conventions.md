@@ -144,8 +144,8 @@ own. It must be inside a git repo and hold:
 - `BY-HAND.md`: the by-hand list (below).
 
 `build-index.py` enforces all of this: an unknown mode, a missing
-`tooling:`, a dir outside git, or a missing file fails the check. The
-top-level index shows each area's mode.
+`tooling:`, a dir outside git, or a missing file fails the check. Once any
+area is `continuous`, the top-level index shows each area's mode.
 
 ### The by-hand list (`BY-HAND.md`)
 

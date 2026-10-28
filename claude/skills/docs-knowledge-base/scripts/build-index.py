@@ -282,13 +282,15 @@ def main() -> int:
     for stray in (p for p in DOCS.iterdir() if p.is_file() and DOC_RE.match(p.name)):
         problems.append(f"{stray.name}: numbered doc at top level; move it into an area folder")
 
-    rows = ["| Area | What's in it | Tags | Docs | Skills / jobs | Improvement |",
-            "| --- | --- | --- | --- | --- | --- |"]
+    # The Improvement column appears only once some area opts in.
+    modes = any(a.get("improvement", "off") != "off" for a in areas)
+    rows = ["| Area | What's in it | Tags | Docs | Skills / jobs |" + (" Improvement |" if modes else ""),
+            "| --- | --- | --- | --- | --- |" + (" --- |" if modes else "")]
     for a in areas:
         rows.append(
             f"| [{a['name']}/](./{quote(a['name'])}/INDEX.md) | {cell(a.get('description', '—'))} "
             f"| {cell(', '.join(a.get('tags', [])))} | {a['count']} (updated {a['updated'] or '?'}) "
-            f"| {cell(a.get('related', '—') or '—')} | {a.get('improvement', 'off')} |"
+            f"| {cell(a.get('related', '—') or '—')} |" + (f" {a.get('improvement', 'off')} |" if modes else "")
         )
     replace_generated(DOCS / "INDEX.md", "\n".join(rows), check)
     for top in ("INDEX.md", "ABOUT.md", "CLAUDE.md"):

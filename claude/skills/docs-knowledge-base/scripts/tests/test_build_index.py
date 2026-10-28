@@ -96,6 +96,24 @@ class ObsidianVaultTests(unittest.TestCase):
                                capture_output=True, text=True)
         self.assertEqual(check.returncode, 0, check.stdout)
 
+    def test_improvement_column_only_when_an_area_is_continuous(self):
+        code, out = self.run_script("Deploy steps.")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("Improvement", (self.docs / "INDEX.md").read_text())
+        tooling = self.vault / "tooling"
+        (tooling / "tests").mkdir(parents=True)
+        for name in ("README.md", "BY-HAND.md"):
+            (tooling / name).write_text("")
+        subprocess.run(["git", "init", "-q", str(tooling)], check=True)
+        index = self.docs / "db" / "INDEX.md"
+        index.write_text(index.read_text().replace(
+            "tags: [db]\n", f"tags: [db]\nimprovement: continuous\ntooling: {tooling}\n"))
+        code, out = self.run_script("Deploy steps.")
+        self.assertEqual(code, 0, out)
+        top = (self.docs / "INDEX.md").read_text()
+        self.assertIn("| Improvement |", top)
+        self.assertIn("| continuous |", top)
+
     def test_plain_docs_dir_resolves_markdown_links_relatively(self):
         (self.vault / ".obsidian" / "app.json").unlink()
         (self.vault / ".obsidian").rmdir()
