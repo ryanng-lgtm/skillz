@@ -1,9 +1,15 @@
 ---
 name: bump-rc
-description: Release a new @openmarket/rooms-client version — pick the bump from what actually changed, run the repo's release script, then update both GUI consumers' pins. Trigger: /bump-rc [version]
+description: >-
+  Use when a change to @openmarket/rooms-client has to reach the GUIs — it
+  needs a new npm release, or openmarket-chat and openmarket-chat-cloud still
+  pin the old version — or when choosing the semver bump for a rooms-client
+  release. Trigger: /bump-rc [version], $bump-rc [version].
 ---
 
 # bump-rc — release rooms-client and repin its consumers
+
+## Overview
 
 `@openmarket/rooms-client` lives in `openmarket-internal` and is consumed by two
 forks that pin it exactly: `openmarket-chat` (bun) and `openmarket-chat-cloud`
@@ -11,19 +17,11 @@ forks that pin it exactly: `openmarket-chat` (bun) and `openmarket-chat-cloud`
 repinning without publishing leaves them unresolvable. This skill does the whole
 sequence.
 
+**Core principle: Publishing is irreversible — a version number can never be reused, even after `npm unpublish`.**
+
 **Announce at start:** "Using bump-rc to release rooms-client."
 
-## Hard rules
-
-- **Publishing is irreversible.** A version number can never be reused, even
-  after `npm unpublish`. Confirm the version with Ryan before step 5 unless he
-  named it in the invocation.
-- **Never invent an npm token.** If auth fails, stop and ask — do not try other
-  registries, other accounts, or `--force`.
-- Commit the version bump via the `/commit` skill, never raw `git commit`.
-- No pushing unless Ryan says so; the release script itself does not push.
-
-## Steps
+## Procedure
 
 ### 1. Read the current state
 
@@ -165,19 +163,6 @@ cd ~/Documents/GitLab/openmarket-chat-cloud
 pnpm add @openmarket/rooms-client@0.X.0 --save-exact
 ```
 
-Two traps, both real:
-
-- `openmarket-chat` may have rooms-client **symlinked** to a local monorepo
-  checkout (`tools/link-rooms-client.ts`). `bun add` replaces the link. Check
-  `readlink node_modules/@openmarket/rooms-client` first; if it was linked and
-  the session still needs the link, relink after the pin lands:
-  `bun tools/link-rooms-client.ts --unlink && OM_REPO=<checkout> bun tools/link-rooms-client.ts`.
-- Pre-public-launch, the registry may not serve the package at all. If the add
-  fails to resolve, report it and fall back to the local tarball flow rather
-  than editing the pin by hand:
-  `cd <monorepo>/packages/rooms-client && bun run build && npm pack`, then
-  install that tarball in the consumer.
-
 ### 8. Verify and report
 
 ```bash
@@ -193,3 +178,28 @@ Commit each consumer's pin change (`package.json` + its lockfile) via the
 Report: the version published, why that bump, both consumer pins before/after,
 typecheck results, and anything left for Ryan (a relink, an unpushed commit, a
 failed resolve).
+
+## Rules
+
+- **Publishing is irreversible.** A version number can never be reused, even
+  after `npm unpublish`. Confirm the version with Ryan before step 5 unless he
+  named it in the invocation.
+- **Never invent an npm token.** If auth fails, stop and ask — do not try other
+  registries, other accounts, or `--force`.
+- Commit the version bump via the `/commit` skill, never raw `git commit`.
+- No pushing unless Ryan says so; the release script itself does not push.
+
+## Common mistakes
+
+Two traps, both real:
+
+- **Letting `bun add` replace a local rooms-client link.** `openmarket-chat` may have rooms-client **symlinked** to a local monorepo
+  checkout (`tools/link-rooms-client.ts`). `bun add` replaces the link. Check
+  `readlink node_modules/@openmarket/rooms-client` first; if it was linked and
+  the session still needs the link, relink after the pin lands:
+  `bun tools/link-rooms-client.ts --unlink && OM_REPO=<checkout> bun tools/link-rooms-client.ts`.
+- **Editing a consumer pin by hand when the registry cannot resolve it.** Pre-public-launch, the registry may not serve the package at all. If the add
+  fails to resolve, report it and fall back to the local tarball flow rather
+  than editing the pin by hand:
+  `cd <monorepo>/packages/rooms-client && bun run build && npm pack`, then
+  install that tarball in the consumer.
