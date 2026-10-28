@@ -1,6 +1,10 @@
 ---
 name: panos
-description: Use when MRs Ryan opened or pushed have landed on GitLab and need the review Panos (pan26, the usual blocking backend reviewer) would give, before Panos sees them — "review this like Panos", "assume you are Panos", "now that the work has landed, review and fix it". Trigger: /panos [MR ...] [--model MODEL].
+description: >-
+  Use when MRs Ryan opened or pushed have landed on GitLab and need the review
+  Panos (pan26, the usual blocking backend reviewer) would give, before Panos
+  sees them. Trigger: /panos [MR ...] [--model MODEL], "review this like Panos",
+  "assume you are Panos", "now that the work has landed, review and fix it".
 ---
 
 # panos — review landed MRs as Panos, fix what is real
@@ -12,30 +16,11 @@ skill gives each MR that review first: codex reviews it under the Panos brief,
 you verify every finding against the code, fix the real ones on the MR's
 branch, push, and report. Nothing is ever posted on the MR.
 
+**Core principle: a reviewer finding is a hypothesis; never fix one Phase 3 has not reproduced.**
+
 The reviewer is codex `gpt-6.1-sol` at `xhigh`. When sol is unavailable, it is
 Claude Fable 5.1, then Opus 5.5. `--model` sets the reviewer and turns the
 fallback off: another codex model, or `fable` / `opus`.
-
-## Hard rules
-
-- Invoking `/panos` authorizes pushes to each selected MR's source branch, and
-  nothing else. Never push to a target or default branch. Every force push is
-  `--force-with-lease=<source>:<head recorded in Phase 0>`.
-- Never write to the MR: no notes, replies, approvals, thread resolution,
-  labels, reviewers or merge. Two exceptions: when a fix makes a sentence of
-  the MR description false, correct that sentence; and Phase 5 may start a
-  missing pipeline.
-- Never touch production: no database, cluster or broker connections, no
-  `connections.env`. A claim that needs prod numbers becomes a question for
-  Ryan, with the measurement that would settle it.
-- A reviewer finding is a hypothesis. Never fix one Phase 3 has not
-  reproduced.
-- Design changes go to Ryan, not into the branch: splitting an MR, moving a
-  component to its own deployment, changing rollout or merge order, changing a
-  public contract.
-- Change reviewer only because sol is unavailable (Phase 2). A review that
-  times out (exit 124), crashes or comes back empty: show the log's tail and
-  ask.
 
 ## Phase 0 — pick the MRs
 
@@ -266,15 +251,36 @@ or catch into the brief:
 python3 -I ~/.claude/skills/panos/scripts/threads.py <out.md>
 ```
 
+## Rules
+
+- Invoking `/panos` authorizes pushes to each selected MR's source branch, and
+  nothing else. Never push to a target or default branch. Every force push is
+  `--force-with-lease=<source>:<head recorded in Phase 0>`.
+- Never write to the MR: no notes, replies, approvals, thread resolution,
+  labels, reviewers or merge. Two exceptions: when a fix makes a sentence of
+  the MR description false, correct that sentence; and Phase 5 may start a
+  missing pipeline.
+- Never touch production: no database, cluster or broker connections, no
+  `connections.env`. A claim that needs prod numbers becomes a question for
+  Ryan, with the measurement that would settle it.
+- A reviewer finding is a hypothesis. Never fix one Phase 3 has not
+  reproduced.
+- Design changes go to Ryan, not into the branch: splitting an MR, moving a
+  component to its own deployment, changing rollout or merge order, changing a
+  public contract.
+- Change reviewer only because sol is unavailable (Phase 2). A review that
+  times out (exit 124), crashes or comes back empty: show the log's tail and
+  ask.
+
 ## Common mistakes
 
-- Fixing a finding because the reviewer sounded sure. A fix for a branch
+- **Fixing a finding because the reviewer sounded sure.** A fix for a branch
   nothing calls adds code and review surface for nothing.
-- `git rebase --autosquash origin/<target>`: on an MR that is behind, this
+- **`git rebase --autosquash origin/<target>`**: on an MR that is behind, this
   silently rebases it onto the new target before the force push.
-- `golangci-lint --new-from-rev` as the lint gate: CI then fails on the
+- **`golangci-lint --new-from-rev` as the lint gate**: CI then fails on the
   touched function's complexity.
-- Resolving a rebase conflict in chart values by moving keys between blocks.
+- **Resolving a rebase conflict in chart values by moving keys between blocks.**
   After any rebase, diff `charts/**/values*.yaml` against the target.
-- Leaving a local `replace` in `go.mod` at push time.
-- Reporting "done" before the pipeline ends, or without the merge order.
+- **Leaving a local `replace` in `go.mod` at push time.**
+- **Reporting "done" before the pipeline ends, or without the merge order.**
