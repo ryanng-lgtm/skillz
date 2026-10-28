@@ -96,7 +96,9 @@ def replace_generated(index: Path, generated: str, check: bool) -> None:
         return
     head, rest = text.split(BEGIN, 1)
     _, tail = rest.split(END, 1)
-    new = f"{head}{BEGIN}\n{generated.rstrip()}\n{END}{tail}"
+    # Blank lines around the table: Obsidian won't render a table that touches the comment markers.
+    body = f"\n\n{generated.strip()}\n\n" if generated.strip() else "\n"
+    new = f"{head}{BEGIN}{body}{END}{tail}"
     if new != text:
         if check:
             problems.append(f"{index.relative_to(DOCS)}: out of date (run build-index.py)")
