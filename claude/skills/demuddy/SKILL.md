@@ -24,7 +24,9 @@ A plan that went through many editing rounds accretes conversation archaeology. 
 
 This is deliberately the inverse of "keep only instructions and facts". Plenty of load-bearing content is neither: the reason a deliberate deviation exists, an unresolved question, a negative result, a constraint that only ever got written down inside a rejected-alternative discussion. A delete-unless-instruction rule eats all of it. **When you cannot classify a sentence, it stays.**
 
-**Editorial residue** is the short list of things you may remove: decision framing and dates that carry no applicability (`**Decision, verified:**`, "(decided 2026-07-20)" on a rule with no expiry), politeness and hedging, restatements of a rule already stated in full elsewhere, transcript back-and-forth ("good catch — updated"), and section ordering that reflects when text was added.
+**Editorial residue** is the short list of things you may remove: decision framing and dates that carry no applicability (`**Decision, verified:**`, "(decided 2026-07-20)" on a rule with no expiry), politeness, restatements of a rule already stated in full elsewhere, transcript back-and-forth ("good catch — updated"), process narration ("after grepping the handlers", "per your clarification") except the method, date, or revision that records how a claim was verified, and section ordering that reflects when text was added. Time-relative words are rewritten, not removed: "the new endpoint" names the endpoint, and "for now" or "temporarily" names the condition that ends it.
+
+A sentence is residue when a reader who never saw the conversation or the earlier drafts cannot follow it, because it points at a prior value, a search that was run, or an exchange. A `because` stays when its reason points at the system and goes when it points at the edit.
 
 ## Code comments
 
@@ -37,13 +39,14 @@ This is deliberately the inverse of "keep only instructions and facts". Plenty o
 - With a path: use it.
 - Without a path: resolve candidates **read-only**, then print the absolute path and a content hash and ask which. "Most recently edited" and "most recently discussed" are different orderings, and the conversation may have mentioned a scratch copy, a generated plan, or a stale duplicate. Never break the ambiguity by guessing.
 
-Read the WHOLE file before touching it.
+Read the WHOLE file before touching it. If it is a decision record (ADR), post-mortem, changelog, or migration guide, stop and say so: its history is its content.
 
 ## Protected — never removed, never silently resolved
 
-Rule 6's old enumeration was too short. These categories survive in substance, not just as headings:
+These categories survive in substance, not just as headings:
 
 - Gotchas, traps, and do-not-"fix"-this warnings
+- **Hedges** ("probably", "I believe", "appears to") — each marks an unverified assumption. Keep the hedge, or move the claim to Assumptions or Open questions. State it plainly only after verifying it, recorded as contract 2 requires.
 - `file:line` cites, URLs, identifiers, numbers, limits, thresholds
 - Invariants, conventions, verification matrices (**every cell**)
 - **Risks, unknowns, open questions, assumptions** — an editorial pass may never answer, resolve, or drop one. Downstream skills mine exactly this section; `loop-me-in` reads it hardest, because "does this fix even address the report?" lives there.
@@ -87,13 +90,14 @@ extract() {   # cites, URLs, numbers+units, modal/conditional sentences, negatio
     | sed 's/^[0-9]*://' | sort -u                                    # normative sentences
   grep -cE '^\|' "$1"                                                 # table row count
   grep -c '?'    "$1"                                                 # unresolved questions
+  grep -ciE '\b(probably|likely|appears to|seems|I think|I believe|might|unclear|unsure)\b' "$1"   # hedges
 }
 diff <(extract "$orig") <(extract "$cand")
 ```
 
 Anything present in the original and absent from the candidate must have an explicit, stated reason. A dropped table row, a vanished `must`, a lost threshold, or a missing cite fails the check by default.
 
-**The question count is the cheap detector for the worst failure mode.** It drops when an open question is deleted *or silently answered* — a rewrite that turns "Does this cover reports created before migration?" into "Yes, it covers pre-migration reports" passes every other check in this file. A lower count than the original fails the pass.
+**The question count is the cheap detector for the worst failure mode.** It drops when an open question is deleted *or silently answered* — a rewrite that turns "Does this cover reports created before migration?" into "Yes, it covers pre-migration reports" passes every other check in this file. A lower count than the original fails the pass. The hedge count works the same way: it fails when it drops by more than the hedges you verified and recorded.
 
 **Also check, by reading:** every `Risks`/`Unknowns`/`Open questions`/`Assumptions` heading still has contents.
 
@@ -106,6 +110,7 @@ A compliant output is a **fixed point**: running demuddy again produces no subst
 - **Deleting rationale because it isn't an instruction.** The sentence explaining why a deviation is deliberate is what stops the next implementer reverting it. Highest-value content in the file, and the easiest to classify as noise.
 - **Emptying a Risks or Open questions section while keeping its heading.** Passes every structural check and destroys what the downstream run depends on.
 - **Answering an open question in passing.** An editorial pass has no authority to resolve one.
+- **Deleting a hedge word.** "Probably retries on 502" becoming "Retries on 502" turns a guess into a spec the implementer trusts.
 - **Over-trimming a "do not correct this deliberate deviation" warning.**
 - **Leaving "decided/accepted" ghosts inside invariants and risks after cleaning the fix sections.**
 - **Broadening a verification claim to cover cites that were never checked.**
