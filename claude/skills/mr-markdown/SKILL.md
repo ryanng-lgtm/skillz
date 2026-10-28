@@ -1,24 +1,22 @@
 ---
 name: mr-markdown
-description: Generate a condensed MR markdown for the changes on the current branch. Use when the user invokes /mr-markdown or $mr-markdown, or asks for an MR/PR description for the branch — a single copyable code block with title, Summary, Problem, Solution, and How to test.
+description: >-
+  Use when the user asks for an MR or PR description for the changes on the
+  current branch. Trigger: /mr-markdown, $mr-markdown.
 ---
 
-# MR markdown
+# mr-markdown — condensed MR description for the current branch
+
+## Overview
 
 Generate a condensed MR markdown for the changes on the current branch.
 
-Rules:
-- Final output must be a single inline markdown code block the user can click to copy/paste.
-- No file hyperlinks anywhere — refer to files/symbols using backtick code spans (e.g. `sentry.util.ts`, `V2StreamingError`). The only links are related MRs, under `## Dependencies`.
-- The final MR is at most 200 words, not counting a diagram. Match length to change size: a small change needs far fewer.
-- Write so a non-technical reader understands it. Describe user-facing behavior and impact, not implementation. Avoid jargon (chunk, lazy-load, fall-through, refs); name files/symbols only when they add clarity.
-- First line of the code block is the MR title: imperative, ≤ 72 chars, no trailing period. Match the repo's commit convention if it has one (e.g. Conventional Commits `type(scope): summary`). Blank line after it, then the sections.
-- Below the title, four sections: `## Summary`, `## Problem`, `## Solution`, `## How to test`. Add `## Dependencies` between Solution and How to test when the change has related MRs.
-- `## How to test` must be numbered steps a reviewer can follow in whatever form the project runs — app, service, CLI, library test suite: where to go, what to do, what to look for. Prefer steps that mirror how the change was actually reproduced/verified during the session over steps invented from the diff.
+**Core principle: write so a non-technical reader understands it, describing user-facing behavior and impact, not implementation.**
+
+## Procedure
 
 The MR is written in three stages. Each stage saves its version to a file in a working directory, and the next stage starts from that file. Create the directory with `mktemp -d "<parent>/mr-markdown.XXXXXX"`, where `<parent>` is this session's scratchpad directory, else `${TMPDIR:-/tmp}`. `<dir>` below is the path it prints. Delete it once the final block is printed.
 
-Steps:
 1. Determine the base branch (usually `main`) and run `git log --oneline <base>..HEAD` plus `git diff <base>..HEAD --stat` to understand what changed on the branch. Read commit messages and diffs as needed to understand what changed, why it changed, and what the changes do.
 
 2. Recall the current session's context for testing evidence: the symptom/bug that was reproduced, the exact steps or scenario used to reproduce it, how the fix was verified (manual steps, test runs, probes), and any setup preconditions (env vars, feature flags, fixtures, required accounts or data). If this session has no relevant context (e.g. fresh session), infer plausible test steps from the diff and commit messages instead, and keep them conservative.
@@ -51,3 +49,13 @@ Steps:
    If a fix pushes the count over 200, cut more content. Never go back to fragments.
 
 6. Replace any markdown file hyperlinks (`[text](path)`) in `3-final.md` with backtick code spans of just the filename or symbol. Then output it wrapped inside a single fenced ```markdown code block so the user can click to copy. When the MR has a fenced block of its own, such as a diagram, the outer fence takes four backticks. Then delete `<dir>`.
+
+## Rules
+
+- Final output must be a single inline markdown code block the user can click to copy/paste.
+- No file hyperlinks anywhere — refer to files/symbols using backtick code spans (e.g. `sentry.util.ts`, `V2StreamingError`). The only links are related MRs, under `## Dependencies`.
+- The final MR is at most 200 words, not counting a diagram. Match length to change size: a small change needs far fewer.
+- Write so a non-technical reader understands it. Describe user-facing behavior and impact, not implementation. Avoid jargon (chunk, lazy-load, fall-through, refs); name files/symbols only when they add clarity.
+- First line of the code block is the MR title: imperative, ≤ 72 chars, no trailing period. Match the repo's commit convention if it has one (e.g. Conventional Commits `type(scope): summary`). Blank line after it, then the sections.
+- Below the title, four sections: `## Summary`, `## Problem`, `## Solution`, `## How to test`. Add `## Dependencies` between Solution and How to test when the change has related MRs.
+- `## How to test` must be numbered steps a reviewer can follow in whatever form the project runs — app, service, CLI, library test suite: where to go, what to do, what to look for. Prefer steps that mirror how the change was actually reproduced/verified during the session over steps invented from the diff.
