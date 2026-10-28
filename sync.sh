@@ -188,8 +188,9 @@ if [ "$(git rev-parse HEAD)" != "$before" ]; then
   # Skills are linked one by one, so one another machine added has no link
   # here, and one it removed leaves a dead link, until install.sh runs.
   # --links-only skips the Codex plugin step, which can hang, and the hook
-  # registration.
-  if [ -n "$(git diff --name-only --diff-filter=AD "$before" HEAD -- \
+  # registration. --no-renames reports a moved skill as an add and a delete,
+  # which a rename filter would miss.
+  if [ -n "$(git diff --no-renames --name-only --diff-filter=AD "$before" HEAD -- \
     'claude/skills/*/SKILL.md' 'codex/skills/*')" ]; then
     "$REPO/install.sh" --links-only >>"$LOG" 2>&1 9>&- || log "install.sh --links-only failed"
   fi
