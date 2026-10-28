@@ -36,6 +36,9 @@ templates/
 `templates/skill-template.md` is the reference agents follow when writing a
 skill here, adapted from
 [wooneusean/skills](https://github.com/wooneusean/skills/blob/main/templates/skill-template.md).
+`python3 -I check.py` checks that every skill follows it, that the skill tables
+below match `claude/skills/` and `codex/skills/`, and that every skill path a doc
+or script names exists.
 
 `install.sh` also points `~/.claude/plans` and `~/.codex/plans` at the same
 iCloud-synced Obsidian folder (`Obsidian/Claude Plans`), so plan files from

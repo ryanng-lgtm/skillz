@@ -33,5 +33,6 @@ A Claude Code `Stop` hook runs `sync.sh` at the end of every turn. It stages eve
 
 ## Verifying a change
 
+- After changing a skill, `README.md`, or a global instruction file, run `python3 -I check.py`. It checks every skill against the template, the Codex symlinks, the README tables, and the `~/.claude/skills/...` paths that docs and scripts name. It must print no problems.
 - After adding, renaming, or removing a skill, run `./install.sh --links-only`. It must report no `SKIP` lines, and the new links under `~/.claude/skills/` and `~/.codex/skills/` must resolve into this repo. Run plain `./install.sh` after changing `install.sh` or `hook-install.sh`.
 - A skill that ships tests keeps them in `scripts/tests/`. After changing that skill, run `python3 -m unittest discover -s tests` from its `scripts/` directory.
