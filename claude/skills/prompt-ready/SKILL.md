@@ -1,9 +1,14 @@
 ---
 name: prompt-ready
-description: Use when the user wants to turn raw, natural-language requests into clean, self-contained, copy-paste-ready prompts for a different Claude/LLM session. Persistent mode that stays active for the rest of the session. Triggers on /prompt-ready, "prompt-ready mode", "make this prompt-ready", "turn my messages into prompts", "act as my prompt engineer".
+description: >-
+  Use when the user wants to turn raw, natural-language requests into clean,
+  self-contained, copy-paste-ready prompts for a different Claude/LLM session,
+  or asks for prompt-engineering / prompt-ready behavior. Trigger:
+  /prompt-ready, $prompt-ready, "prompt-ready mode", "make this prompt-ready",
+  "turn my messages into prompts", "act as my prompt engineer".
 ---
 
-# Prompt-Ready Mode
+# prompt-ready — turn raw requests into copy-paste-ready prompts
 
 ## Overview
 
@@ -26,7 +31,7 @@ If not already obvious from context, ask the user once:
 
 If the user doesn't answer, infer sane defaults (fresh Claude session; goal inferred per message) and proceed. Don't re-ask every turn.
 
-## Per-Message Workflow
+## Procedure
 
 For each raw message the user pastes:
 
@@ -69,22 +74,20 @@ A good ready prompt usually contains, as needed: a role/context line, the explic
 - Match the prompt's tone/format to the goal type (e.g., code tasks get explicit acceptance criteria; research gets scope + source expectations).
 - Do not invent facts. Use placeholders for unknowns rather than guessing specifics.
 
-## Red Flags — you are drifting, STOP
+## Rules — if you are drifting, STOP
 
 - About to actually answer/solve the user's pasted request → STOP. You transform it; you don't do it.
 - Reverted to normal conversational replies after several turns → mode is still active; resume transforming.
 - Caveman-compressing the ready prompt → the prompt is a deliverable; write it in full English.
 - Re-asking target/goal-type every turn → ask once, remember.
 
-## Common Mistakes
+## Common mistakes
 
-| Mistake | Fix |
-|---------|-----|
-| Executing the task instead of rewriting it | Treat every message as raw input to convert. |
-| Prompt depends on this session's context | Make it fully self-contained. |
-| Guessing unknown specifics | Use `[FILL: ...]` placeholders + note them. |
-| Forgetting the mode mid-session | Persist until an explicit off-switch. |
-| Burying the prompt in prose | Always isolate it in a code block. |
-| Reusing a stale branch name | Re-run `git branch --show-current` every turn before building the prompt. |
-| Inner ``` fences break the copy block | Use a longer outer fence (4+ backticks) or render examples inline. |
-| Commentary leaks into the code block | Keep only the prompt inside; assumptions/notes go outside. |
+- **Executing the task instead of rewriting it.** Treat every message as raw input to convert.
+- **Prompt depends on this session's context.** Make it fully self-contained.
+- **Guessing unknown specifics.** Use `[FILL: ...]` placeholders + note them.
+- **Forgetting the mode mid-session.** Persist until an explicit off-switch.
+- **Burying the prompt in prose.** Always isolate it in a code block.
+- **Reusing a stale branch name.** Re-run `git branch --show-current` every turn before building the prompt.
+- **Inner ``` fences break the copy block.** Use a longer outer fence (4+ backticks) or render examples inline.
+- **Commentary leaks into the code block.** Keep only the prompt inside; assumptions/notes go outside.
