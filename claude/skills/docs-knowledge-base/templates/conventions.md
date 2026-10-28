@@ -93,6 +93,11 @@ fails on:
   with a definition `[002]: ./002%20Title.md`. Across areas, write `[k3s/002]`
   with `[k3s/002]: ../k3s/002%20Title.md`. Put the definitions at the bottom
   of the doc.
+- In an Obsidian vault, use the vault's own link style instead: wikilinks
+  (`[[k3s/002 Title]]`) or inline markdown links. Obsidian's graph,
+  backlinks and rename updates skip reference-style definitions.
+  `build-index.py` checks wikilinks and embeds as well, and reports a bare
+  `[[Title]]` that matches more than one file.
 - **Temporary docs** (handoffs, one-off briefings, requests for another agent
   or a human) are named `TMP Title.md`, with no number and no frontmatter.
   - Their status is "temporary — delete once acted on".

@@ -20,7 +20,8 @@ Layout:
 
 Only the block between the GENERATED markers is rewritten; everything else in an
 INDEX.md is left alone. Also checks: every doc has description/tags/status/updated,
-every [ref] has a definition, every relative link resolves, and an area's optional
+every [ref] has a definition, every markdown link and wikilink resolves (inside an
+Obsidian vault, the way Obsidian resolves it), and an area's optional
 `improvement:` field is one of IMPROVEMENT_MODES (a typo must not silently disable it), and a
 `continuous` area names a `tooling:` dir that is in git and has README.md, tests/ and BY-HAND.md.
 
@@ -61,16 +62,24 @@ def frontmatter(path: Path) -> dict | None:
     except ValueError:
         return None
     out: dict = {}
+    key = ""
     for line in block.splitlines():
         if not line.strip() or line.lstrip().startswith("#"):
             continue
+        item = re.match(r"\s*-\s+(.*)$", line)
+        if item and isinstance(out.get(key), list):
+            out[key].append(item.group(1).strip().strip("\"'"))
+            continue
         key, _, val = line.partition(":")
-        val = val.strip()
-        if val.startswith("[") and val.endswith("]"):
-            out[key.strip()] = [v.strip().strip("\"'") for v in val[1:-1].split(",") if v.strip()]
+        key, val = key.strip(), val.strip()
+        if not val:
+            out[key] = []  # a block list, as Obsidian's Properties editor writes one
+        elif val.startswith("[") and val.endswith("]"):
+            out[key] = [v.strip().strip("\"'") for v in val[1:-1].split(",") if v.strip()]
         else:
-            out[key.strip()] = val.strip("\"'")
-    return out
+            out[key] = val.strip("\"'")
+    # A key with no value and no items is an empty property, not a list.
+    return {k: "" if v == [] else v for k, v in out.items()}
 
 
 def cell(s: str) -> str:
@@ -96,6 +105,60 @@ def replace_generated(index: Path, generated: str, check: bool) -> None:
             print(f"updated {index.relative_to(DOCS)}")
 
 
+def find_vault(docs: Path) -> Path:
+    """The Obsidian vault holding the docs dir (nearest .obsidian/), else the docs dir."""
+    for d in (docs, *docs.parents):
+        if (d / ".obsidian").is_dir():
+            return d
+    return docs
+
+
+VAULT = find_vault(DOCS)
+OBSIDIAN = (VAULT / ".obsidian").is_dir()
+_vault_files: list[str] = []
+
+
+def vault_files() -> list[str]:
+    """Every file in the vault, as a lowercase vault-relative path, skipping dot dirs."""
+    if not _vault_files:
+        for root, dirs, files in os.walk(VAULT):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            for f in files:
+                _vault_files.append((Path(root) / f).relative_to(VAULT).as_posix().lower())
+    return _vault_files
+
+
+def resolve(target: str, src: Path, wikilink: bool) -> str | None:
+    """None when the target resolves, else "broken" or why it is ambiguous.
+
+    A markdown link resolves against the linking file's folder. A wikilink, or
+    any link inside an Obsidian vault, also resolves the way Obsidian does:
+    against the vault root, then as the tail of exactly one vault path (the
+    shortest-path form). A wikilink names a note (`.md`) unless it ends in a
+    file extension, as `[[diagram.png]]` does.
+    """
+    relative = not wikilink or target.startswith(("./", "../"))
+    vault_wide = wikilink or OBSIDIAN
+    if not wikilink or target.lower().endswith(".md"):
+        names = [target]
+    elif re.search(r"\.[A-Za-z0-9]{1,5}$", target):
+        names = [target, target + ".md"]
+    else:
+        names = [target + ".md"]
+    for name in names:
+        if relative and (src.parent / name).exists():
+            return None
+        if vault_wide and (VAULT / name).exists():
+            return None
+    if not vault_wide:
+        return "broken"
+    tails = [n.lower().lstrip("./") for n in names]
+    hits = {f for f in vault_files() for t in tails if f == t or f.endswith("/" + t)}
+    if len(hits) == 1:
+        return None
+    return f"{target} matches {len(hits)} files; give its path" if hits else "broken"
+
+
 def check_links(path: Path) -> None:
     text = path.read_text()
     rel = path.relative_to(DOCS)
@@ -106,10 +169,23 @@ def check_links(path: Path) -> None:
     for ref in set(re.findall(r"\[((?:[a-z0-9-]+/)*\d{3})\](?![:(])", prose)):
         if ref not in defs:
             problems.append(f"{rel}: [{ref}] used but not defined")
-    targets = list(defs.values()) + re.findall(r"\]\((\.{1,2}/[^)\s]+)\)", prose)
+    # Markdown links: skip URLs (any scheme) and same-file anchors.
+    targets = list(defs.values()) + [
+        t.strip("<>") for t in re.findall(r"\]\(\s*(<[^>]+>|[^)\s]+)", prose)
+    ]
     for t in targets:
-        if t.startswith(("./", "../")) and not (path.parent / unquote(t.split("#")[0])).exists():
-            problems.append(f"{rel}: broken link {t}")
+        t = unquote(t.split("#")[0])
+        if t and not re.match(r"[a-zA-Z][a-zA-Z0-9+.-]*:", t):
+            problem = resolve(t, path, wikilink=False)
+            if problem:
+                problems.append(f"{rel}: {'broken link ' + t if problem == 'broken' else problem}")
+    # Wikilinks and embeds: [[target#anchor|alias]], with `\|` inside tables.
+    for t in re.findall(r"!?\[\[([^\[\]|#]*)[^\[\]]*\]\]", prose):
+        t = t.rstrip("\\").strip()
+        if t:
+            problem = resolve(t, path, wikilink=True)
+            if problem:
+                problems.append(f"{rel}: {'broken wikilink [[' + t + ']]' if problem == 'broken' else problem}")
 
 
 def check_tooling(area: str, tooling: str | None) -> None:

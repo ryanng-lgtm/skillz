@@ -137,8 +137,9 @@ markers.
 - Tags are lowercase kebab-case, and the **area comes first**.
 - Always quote `description`. Don't nest escaped quotes inside it, because
   they render as `\"` in the generated table.
-- The parser is deliberately tiny: one `key: value` per line, `[a, b]`
-  lists, `#` comment lines skipped. Don't use multi-line YAML.
+- The parser is deliberately tiny: one `key: value` per line, lists as
+  `[a, b]` or as `- item` lines under the key (the form Obsidian's Properties
+  editor writes), `#` comment lines skipped. Don't use other multi-line YAML.
 
 ## Filenames and links
 
@@ -147,12 +148,37 @@ markers.
   reuse or renumber**, because the number is an identity, not a ranking.
 - Filenames use spaces, so quote paths in shell commands.
 - Use reference-style cross-links, with the definitions at the bottom of
-  the doc:
+  the doc. In an Obsidian vault, use the vault's link style instead (see
+  "Obsidian vaults").
   - same area: `[002]` with `[002]: ./002%20Title.md`
   - across areas: `[k3s/002]` with `[k3s/002]: ../k3s/002%20Title.md`
 - `TMP Title.md` holds handoffs, briefs and questions for another agent or
   a human. The script ignores it. Never cite it as a source of truth. Fold
   its lasting facts into a numbered doc, then delete it.
+
+## Obsidian vaults
+
+The docs dir can be an Obsidian vault or a folder inside one. The script
+finds the vault (the nearest `.obsidian/` at or above the docs root) and
+checks links the way Obsidian resolves them:
+
+- **Wikilinks and embeds:** `[[Title]]`, `[[area/001 Title|text]]`,
+  `[[Title#Heading]]`, `![[diagram.png]]`. A bare name must match exactly one
+  note in the vault. One that matches several is reported; give it a path.
+- **Markdown links:** relative to the doc, from the vault root, or by a
+  filename unique in the vault, which covers each of Obsidian's "New link
+  format" settings. Outside a vault, markdown links resolve relative to the
+  doc only.
+
+Keep the vault's existing link style rather than converting it. Obsidian
+does not treat reference-style definitions (`[002]: ./002%20Title.md`) as
+internal links, so they miss its graph, backlinks and rename updates.
+
+Move or rename docs inside Obsidian when you can: with "Automatically update
+internal links" on, it rewrites every link to the file. After a scripted
+move, `--check` lists the links it left behind. If iCloud has offloaded
+notes to save space, `--check` reports links to them as broken; download the
+folder first.
 
 ## The script
 
@@ -171,7 +197,8 @@ prose in an `INDEX.md` is safe. It exits 1 and prints `PROBLEM:` lines for:
 - an area `INDEX.md` missing `description`/`tags`, or missing the markers
 - an `[NNN]` or `[area/NNN]` used but not defined (fenced and inline code
   are ignored)
-- a relative link whose target doesn't exist
+- a markdown link or wikilink whose target doesn't exist, or a bare name
+  that matches several files in an Obsidian vault
 - a numbered doc at the top level
 - an index that is out of date (`--check` only)
 - `improvement:` not in (`continuous`, `off`), or set on a doc rather than
