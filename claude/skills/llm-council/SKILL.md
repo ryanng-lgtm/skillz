@@ -1,15 +1,29 @@
 ---
 name: llm-council
-description: "Run any question, idea, or decision through a council of 5 AI advisors who independently analyze it, peer-review each other anonymously, and synthesize a final verdict. Based on Karpathy's LLM Council methodology. MANDATORY TRIGGERS: 'council this', 'run the council', 'war room this', 'pressure-test this', 'stress-test this', 'debate this'. STRONG TRIGGERS (use when combined with a real decision or tradeoff): 'should I X or Y', 'which option', 'what would you do', 'is this the right move', 'validate this', 'get multiple perspectives', 'I can't decide', 'I'm torn between'. Do NOT trigger on simple yes/no questions, factual lookups, or casual 'should I' without a meaningful tradeoff (e.g. 'should I use markdown' is not a council question). DO trigger when the user presents a genuine decision with stakes, multiple options, and context that suggests they want it pressure-tested from multiple angles."
+description: >-
+  Use when the user presents a genuine decision with stakes, multiple options,
+  and context that suggests they want it pressure-tested from multiple angles.
+  Do NOT trigger on simple yes/no questions, factual lookups, or casual 'should
+  I' without a meaningful tradeoff (e.g. 'should I use markdown' is not a
+  council question). Trigger: /llm-council, $llm-council. MANDATORY TRIGGERS:
+  'council this', 'run the council', 'war room this', 'pressure-test this',
+  'stress-test this', 'debate this'. STRONG TRIGGERS (use when combined with a
+  real decision or tradeoff): 'should I X or Y', 'which option', 'what would you
+  do', 'is this the right move', 'validate this', 'get multiple perspectives',
+  'I can't decide', 'I'm torn between'.
 ---
 
-# LLM Council
+# llm-council — pressure-test a decision with five advisors and a chairman
+
+## Overview
 
 You ask one AI a question, you get one answer. That answer might be great. It might be mid. You have no way to tell because you only saw one perspective.
 
 The council fixes this. It runs your question through 5 independent advisors, each thinking from a fundamentally different angle. Then they review each other's work. Then a chairman synthesizes everything into a final recommendation that tells you where the advisors agree, where they clash, and what you should actually do.
 
 This is adapted from Andrej Karpathy's LLM Council. He dispatches queries to multiple models, has them peer-review each other anonymously, then a chairman produces the final answer. We do the same thing inside Claude using sub-agents with different thinking lenses instead of different models.
+
+**Core principle: The council is for questions where being wrong is expensive.**
 
 ---
 
@@ -63,7 +77,7 @@ Only cares about one thing: can this actually be done, and what's the fastest pa
 
 ---
 
-## how a council session works
+## Procedure
 
 ### step 1: frame the question (with context enrichment)
 
@@ -274,6 +288,18 @@ Only save a transcript if the user asks for it or if the question is significant
 
 ---
 
+## Rules
+
+- **Always spawn all 5 advisors in parallel.** Sequential spawning wastes time and lets earlier responses bleed into later ones.
+
+- **Always anonymize for peer review.** If reviewers know which advisor said what, they'll defer to certain thinking styles instead of evaluating on merit.
+
+- **The chairman can disagree with the majority.** If 4 out of 5 advisors say "do it" but the reasoning of the 1 dissenter is strongest, the chairman should side with the dissenter and explain why.
+
+- **Don't council trivial questions.** If the user asks something with one right answer, just answer it. The council is for genuine uncertainty where multiple perspectives add value.
+
+---
+
 ## example: counciling a product decision
 
 **User:** "Council this: I'm thinking of building a $297 course on Claude Code for beginners. My audience is mostly non-technical solopreneurs. Is this the right move?"
@@ -299,15 +325,3 @@ Only save a transcript if the user asks for it or if the question is significant
 *Recommendation:* Don't build the course yet. Validate with a lower-commitment offer first. But reframe entirely: sell the outcome (automate your business, get 10 hours back per week), not the tool.
 
 *One thing to do first:* Run a $97 live workshop called "How to automate your first business task with AI" to 50 people. Don't mention Claude Code in the title.
-
----
-
-## important notes
-
-- **Always spawn all 5 advisors in parallel.** Sequential spawning wastes time and lets earlier responses bleed into later ones.
-
-- **Always anonymize for peer review.** If reviewers know which advisor said what, they'll defer to certain thinking styles instead of evaluating on merit.
-
-- **The chairman can disagree with the majority.** If 4 out of 5 advisors say "do it" but the reasoning of the 1 dissenter is strongest, the chairman should side with the dissenter and explain why.
-
-- **Don't council trivial questions.** If the user asks something with one right answer, just answer it. The council is for genuine uncertainty where multiple perspectives add value.
