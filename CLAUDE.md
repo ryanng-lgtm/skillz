@@ -8,7 +8,7 @@ This repository is the single source of truth for Ryan's agent setup: skills and
 - `codex/skills/<name>` — a Codex skill. A skill that works the same under both agents is stored once in `claude/skills/`, with a relative symlink here (`../../claude/skills/<name>`), and written for both agents (name both triggers, `/name` and `$name`). It can carry `agents/openai.yaml` for Codex's skill list. Keep a separate copy only when the Codex version has to differ.
 - `claude/CLAUDE.md` and `codex/AGENTS.md` — global instructions, linked to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`. They load in every project, so guidance about this repo belongs in this file, not there. They carry the same rules in each agent's terms; change one, change the other.
 
-The skill name is its directory name and must match the `name` field in the frontmatter. Frontmatter requires `name` and `description`. The `description` carries the trigger phrases that decide when the skill fires, so write it to be matched against, not skimmed.
+Every skill follows `templates/skill-template.md` for its frontmatter, body, and supporting files. Read it before writing a skill or restructuring one.
 
 `openmarket` and `om-chat` ship with the `om` CLI and are vendored here only so both agents get the same copy. Do not edit them by hand.
 

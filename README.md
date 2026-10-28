@@ -33,7 +33,8 @@ templates/
   skill-template.md                         not linked anywhere
 ```
 
-`templates/skill-template.md` is a skill skeleton copied from
+`templates/skill-template.md` is the reference agents follow when writing a
+skill here, adapted from
 [wooneusean/skills](https://github.com/wooneusean/skills/blob/main/templates/skill-template.md).
 
 `install.sh` also points `~/.claude/plans` and `~/.codex/plans` at the same
