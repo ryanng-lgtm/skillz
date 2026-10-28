@@ -1,15 +1,25 @@
 ---
 name: regroup
-description: Use when a branch's commits or tests need cleaning up for review — a finished run left many TDD-style commits (red/green, wip, "fix test") or a pile of near-duplicate tests on a branch about to become an MR, commits mix tests and code, a commit is too big to review, or Ryan asks to squash, regroup, tidy or clean up commits or trim tests. Works on any branch, whatever its commit count. Trigger: /regroup [--base REF].
+description: >-
+  Use when a branch's commits or tests need cleaning up for review — a finished
+  run left many TDD-style commits (red/green, wip, "fix test") or a pile of
+  near-duplicate tests on a branch about to become an MR, commits mix tests and
+  code, a commit is too big to review, or Ryan asks to squash, regroup, tidy or
+  clean up commits or trim tests. Works on any branch, whatever its commit count.
+  Trigger: /regroup [--base REF].
 ---
 
 # regroup — trim a branch's tests and rewrite its commits for the reviewer
+
+## Overview
 
 The reviewer reads the MR commit by commit, and CI runs every test the MR
 adds on every pipeline after it. `/regroup` trims the tests the branch adds
 to the absolutely necessary ones, then rewrites `base..HEAD` into commits
 that each make one step of the change, in reading order. Only tests and
 testdata change; the script proves everything else at the tip unchanged.
+
+**Core principle: only tests and testdata change; the script proves everything else at the tip unchanged.**
 
 ```bash
 R=~/.claude/skills/regroup/scripts/regroup.py
@@ -206,15 +216,15 @@ Delete them with `git update-ref -d <ref>` once the MR has merged.
 
 ## Common mistakes
 
-- Keeping a test because it adds coverage or looks thorough, without
-  naming the bug only it catches.
-- Deleting the only test of per-value hand-written code because another
-  value's function "has the same shape".
-- Trimming tests that were already on the base.
-- Trimming after `apply`, so the tests land in a second tests commit.
-- Making up a halfway version of one big file to get under 600 lines.
-- Running the test suite at every commit, then moving tests back into a
-  code commit to make an intermediate commit pass.
-- Rewriting by hand with `reset` and `add`, without proving the tree
-  unchanged.
-- Saving the backup as a branch and leaving it in the branch list.
+- **Keeping a test because it adds coverage or looks thorough, without
+  naming the bug only it catches.**
+- **Deleting the only test of per-value hand-written code because another
+  value's function "has the same shape".**
+- **Trimming tests that were already on the base.**
+- **Trimming after `apply`**, so the tests land in a second tests commit.
+- **Making up a halfway version of one big file to get under 600 lines.**
+- **Running the test suite at every commit, then moving tests back into a
+  code commit to make an intermediate commit pass.**
+- **Rewriting by hand with `reset` and `add`, without proving the tree
+  unchanged.**
+- **Saving the backup as a branch and leaving it in the branch list.**
