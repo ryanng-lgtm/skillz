@@ -106,7 +106,7 @@ Skills live in `~/.codex/skills/<name>/SKILL.md`. When I mention one as `$name`,
 - **llm-council** (`~/.codex/skills/llm-council/SKILL.md`) — run a real decision through 5 advisors who analyse independently, peer-review anonymously, then synthesise a verdict. Trigger: "council this", "pressure-test this", `$llm-council`
 - **prompt-ready** (`~/.codex/skills/prompt-ready/SKILL.md`) — persistent mode turning raw requests into clean, self-contained, copy-paste-ready prompts for another session. Trigger: `$prompt-ready`
 - **war-diary** (`~/.codex/skills/war-diary/SKILL.md`) — turn a day's GitLab `.atom` export plus the day's sessions into Frontend War Diaries daily-log notes and Kanban cards. Trigger: `$war-diary`
-- **mr-markdown** (`~/.codex/skills/mr-markdown/SKILL.md`) — condensed MR description for the current branch, in one copyable code block. Trigger: `$mr-markdown`
+- **mr-markdown** (`~/.codex/skills/mr-markdown/SKILL.md`) — MR description for the current branch, in one copyable code block: drafted in full, cut to 200 words, then rewritten to read like a person wrote it. Trigger: `$mr-markdown`
 - **commit** (`~/.codex/skills/commit/SKILL.md`) — commit the currently staged changes only. Trigger: `$commit`
 
 Skills written for Claude Code may name Claude tools (`AskUserQuestion`, `Agent`, `SendMessage`, `Skill`). Map them to the Codex equivalent — ask in chat, spawn a subagent or run the role inline, message the agent or re-spawn it, read the SKILL.md — and keep going; never stop because a tool name doesn't match.

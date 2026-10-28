@@ -89,7 +89,7 @@ source; these have independent Codex implementations:
 | Skill | Trigger | What it does |
 | --- | --- | --- |
 | `commit` | `$commit` | Commits the currently staged changes only — concise message from the existing index, never stages anything extra. |
-| `mr-markdown` | `$mr-markdown` | Codex port of the `/mr-markdown` command: condensed MR description for the current branch in one copyable code block. |
+| `mr-markdown` | `$mr-markdown` | Codex port of the `/mr-markdown` command: the MR description for the current branch in one copyable code block, drafted in full, cut to 200 words, then rewritten to read like a person wrote it. |
 | `graphify` | `$graphify` | The Codex build of graphify. Genuinely differs from the Claude one, so it's stored separately rather than symlinked. |
 | `loop-me-in` | `$loop-me-in [path]` | Builds a runnable brief for native Codex goals, with acceptance gates, bounded recovery, evidence, and repository completion checks. Stored separately so Codex adaptations leave Claude unchanged. |
 
@@ -108,7 +108,7 @@ records both in `config.toml` (per machine, not tracked here).
 | Command | What it does |
 | --- | --- |
 | `/commit` | Commits the currently staged changes. |
-| `/mr-markdown` | Generates a condensed MR markdown for the changes on the current branch. |
+| `/mr-markdown` | Writes the MR description for the current branch in three stages: a full draft (with a Dependencies section linking related MRs when there are any), a cut to 200 words, and a rewrite that removes jargon and AI tells. |
 
 ## Sync
 
