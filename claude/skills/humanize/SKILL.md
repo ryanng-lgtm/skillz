@@ -1,9 +1,15 @@
 ---
 name: humanize
-description: Use when Claude-authored text (design doc, MR description, README section, chat/message draft) needs to read like a specific person wrote it — before pasting into Discord or GitLab, before publishing a doc, or when text shows AI tells like perfect parallelism, em-dash qualifiers, "Crucially,", recap paragraphs, zero first person. Takes a voice reference file; asks for one if none is given. Trigger: /humanize [light] [--voice <path>] [path].
+description: >-
+  Use when Claude-authored text (design doc, MR description, README section,
+  chat/message draft) needs to read like a specific person wrote it — before
+  pasting into Discord or GitLab, before publishing a doc, or when text shows AI
+  tells like perfect parallelism, em-dash qualifiers, "Crucially,", recap
+  paragraphs, zero first person. Trigger: /humanize [light] [--voice <path>]
+  [path], $humanize [light] [--voice <path>] [path].
 ---
 
-# Humanize — make Claude output read like a real person wrote it
+# humanize — make Claude output read like a real person wrote it
 
 ## Overview
 
@@ -41,7 +47,7 @@ Read the whole target before touching it.
 4. Verify invariants below.
 5. Report changes grouped by tell category, plus anything deliberately kept (e.g. a table that earns its keep), and name the voice reference used.
 
-## Hard invariants — both modes
+## Rules — invariants in both modes
 
 - Technical facts, numbers, file:line cites, URLs, identifiers, code blocks: byte-exact.
 - Security warnings: never softened.
@@ -49,9 +55,9 @@ Read the whole target before touching it.
 
 ## Common mistakes
 
-- Fixing the surface and shipping the structure: the strongest tells are parallelism, triads, and recap paragraphs, not vocabulary.
-- Ending the rewrite with "In short: X, Y, and Z" — the deleted bullet list restated as a new triad.
-- AI-does-casual for chat: lowercase + emoji + tidy clauses is not a real casual register. Take casing, punctuation, typo level, emoji rate, and message length from the reference's samples and stats — and tell one story, do not summarize all the facts.
-- Hedging everything: hedges go only where the source text is genuinely uncertain, and in the hedge words the reference uses.
-- Polishing the grammar: comma splices, dropped articles, dropped apostrophes, and missing terminal periods are part of a voice when the reference shows them; do not fix them into AI-perfect sentences.
-- Copying sample sentences wholesale when the target overlaps a sample's subject: imitate the shapes, write fresh sentences.
+- **Fixing the surface and shipping the structure:** the strongest tells are parallelism, triads, and recap paragraphs, not vocabulary.
+- **Ending the rewrite with "In short: X, Y, and Z"** — the deleted bullet list restated as a new triad.
+- **AI-does-casual for chat:** lowercase + emoji + tidy clauses is not a real casual register. Take casing, punctuation, typo level, emoji rate, and message length from the reference's samples and stats — and tell one story, do not summarize all the facts.
+- **Hedging everything:** hedges go only where the source text is genuinely uncertain, and in the hedge words the reference uses.
+- **Polishing the grammar:** comma splices, dropped articles, dropped apostrophes, and missing terminal periods are part of a voice when the reference shows them; do not fix them into AI-perfect sentences.
+- **Copying sample sentences wholesale when the target overlaps a sample's subject:** imitate the shapes, write fresh sentences.
