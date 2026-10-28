@@ -23,6 +23,7 @@ Ryan's agent skills and global instructions, shared across machines. One source 
 | [`regroup`](claude/skills/regroup/SKILL.md) | Claude | Trims a branch's tests to the necessary ones and rewrites its commits for review, leaving the code byte-identical. |
 | [`shared-dev`](claude/skills/shared-dev/SKILL.md) | Claude | Brings up the backend services a change needs in shared-dev, probes main against the branch with real data, and tears down. |
 | [`socratic-teacher`](claude/skills/socratic-teacher/SKILL.md) | Claude, Codex | Teaching mode: one guiding question per turn, never the full solution. |
+| [`status-line`](claude/skills/status-line/SKILL.md) | Claude | One-time setup of the Claude Code status line (model, folder, branch, context, usage limits, effort), changing only `statusLine` in `settings.json`. |
 | [`syncup`](claude/skills/syncup/SKILL.md) | Claude, Codex | Rebases the working branch and every behind MR or PR onto its target, resolving conflicts and keeping uncommitted work. |
 | [`test-audit`](claude/skills/test-audit/SKILL.md) | Claude | Gates new or changed tests on the behaviour they protect, and sweeps out low-value ones. |
 | [`testing-harness`](claude/skills/testing-harness/SKILL.md) | Claude, Codex | Proves a change in the running OM Chat GUI with cloud-versus-local visual diffs and browser probes. |
