@@ -7,7 +7,7 @@ description: Use when a branch's commits or tests need cleaning up for review â€
 
 The reviewer reads the MR commit by commit, and CI runs every test the MR
 adds on every pipeline after it. `/regroup` trims the tests the branch adds
-to the ones that guard something, then rewrites `base..HEAD` into commits
+to the absolutely necessary ones, then rewrites `base..HEAD` into commits
 that each make one step of the change, in reading order. Only tests and
 testdata change; the script proves everything else at the tip unchanged.
 
@@ -43,27 +43,53 @@ from its diff: old messages like `wip fix rounding` are often wrong.
 
 ## 2. Trim the tests
 
-**REQUIRED SUB-SKILL:** test-audit. Its authoring gate and junk patterns
-decide whether a test the branch adds is worth running on every pipeline.
+Agent-written tests bloat, and CI runs every one on every pipeline from now
+on. Keep only the tests that are absolutely necessary: delete by default,
+and make each test you keep earn its place.
+
+**REQUIRED SUB-SKILL:** test-audit. Its junk patterns name tests to delete.
+
+A test the branch adds stays only when you can write down both answers:
+
+1. **The bug it catches**: a mistake someone could plausibly make in code
+   this branch adds or changes, which a user, caller or contract would see.
+2. **Why no other kept test catches it.** One test per behavior; of two
+   that catch the same bug, keep the one with the exact assertion.
+
+Everything else goes, however thorough it looks:
+
+- one case per value through the same code: keep one at most, with a value
+  that tells a real result from a default (not 0 or empty). A table only
+  when each value runs its own hand-written code;
+- a happy path that a kept regression or edge test already runs;
+- tests of defaults, constructors, getters, constants, data tables, types,
+  or of the language, a framework or a library (argparse rejecting a
+  missing argument);
+- smoke tests ("does not raise", "prints something"), tests that a mock was
+  called, and tests that cannot fail (a value compared with itself, no
+  assertion);
+- tests of private helpers that a kept public-path test already runs.
+
+A bug fix keeps one regression test, once you have seen it fail on the code
+before the fix.
 
 - Trim only test cases this branch adds. Cases already on the base stay,
   even where the branch edits them (a rename) or they duplicate each other;
   name the duplicates in the report.
-- Cases that feed different values through one code path: keep one, with a
-  value that tells a real result from a default (not 0 or empty). Cases
-  whose values each reach different code (a hand-written or generated
-  function per value): fold them into one table-driven test.
-- Keep each bug fix's regression test and each error path's only test.
-- Delete testdata that only the removed tests read.
-- Every changed code line the suite ran before the trim still runs after
-  it. Run the coverage tool before and after (Go `go test -coverprofile`,
-  TypeScript the runner's `--coverage`, Python `coverage run` or the
-  stdlib `trace` module) and check the code lines `git diff -U0 <base>`
-  lists. A line that stops running gets a test back, unless its only test
-  could not fail (it compares a value with itself, or asserts nothing):
-  drop that test and report the line as untested.
+- Delete testdata and test helpers that only removed tests used.
+- Coverage informs the answers; it is not a quota. Run the coverage tool
+  before and after (Go `go test -coverprofile`, TypeScript the runner's
+  `--coverage`, Python `coverage run`, or without it
+  `python3 -m trace --count --missing -C <dir> --module unittest discover ...`,
+  which marks lines that never ran with `>>>>>>` in `<dir>/*.cover`) and
+  check the code lines `git diff -U0 <base>` lists. A changed line that
+  stops running gets a test only when that test has both answers;
+  otherwise report it as untested.
+- The trim removes, folds and renames tests; it never adds coverage the run
+  did not have. Report the gaps instead, such as per-value code no test
+  ever ran.
 - The trim changes tests and testdata only. Code it shows to be dead or
-  untested stays as it is; report it.
+  untested stays as it is, with no new test written for it; report it.
 
 Run the suite, then commit the trim on the branch with `/commit` before
 planning. The plan takes test files at the tip, so the trim folds into the
@@ -165,8 +191,8 @@ Show Ryan:
 
 - the old and new `git log --oneline` with each commit's size (`stats`
   before and after), the backup ref and the check result;
-- the tests removed or folded, a line per group on why, and the test count
-  and test lines before and after;
+- each kept test with its two answers, the removed tests grouped by why,
+  and the test count and test lines before and after;
 - duplicate base tests left alone, dead code, and changed code lines no
   test runs, whether the trim stopped them or they never ran.
 
@@ -180,9 +206,10 @@ Delete them with `git update-ref -d <ref>` once the MR has merged.
 
 ## Common mistakes
 
-- Deleting per-value tests whose values each reach different code, then
-  calling the lines that stopped running "the same shape" as one that
-  still runs.
+- Keeping a test because it adds coverage or looks thorough, without
+  naming the bug only it catches.
+- Deleting the only test of per-value hand-written code because another
+  value's function "has the same shape".
 - Trimming tests that were already on the base.
 - Trimming after `apply`, so the tests land in a second tests commit.
 - Making up a halfway version of one big file to get under 600 lines.
