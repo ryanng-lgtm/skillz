@@ -29,7 +29,12 @@ claude/
 codex/
   AGENTS.md      global instructions        → ~/.codex/AGENTS.md
   skills/        skills                     → ~/.codex/skills/<name>
+templates/
+  skill-template.md                         not linked anywhere
 ```
+
+`templates/skill-template.md` is a skill skeleton copied from
+[wooneusean/skills](https://github.com/wooneusean/skills/blob/main/templates/skill-template.md).
 
 `install.sh` also points `~/.claude/plans` and `~/.codex/plans` at the same
 iCloud-synced Obsidian folder (`Obsidian/Claude Plans`), so plan files from
