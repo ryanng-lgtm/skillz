@@ -9,6 +9,7 @@ Ryan's agent skills and global instructions, shared across machines. One source 
 | [`bump-rc`](claude/skills/bump-rc/SKILL.md) | Claude, Codex | Releases `@openmarket/rooms-client`, choosing the version bump from what changed, and repins both GUI consumers. |
 | [`commit`](claude/skills/commit/SKILL.md) | Claude, Codex | Commits only what is already staged, with a short message in the repo's style. |
 | [`demuddy`](claude/skills/demuddy/SKILL.md) | Claude, Codex | Makes a much-edited plan handover-ready, or cleans up the comments a code change left behind, keeping every gotcha and cite. |
+| [`docs-knowledge-base`](claude/skills/docs-knowledge-base/SKILL.md) | Claude, Codex | Looks up and records durable facts in a nested markdown docs dir, with `INDEX.md` tables generated and checked by `build-index.py`. |
 | [`graphify`](claude/skills/graphify/SKILL.md) | Claude, Codex (own copy) | Turns code, docs, papers, images or video into a knowledge graph to query instead of grepping. |
 | [`humanize`](claude/skills/humanize/SKILL.md) | Claude, Codex | Rewrites Claude-authored text so it reads like Ryan wrote it. |
 | [`ivtg`](claude/skills/ivtg/SKILL.md) | Claude, Codex | Investigates issues one at a time across the named repos and writes each up as a fix plan. Never implements. |
@@ -28,7 +29,7 @@ Ryan's agent skills and global instructions, shared across machines. One source 
 | [`war-diary`](claude/skills/war-diary/SKILL.md) | Claude, Codex | Turns a day's GitLab activity and Claude Code sessions into War Diaries notes and Kanban cards. |
 | [`world-todo`](claude/skills/world-todo/SKILL.md) | Claude, Codex | Plans every OM World service change before implementation, however small. |
 
-`openmarket` and `om-chat` ship with the `om` CLI and are vendored here so both agents get the same copy; they are not listed. `socratic-teacher` and the skill template are adapted from [wooneusean/skills](https://github.com/wooneusean/skills).
+`openmarket` and `om-chat` ship with the `om` CLI and are vendored here so both agents get the same copy; they are not listed. `socratic-teacher`, `docs-knowledge-base` and the skill template are adapted from [wooneusean/skills](https://github.com/wooneusean/skills).
 
 ## Structure
 

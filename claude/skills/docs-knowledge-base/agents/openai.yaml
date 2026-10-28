@@ -1,0 +1,4 @@
+interface:
+  display_name: "Docs knowledge base"
+  short_description: "Look up and record facts in a nested markdown docs dir"
+  default_prompt: "Use $docs-knowledge-base to record this in the docs dir and rebuild its indexes."
