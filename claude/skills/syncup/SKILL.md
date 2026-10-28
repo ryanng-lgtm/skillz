@@ -1,6 +1,13 @@
 ---
 name: syncup
-description: Use when the user wants one or more local repos brought up to date with their default branch, or their open GitLab MRs or GitHub PRs rebased onto their target branches — refresh main from origin, rebase the working branch onto it, resolve every conflict, including when the worktree has uncommitted changes, and push the rebased MR branches. Picks candidates from the current session and from the user's open MRs that have fallen behind, or from a named stack (om-chat, fe, tc, be). Trigger: /syncup [repo|stack ...], "sync up my repos", "sync the FE stack", "rebase everything on main", "get me on latest main", "update my MRs", "rebase my MRs", "rebase my PRs".
+description: >-
+  Use when the user wants one or more local repos brought up to date with their
+  default branch, or their open GitLab MRs or GitHub PRs rebased onto their target
+  branches, including when the worktree has uncommitted changes or the user names
+  a stack (om-chat, fe, tc, be). Trigger: /syncup [repo|stack ...],
+  $syncup [repo|stack ...], "sync up my repos", "sync the FE stack",
+  "rebase everything on main", "get me on latest main", "update my MRs",
+  "rebase my MRs", "rebase my PRs".
 ---
 
 # syncup — bring selected repos and MRs up to date
@@ -20,6 +27,8 @@ unstaged/staged as it started, and push the unit if it is an MR. Units are proce
 time, sequentially**, inline in the main thread — never via subagents, because conflict resolution
 needs the full session context.
 
+**Core principle: if a unit cannot be finished safely, abort that unit back to its pre-sync state, do not push it, and keep going with the rest.**
+
 An MR here is a GitLab MR or a GitHub PR. The scripts find both, and every phase treats them the
 same.
 
@@ -28,25 +37,6 @@ or more, or `SYNCUP_ROOT`, a colon-separated list.
 
 The Bash tool runs zsh, where `$VAR:r…` is a modifier: always brace a variable followed by `:`
 (`"${SHA}:refs/heads/${SRC}"`), as every snippet below does.
-
-## Hard rules
-
-- **Push only MR source branches**, only in Phase 7, only with `--force-with-lease` pinned to the
-  SHA recorded in Phase 1. Never push the default branch, a protected branch, or a branch with no
-  open MR. Never plain `--force`, never `--no-verify`.
-- **Never `git stash`.** Dirty state travels as a temporary WIP commit (Phase 2). Reflog recovers a
-  botched WIP commit; a botched stash pop is much worse.
-- **Never `reset --hard`, `checkout -f`, `clean`, or `restore` on a repo with uncommitted work.**
-- **Never switch the user's checkout.** An MR branch that is not checked out is rebased in a
-  temporary worktree, and every temporary worktree is removed before its unit is reported.
-- **Never `rebase --skip` on a commit that is not the WIP commit.** Use `--onto` only for a
-  restack unit (Phase 4).
-- Record every unit's pre-sync SHA *before* touching it. Those SHAs are the undo handles and must
-  appear in the final report.
-- Only touch the repos the user selected. Never widen the set, never touch submodules.
-- Never edit `.git/config`, change remotes, or delete branches.
-- If a unit cannot be finished safely, abort **that unit** back to its pre-sync state, do not push
-  it, and keep going with the rest. Never leave a repo mid-rebase.
 
 ## Stacks
 
@@ -441,16 +431,35 @@ Review a result:      lazygit -p <path>
 Report the pre-sync SHA for every unit touched, including the ones that ended clean, and
 `<old>`/`<new>` for every pushed MR.
 
-## Anti-patterns
+## Rules
 
-- Reporting "synced" without the `merge-base --is-ancestor` check.
-- Pushing before Phase 6 passes, or with the WIP commit on `HEAD`.
-- Retrying a rejected lease with `--force`, or pushing with `--no-verify` past a failing hook.
-- Rebasing a restack unit with a plain `git rebase "origin/${TGT}"`.
-- Switching the user's checkout to reach an MR branch instead of using a temporary worktree.
-- `rebase --continue` without `GIT_EDITOR=true`.
-- Fixing a conflict by taking one whole side because the merge is tedious. State the trade-off and
+- **Push only MR source branches**, only in Phase 7, only with `--force-with-lease` pinned to the
+  SHA recorded in Phase 1. Never push the default branch, a protected branch, or a branch with no
+  open MR. Never plain `--force`, never `--no-verify`.
+- **Never `git stash`.** Dirty state travels as a temporary WIP commit (Phase 2). Reflog recovers a
+  botched WIP commit; a botched stash pop is much worse.
+- **Never `reset --hard`, `checkout -f`, `clean`, or `restore` on a repo with uncommitted work.**
+- **Never switch the user's checkout.** An MR branch that is not checked out is rebased in a
+  temporary worktree, and every temporary worktree is removed before its unit is reported.
+- **Never `rebase --skip` on a commit that is not the WIP commit.** Use `--onto` only for a
+  restack unit (Phase 4).
+- Record every unit's pre-sync SHA *before* touching it. Those SHAs are the undo handles and must
+  appear in the final report.
+- Only touch the repos the user selected. Never widen the set, never touch submodules.
+- Never edit `.git/config`, change remotes, or delete branches.
+- If a unit cannot be finished safely, abort **that unit** back to its pre-sync state, do not push
+  it, and keep going with the rest. Never leave a repo mid-rebase.
+
+## Common mistakes
+
+- **Reporting "synced" without the `merge-base --is-ancestor` check.**
+- **Pushing before Phase 6 passes, or with the WIP commit on `HEAD`.**
+- **Retrying a rejected lease with `--force`, or pushing with `--no-verify` past a failing hook.**
+- **Rebasing a restack unit with a plain `git rebase "origin/${TGT}"`.**
+- **Switching the user's checkout to reach an MR branch instead of using a temporary worktree.**
+- **`rebase --continue` without `GIT_EDITOR=true`.**
+- **Fixing a conflict by taking one whole side because the merge is tedious.** State the trade-off and
   pick deliberately.
-- Running Phase 4 on the next unit while one is mid-rebase.
-- Suggesting the user resolve conflicts in lazygit's merge tool as a substitute for resolving them
-  here. lazygit is for their review pass afterward.
+- **Running Phase 4 on the next unit while one is mid-rebase.**
+- **Suggesting the user resolve conflicts in lazygit's merge tool as a substitute for resolving them
+  here.** lazygit is for their review pass afterward.
