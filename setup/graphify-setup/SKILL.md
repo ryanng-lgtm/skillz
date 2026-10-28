@@ -39,7 +39,7 @@ Step 0 picks one. Every later step branches on it.
 - Run every command from the repo root (SINGLE) or the workspace root (CROSS), unless a step says otherwise.
 - Every step ends with a VERIFY gate. A gate fails → stop, diagnose, report. Do not continue.
 - All steps are idempotent. Re-running the whole file is safe.
-- graphify entries go in `.git/info/exclude`, never the tracked `.gitignore`. Commit nothing this skill creates.
+- graphify entries go in `.git/info/exclude`, never the tracked `.gitignore`. Commit nothing this runbook creates.
 - **CROSS: `MERGED_OUT` never lives inside a repo that has hooks installed.** That repo's post-commit hook runs `graphify update .`, rebuilds the file from that repo alone, and every other repo's nodes vanish — Step 7's `--force` semantics (allow node-count shrink) let it land without complaint. Step 0 gates this; Step 6 re-checks it.
 - CROSS: `query`, `explain`, and `path` default to `./graphify-out/graph.json`. Pass `--graph "$MERGED_OUT"` on every read, or you read the wrong graph or none.
 
@@ -60,7 +60,7 @@ Record `REPOS` (this one path) and `HOOKS_PATH` (empty = plain git hooks; `.husk
 
 **CROSS:**
 
-**Locate the workspace root first — it is usually not your cwd.** A session usually starts *inside* one of the target repos, so the directory you start in is a repo, not the workspace. The workspace root is the directory that *contains* the repos as children:
+**Locate the workspace root first — it is not your cwd.** This file is often dropped *inside* one of the target repos, so the directory you start in is a repo, not the workspace. The workspace root is the directory that *contains* the repos as children:
 
 ```bash
 # If cwd is inside a git repo, the workspace root is that repo's PARENT:
@@ -157,6 +157,11 @@ logs/
 *.log
 *.tsbuildinfo
 
+# this runbook, if it was copied into the repo. Markdown IS extracted — leaving it
+# in puts "SINGLE", "CROSS", "MERGED_OUT" and the step titles into the graph as
+# concept nodes, so install instructions surface as if they were architecture.
+INSTALL.md
+
 # editor / agent state
 .claude/
 .vscode/
@@ -196,10 +201,11 @@ graphify-out/
 .graphifyignore
 .husky/post-commit
 .husky/post-checkout
+INSTALL.md
 EOF
 ```
 
-The `.husky/` lines are harmless in repos without husky. If Step 5 installs hooks elsewhere (custom `core.hooksPath`), add those paths then.
+The `.husky/` lines are harmless in repos without husky. The `INSTALL.md` line hides this runbook from `git status` in whichever repo holds it; it is a no-op in the others, so leaving it in every repo is fine. (Keeping it out of the *graph* is separate — that is the `.graphifyignore` entry from Step 2.) If Step 5 installs hooks elsewhere (custom `core.hooksPath`), add those paths then.
 
 If the tracked `.gitignore` holds graphify patterns from an older setup, remove them and leave the edit uncommitted for the user to review.
 
@@ -259,7 +265,7 @@ graphify merge-graphs \
 
 The merge is a union of already-built graphs — ~0.25s for two mid-size repos (1,880 nodes). Cheap enough to re-run on every commit, which is what Step 6 does.
 
-**Graph file format** (needed to edit any script in this skill): graphify writes networkx node-link JSON. Edges live under `g['links']`, **not** `g['edges']`, keyed `source`/`target`. Merged nodes carry `repo`, `local_id`, and the namespaced `id`.
+**Graph file format** (needed to edit any script in this runbook): graphify writes networkx node-link JSON. Edges live under `g['links']`, **not** `g['edges']`, keyed `source`/`target`. Merged nodes carry `repo`, `local_id`, and the namespaced `id`.
 
 **VERIFY:**
 
