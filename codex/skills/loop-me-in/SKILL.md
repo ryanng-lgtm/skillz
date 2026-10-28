@@ -1,13 +1,15 @@
 ---
 name: loop-me-in
 description: >-
-  Turn an approved plan into a self-contained brief that a fresh Codex session can
-  execute and verify unattended. Resolve missing expected results, execution paths,
-  acceptance gates, retry caps, and reporting before handing it off.
+  Use when an approved plan needs to become a self-contained brief that a fresh
+  Codex session can execute and verify unattended. Not for an unsettled plan
+  (clean it up first) or a small direct edit that needs no loop.
   Trigger: $loop-me-in [path].
 ---
 
 # loop-me-in — a plan in, a runnable Codex brief out
+
+## Overview
 
 The brief must survive an empty session: copy the requirements and constraints,
 resolve the environment, and define observable completion. The execution loop
@@ -17,7 +19,9 @@ This is the independent Codex version. Do not edit the Claude skill or import it
 launch commands. Generating a brief does not start a goal, create a worktree, install
 dependencies, implement changes, commit, or post messages.
 
-## Prepare the handoff
+**Core principle: the brief must survive an empty session.**
+
+## Procedure
 
 1. Read the complete source plan and its specification authorities, including risks
    and unknowns. If multiple copies exist, diff them and use the copy Ryan named.

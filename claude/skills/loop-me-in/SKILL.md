@@ -1,6 +1,16 @@
 ---
 name: loop-me-in
-description: Use when a fix plan, spec, or design doc needs to become a file that a fresh session can execute unattended and prove its own changes landed — "make this runnable", "turn this plan into a loop", "so I can paste it and let it rip". Elicits the expected result of every change from the user first (never assumed), turns each into a committed spec written before the code, and gates the run on those specs. Trigger: /loop-me-in [path].
+description: >-
+  Use when a fix plan, spec, or design doc (an /ivtg fix plan, a
+  superpowers:writing-plans plan, a dated plan in the vault) is approved and needs
+  to become a file that a fresh session can execute unattended and prove its own
+  changes landed — "make this runnable", "turn this plan into a loop", "so I can
+  paste it and let it rip" — or when the last run kept pulling Ryan back in to
+  confirm a change had landed, or finished green having fixed something adjacent
+  to the actual complaint. Do NOT use for a plan still under discussion (run
+  /demuddy first) or a one-line change you'd just do. Trigger: /loop-me-in [path],
+  "make this runnable", "turn this plan into a loop", "so I can paste it and let
+  it rip".
 ---
 
 # loop-me-in — a plan in, a self-driving brief out
@@ -460,7 +470,9 @@ report to the findings log instead), a phase blocked by an earlier red phase
 Everything else: keep going. Do not stop to ask whether it looks right.
 ```
 
-## Rules for the brief you write
+## Rules
+
+### The brief you write
 
 - **Copy facts, don't cite them.** "See the handoff" fails in a fresh session. Paste the constraint.
 - **The paste line is the whole handover, and it assumes a session that knows nothing.** It is the one part guaranteed to arrive, so two things are always in it and neither is paraphrased, shortened, or left to the brief body:
@@ -479,66 +491,7 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 - **Pilot without blocking.** "Execute phase 1 and report before continuing" is a contradiction in an unattended run: if it waits for review the night ends after one phase, and if it doesn't it was never a pilot. Instead, when the plan is large or the repo is unfamiliar, make phase 1 a **self-judged canary** — it posts its result immediately and continues, and it *stops the run* only on a stated tripwire (its gate mode could not be validated, or the environment turned out different from the brief). Ryan wakes to either a finished run or a run that stopped at phase 1 with a reason.
 - **Feed lessons back.** If the run discovers a trap, it belongs in the plan's Environment traps for next time — fixing the instance without recording it means the next run pays again.
 
-## Common mistakes
-
-| Mistake | Consequence |
-|---|---|
-| Assuming the expected result instead of asking | Every gate passes; the run built the wrong thing, tested and committed |
-| Asking the spec questions as a numbered prose list instead of the interactive question tool | Ryan answers "defaults" to eight questions at once; the one he would have changed is now an assumption |
-| Treating a probe or a live capture as the expected result | Both measure CURRENT. You have just specified the bug as the requirement |
-| An EXPECTED with no named authority | Nobody can tell later whether it was a decision or a guess |
-| Paraphrasing Ryan's expected result into the brief | The assumption you avoided re-enters as your wording |
-| Negotiating an ambiguous issue in prose instead of asking for a live capture | Rounds of clarification, and a spec written on the wrong reading anyway |
-| A live capture described in chat but never saved to the evidence dir | The one piece of ground truth is gone when the run needs it |
-| Deriving an expected value from the implementation | The spec asserts what the code does, so it passes whether the code is right or not |
-| Writing a spec blind to the harness, fixtures and interfaces | Guaranteed missing-import and bad-selector failures — the exact ones that don't count as red |
-| Demanding `behavior-red` of a refactor or a perf change | Unsatisfiable gate; the phase cannot start, or a fake failure gets manufactured to satisfy it |
-| Accepting any non-zero exit as red | A missing runner, syntax error or zero tests executed all look like proof; none is |
-| Relying on commit order as the red evidence | Proves text order only. Without a receipt, nothing shows the spec ever ran or why it failed |
-| An intentionally-red commit in a repo with CI on every push or bisect in use | You have knowingly broken CI, cherry-picks and `git bisect` for a record a receipt could have carried |
-| Loosening an assertion and calling it a mechanical fix | The one move that voids the scheme, wearing the costume of the one that's allowed |
-| Treating a spec that passes pre-implementation as a green phase | Either the requirement was already met, the spec is wrong, or it isn't running — and the run can't tell which |
-| Linking the spec instead of copying its constraints | Fresh session can't see it; invents its own interpretation |
-| Omitting the worktree path, or not forbidding per-phase worktrees | A later phase builds against a tree missing the earlier ones; fails quietly |
-| A paste line with no worktree clause | The run commits straight onto the default branch, inside Ryan's own checkout, overnight |
-| A paste line carrying `~` paths, an unresolved symlink, or a leftover placeholder | The fresh session cannot find the brief it was told to follow, and improvises from the sentence alone |
-| Assuming the default branch is `main`, or cutting from a stale local copy of it | Breaks outright on a `master`/`develop` repo, or lands the whole run on a base weeks behind origin |
-| A new worktree used before its install | The first gate fails on missing dependencies and reads as a code failure |
-| Building from a stale copy of the plan | Implements a superseded fix; the cite that was corrected is the one it follows |
-| Dropping the plan's unknowns | Run "fixes" a bug the report was never about, and closes it |
-| "Run the tests" with no command or baseline | Any red result reads as catastrophe or gets ignored |
-| No stop conditions | Run guesses on the one question that needed a human |
-| Leaving publish/push/merge unqualified | An unattended run does something outward-facing |
-| Writing the brief into the repo | Plan docs get committed, against house rules |
-| A paste line naming a trigger this session doesn't have | The brief is dead on arrival; nothing runs at all |
-| Printing the paste line before the brief audit ran | The one reader who would have caught a wrong `EXPECTED` never saw it; the run builds it faithfully |
-| Committing a spec the other model never audited | A tautology or a paraphrased requirement becomes the night's acceptance oracle |
-| Committing on a glance at the diff, or the author reviewing its own hunks | An unexplained hunk lands with the fix, and nobody asked for it |
-| Naming a codex model in an invocation instead of `$CODEX_MODEL` | The pin outlives the config; every brief silently runs last quarter's model |
-| Sweeping without the build-identity gate | "Verified" against a stale bundle or a second server on the same port |
-| No attempt cap, or a third attempt that patches instead of diagnosing | Patches forever against a wrong model of the bug |
-| Fixing out-of-scope bugs the sweep surfaced | Unattended scope creep, in a diff nobody watched grow |
-| Writing `timeout 900 …`, or no time box at all | No such binary on macOS; and one hang costs the whole window |
-| Gate helpers left to run under zsh | zsh doesn't word-split, so a multi-file gate collapses to one bogus path and reports "no tests found" — which reads as green |
-| An unquoted `$RUN_DIR` | The plans vault path contains spaces; the evidence write lands somewhere else or fails silently |
-| Treating "the CDP port answers" as a working browser | Sweeps run against a dead renderer and report false negatives all night |
-| Relaunching the browser until it works | Forty headless Chromes by morning, nothing verified |
-| Killing or tearing down a process the run didn't start | Takes down Ryan's browser, or another session's dev server |
-| No teardown, or `pkill -f chrome` as the teardown | Either leaks until the machine chokes, or kills everything he had open |
-| Evidence written to `/tmp`, or a teardown that deletes it | The night's only proof is gone before it's read |
-| A findings log that skips passing sweeps, or omits out-of-scope finds | No way to tell which phase broke what; the bugs the sweep found are lost |
-| Writing the post from memory instead of `/mr-markdown` | Claims drift from the diff that actually landed |
-| Posting mid-plan on a bundled `ivtg-*` fix set | Partial claims about fixes whose siblings are still red |
-| A post over its ceiling, or a per-wave post with nothing substantial | The loop's only output goes unread, or the next real one gets skimmed |
-| Compressing the post or the findings log | Tokens saved by making the only output Ryan reads useless |
-| A prompt that lets an agent narrate, or points at a file instead of quoting it | Pays for preamble and re-reads on every phase, every attempt |
-| The full suite as a scheduled gate, per attempt, phase, or wave | Hours of re-proving untouched code; the loop spends the night in the test runner |
-| A single test file as the only gate | Misses what the change broke in the modules that import it |
-| Re-running a suite to reproduce one failing case | Minutes per attempt to learn what the sweep already reported |
-| Comparing a targeted run against a full-suite baseline | A green subset reads as a green repo |
-| An escalation full-suite run with no log entry saying why | The one expensive run nobody can account for afterwards |
-
-## Red flags
+### Stop signs
 
 - **You're about to ask the spec questions as a prose list.** Stop; put them through `AskUserQuestion`, four at a time, recommended option first. The list form is where "defaults" swallows a decision nobody made.
 - **You're about to write an expected result Ryan never said.** If you cannot quote him or name the contract it comes from, you are guessing. Stop and ask.
@@ -559,3 +512,60 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 - A process gets started in the brief and never appears again. Ledger it, or it survives the run.
 - A phase step reads "start the browser". It starts once, before phase 1, and every later phase reuses it.
 - An overnight run with no note about the machine staying awake. `/loop` dies with the lid.
+
+## Common mistakes
+
+- **Assuming the expected result instead of asking.** Every gate passes; the run built the wrong thing, tested and committed
+- **Asking the spec questions as a numbered prose list instead of the interactive question tool.** Ryan answers "defaults" to eight questions at once; the one he would have changed is now an assumption
+- **Treating a probe or a live capture as the expected result.** Both measure CURRENT. You have just specified the bug as the requirement
+- **An EXPECTED with no named authority.** Nobody can tell later whether it was a decision or a guess
+- **Paraphrasing Ryan's expected result into the brief.** The assumption you avoided re-enters as your wording
+- **Negotiating an ambiguous issue in prose instead of asking for a live capture.** Rounds of clarification, and a spec written on the wrong reading anyway
+- **A live capture described in chat but never saved to the evidence dir.** The one piece of ground truth is gone when the run needs it
+- **Deriving an expected value from the implementation.** The spec asserts what the code does, so it passes whether the code is right or not
+- **Writing a spec blind to the harness, fixtures and interfaces.** Guaranteed missing-import and bad-selector failures — the exact ones that don't count as red
+- **Demanding `behavior-red` of a refactor or a perf change.** Unsatisfiable gate; the phase cannot start, or a fake failure gets manufactured to satisfy it
+- **Accepting any non-zero exit as red.** A missing runner, syntax error or zero tests executed all look like proof; none is
+- **Relying on commit order as the red evidence.** Proves text order only. Without a receipt, nothing shows the spec ever ran or why it failed
+- **An intentionally-red commit in a repo with CI on every push or bisect in use.** You have knowingly broken CI, cherry-picks and `git bisect` for a record a receipt could have carried
+- **Loosening an assertion and calling it a mechanical fix.** The one move that voids the scheme, wearing the costume of the one that's allowed
+- **Treating a spec that passes pre-implementation as a green phase.** Either the requirement was already met, the spec is wrong, or it isn't running — and the run can't tell which
+- **Linking the spec instead of copying its constraints.** Fresh session can't see it; invents its own interpretation
+- **Omitting the worktree path, or not forbidding per-phase worktrees.** A later phase builds against a tree missing the earlier ones; fails quietly
+- **A paste line with no worktree clause.** The run commits straight onto the default branch, inside Ryan's own checkout, overnight
+- **A paste line carrying `~` paths, an unresolved symlink, or a leftover placeholder.** The fresh session cannot find the brief it was told to follow, and improvises from the sentence alone
+- **Assuming the default branch is `main`, or cutting from a stale local copy of it.** Breaks outright on a `master`/`develop` repo, or lands the whole run on a base weeks behind origin
+- **A new worktree used before its install.** The first gate fails on missing dependencies and reads as a code failure
+- **Building from a stale copy of the plan.** Implements a superseded fix; the cite that was corrected is the one it follows
+- **Dropping the plan's unknowns.** Run "fixes" a bug the report was never about, and closes it
+- **"Run the tests" with no command or baseline.** Any red result reads as catastrophe or gets ignored
+- **No stop conditions.** Run guesses on the one question that needed a human
+- **Leaving publish/push/merge unqualified.** An unattended run does something outward-facing
+- **Writing the brief into the repo.** Plan docs get committed, against house rules
+- **A paste line naming a trigger this session doesn't have.** The brief is dead on arrival; nothing runs at all
+- **Printing the paste line before the brief audit ran.** The one reader who would have caught a wrong `EXPECTED` never saw it; the run builds it faithfully
+- **Committing a spec the other model never audited.** A tautology or a paraphrased requirement becomes the night's acceptance oracle
+- **Committing on a glance at the diff, or the author reviewing its own hunks.** An unexplained hunk lands with the fix, and nobody asked for it
+- **Naming a codex model in an invocation instead of `$CODEX_MODEL`.** The pin outlives the config; every brief silently runs last quarter's model
+- **Sweeping without the build-identity gate.** "Verified" against a stale bundle or a second server on the same port
+- **No attempt cap, or a third attempt that patches instead of diagnosing.** Patches forever against a wrong model of the bug
+- **Fixing out-of-scope bugs the sweep surfaced.** Unattended scope creep, in a diff nobody watched grow
+- **Writing `timeout 900 …`, or no time box at all.** No such binary on macOS; and one hang costs the whole window
+- **Gate helpers left to run under zsh.** zsh doesn't word-split, so a multi-file gate collapses to one bogus path and reports "no tests found" — which reads as green
+- **An unquoted `$RUN_DIR`.** The plans vault path contains spaces; the evidence write lands somewhere else or fails silently
+- **Treating "the CDP port answers" as a working browser.** Sweeps run against a dead renderer and report false negatives all night
+- **Relaunching the browser until it works.** Forty headless Chromes by morning, nothing verified
+- **Killing or tearing down a process the run didn't start.** Takes down Ryan's browser, or another session's dev server
+- **No teardown, or `pkill -f chrome` as the teardown.** Either leaks until the machine chokes, or kills everything he had open
+- **Evidence written to `/tmp`, or a teardown that deletes it.** The night's only proof is gone before it's read
+- **A findings log that skips passing sweeps, or omits out-of-scope finds.** No way to tell which phase broke what; the bugs the sweep found are lost
+- **Writing the post from memory instead of `/mr-markdown`.** Claims drift from the diff that actually landed
+- **Posting mid-plan on a bundled `ivtg-*` fix set.** Partial claims about fixes whose siblings are still red
+- **A post over its ceiling, or a per-wave post with nothing substantial.** The loop's only output goes unread, or the next real one gets skimmed
+- **Compressing the post or the findings log.** Tokens saved by making the only output Ryan reads useless
+- **A prompt that lets an agent narrate, or points at a file instead of quoting it.** Pays for preamble and re-reads on every phase, every attempt
+- **The full suite as a scheduled gate, per attempt, phase, or wave.** Hours of re-proving untouched code; the loop spends the night in the test runner
+- **A single test file as the only gate.** Misses what the change broke in the modules that import it
+- **Re-running a suite to reproduce one failing case.** Minutes per attempt to learn what the sweep already reported
+- **Comparing a targeted run against a full-suite baseline.** A green subset reads as a green repo
+- **An escalation full-suite run with no log entry saying why.** The one expensive run nobody can account for afterwards
