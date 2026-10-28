@@ -79,6 +79,7 @@ Ask-shape rules — pick the surface before reading any detail file:
 - Which metrics an instrument serves (and since when), or an option chain by strike and side → `om instruments` or `om option-chain` (v3 data transport only); listings by data type → `symbols` with `types`.
 - Inside a chat room: "what happened in #x / catch me up" → `rooms_changes_since` (or `room_history` to page a window); "find what someone said" → `room_message_search` (one room) or `rooms_search_messages` (across rooms); file and doc work (what files are here, capture this to a doc, edit or share one) → the rooms doc verbs (rooms-docs.md §"The verbs").
 - "Did a watched stream coincide with price?", event anchors, or pre/post returns on event-watch rows → `research_study` (research.md §"Event studies") — correlational, never a signal.
+- What the chat sidebar shows ("only fired watches in my sidebar") → `sidebar_layout`.
 
 <!-- chat-context: omit-start -->
 ## Channels
