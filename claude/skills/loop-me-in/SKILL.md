@@ -43,16 +43,6 @@ Everything between those is the run's job, commits on its own branch included. A
 
 **The point of touchpoint 1 is to buy out touchpoints later.** Time spent pinning down expected results is not overhead added to the run — it is the per-phase "does this look right?" interruptions, paid once, in daylight, before the machine is committed to anything.
 
-## When to use
-
-- A `/ivtg` fix plan, a `superpowers:writing-plans` plan, or any dated plan in the vault is approved and ready to execute.
-- You want to hand execution to a session you won't babysit.
-- Symptoms: the plan says "then fix it" without naming the branch; it assumes a tool that 404s; it was written before three decisions that have since been made; the last run kept pulling you back in to confirm whether a change had actually landed; the last run finished green and had fixed something adjacent to the actual complaint.
-
-**Budget for the specification session.** This skill front-loads a conversation: every requirement's expected result, probed and where necessary captured live. That is the work, not a preamble to it — a plan handed over without it produces a brief that cannot tell right from wrong.
-
-**Don't use for:** a plan still under discussion (run `/demuddy` first), or a one-line change you'd just do.
-
 ## Procedure
 
 1. **Read the whole plan** — including the sections that aren't instructions. Also read anything it cites as spec-of-record. The brief must stand alone, so facts have to be copied in, not linked.
@@ -72,7 +62,7 @@ Everything between those is the run's job, commits on its own branch included. A
 3. **Lock the acceptance oracle for every requirement. Ask; never assume.** A conversation with Ryan, before phases exist — and it is held **through the interactive question tool (`AskUserQuestion`), never as a numbered list in prose.** Batch up to four questions per call, one requirement decision per question, the recommended answer first and marked `(Recommended)`, each option's consequence in its description. A prose list of "reply defaults or list the numbers you change" is not a spec session: it makes Ryan do the bookkeeping, and an unanswered item silently becomes an assumption. Do not wait to be told to ask interactively — the skill invokes the tool itself, as soon as the environment is resolved and the probes have run. Work the ladder in **Establishing expected results** below until each requirement has a `CURRENT` and an `EXPECTED` with a named authority, specific enough to encode as an assertion. Assign each one a **gate mode** (table in **Spec-first**). **A requirement whose `EXPECTED` you inferred is a brief-generation blocker: the brief does not ship until Ryan settles it.**
 4. **Plan the specs; the run writes them.** In the brief, map requirements to spec files and phases — many-to-many is fine and often correct. For each, record the gate mode and the *expected* failure signature. The run writes, validates and commits each spec at the start of its own phase; the brief carries the plan and the expected signature, not the spec's text or its recorded output. See **Spec-first**.
 5. **Harvest the traps.** Every "don't do X, it breaks Y" you know: package managers that 404, files that must be regenerated rather than hand-merged, test harnesses with sharp edges, suites that OOM. A trap costs one line here and an hour there.
-6. **Design the verify loop around the specs.** Pick the harness, resolve the surface (command, port, URL), and for each phase name its spec files plus the sentinel proving the build under test is this one. Do this while you still have the plan open. Where a requirement cannot be a unit spec — a visual, a layout, a live surface — its spec is a *scripted* assertion (a committed CDP script, or a command with an expected value), never sweep prose.
+6. **Design the verify loop around the specs.** Read `references/verify-loop.md` first: the brief copies its commands, and the rules below are summaries of it. Pick the harness, resolve the surface (command, port, URL), and for each phase name its spec files plus the sentinel proving the build under test is this one. Do this while you still have the plan open. Where a requirement cannot be a unit spec — a visual, a layout, a live surface — its spec is a *scripted* assertion (a committed CDP script, or a command with an expected value), never sweep prose.
 
    **Resolve the stack's adapters here, by name**, so the brief is not silently hard-coded to one ecosystem: `START`, `TEST_ONE`, `TEST_IMPACTED`, `TYPECHECK`, `BUILD`, `DIST_CHECK`. A repo without one of these omits that gate explicitly rather than inheriting a command from another project. Resolve `CODEX_MODEL` the same way: read the `model =` line of `~/.codex/config.toml` and write the literal into the brief's helper block. Every codex call in the brief passes `-m "$CODEX_MODEL"`; none names a model of its own.
 7. **Ask where it reports** — through the same interactive question tool, in the same batch as the spec questions where the batch has room. Do not infer the channel or topic from the plan's subject. Ask the user to paste the destination — channel, and topic if the work belongs to one — once per area if the plan splits across several. Resolve what they paste to a canonical resource string and write that into the brief.
@@ -141,21 +131,11 @@ Acceptance criteria are **files in the repo**, whose meaning is fixed from `EXPE
    Weakening, skipping, deleting or loosening an assertion to make an implementation pass is never a mechanical fix, whatever it looks like at attempt 3.
 8. **Requirements, specs and phases are many-to-many.** One requirement may need several focused spec files and shared fixtures; several coupled requirements may need one atomic implementation. The brief carries a **traceability matrix** — requirement ↔ spec files ↔ phase — so coverage is checkable without forcing a 1:1:1 that produces giant spec files, duplicated fixtures and phases that cannot independently go green. What each phase must state is which spec files are its gate.
 
-### What this actually buys — stated honestly
-
-**Spec-first does not reveal blast radius.** Writing the test before the code tells you nothing about which other modules the change can break. Focused-test *selection* is what saves time, and it is a separate mechanism that spec-first makes easier rather than causes.
-
-The real saving is narrow and worth having: **inside the fix loop**, the question is "do this phase's spec files pass?" — seconds, no guessing which suite covers the change. That is where the attempts pile up, so that is where the hours were going.
-
-What has *not* gone away: an impacted-test set still runs at the phase boundary, and a wider gate at the wave boundary. A green spec proves the requirement is met; it does not prove nothing else broke. Anyone who reads this scheme as "no more suite runs" will ship a regression.
-
-The specs accumulate. By the last phase, the run's own spec files are a fast, targeted regression suite for exactly the behaviour this plan cared about — and they stay in the repo afterwards, which is the durable half of the work.
-
 ## The verify loop
 
 The brief verifies itself. Manual confirmation is not a phase, not a gate, and not a completion criterion.
 
-Commands, prompts, the sweep output contract, and the exact codex invocations live in `references/verify-loop.md`. **Copy the resolved commands into the brief** — a fresh session will not read that file.
+Read `references/verify-loop.md` when you design the loop (procedure step 6). It holds the commands, prompts, the sweep output contract and the exact codex invocations, and the detail behind each rule below. **Copy the resolved commands into the brief** — a fresh session will not read that file.
 
 ### Two models, and neither clears its own work
 
@@ -168,7 +148,7 @@ The Claude session plans; codex verifies and audits. The split follows what each
 | Audit the brief, audit each spec, review a diff the run wrote | codex | the author is the worst judge of its own work |
 | Review a diff codex wrote | the Claude session | same rule, other direction |
 
-**The model that wrote an artifact never clears it alone.** Brief, spec and diff each get a verdict block from the other side before they ship, are committed, or land. Invocations and contracts: `references/verify-loop.md`, sections 11 to 13.
+**The model that wrote an artifact never clears it alone.** Brief, spec and diff each get a verdict block from the other side before they ship, are committed, or land; a verdict that exists only as "looked fine" did not happen. Invocations and contracts: `references/verify-loop.md`, sections 11 to 13.
 
 Codex spends tokens faster. The effort ladder, the time boxes, the one-agent rule and the inline compression preamble exist for that, and the audits obey all four.
 
@@ -181,17 +161,6 @@ Codex spends tokens faster. The effort ladder, the time boxes, the one-agent rul
 | Backend, CLI, library | A command with an expected value | A browser check that proves nothing is worse than admitting the check is a command |
 
 `claude-in-chrome` is the wrong tool here: per-site permission grants and Ryan's real profile mean the run stalls at 3am waiting for consent.
-
-### The build-identity gate
-
-Every sweep opens with a gate in two parts:
-
-- the process listening on the app's port has its `cwd` inside this worktree, and
-- a **sentinel** — a string that exists only after this phase's change — reaches the served output.
-
-Both pass or the sweep is void. A void sweep is recorded as *not verified*, and the run rebuilds and re-gates; it is never recorded as *not landed*. Without this, a stale bundle or a second dev server on the same port turns "verified" into "clicked around something".
-
-Name a sentinel per phase while writing the brief: a new `data-testid`, a new route, a new label. A phase with no observable sentinel gets a command gate instead, and the brief says so.
 
 ### The loop
 
@@ -206,6 +175,8 @@ build → identity gate → run this phase's specs + sweep → specs green, acce
                                            spec) → attempt += 1 → back to build
 ```
 
+**Every sweep opens with a two-part build-identity gate:** the process listening on the app's port has its `cwd` inside this worktree, and a **sentinel** — a string that exists only after this phase's change — reaches the served output. Both pass or the sweep is void: recorded as *not verified*, rebuilt and re-gated, never recorded as *not landed*. Without it, a stale bundle or a second dev server on the same port turns "verified" into "clicked around something". Name a sentinel per phase while writing the brief — a new `data-testid`, route or label. A phase with no observable sentinel gets a command gate instead, and the brief says so.
+
 The sweep returns a fixed shape — verdict per acceptance row with the evidence, regressions seen en route, in-scope gaps with a file guess, out-of-scope findings left alone, and the single question that would need a human. The out-of-scope slot is what keeps an unattended run from wandering: those findings get recorded and reported, not fixed.
 
 **Cap at 3 sweeps per phase, and the third attempt changes job.** Two failures of the same class mean the model of the problem is wrong, so attempt 3 is not a third patch: it is a read-only diagnosis agent that returns a root cause and a verdict on whether the plan's premise still holds. The phase then stops red with that explanation in the findings log, and the run moves to the next phase that does not depend on it. An explanation is worth more than a fourth patch.
@@ -214,7 +185,7 @@ The sweep returns a fixed shape — verdict per acceptance row with the evidence
 
 ### Targeted gates. The full suite is a last resort, not a tier.
 
-A suite that takes 224 seconds is not a gate — at fourteen phases and three attempts it is two and a half hours of re-proving code the phases never touched. It stays out of the loop entirely, and out of the wave boundary too. Every scheduled gate is scoped to what the change can reach:
+A suite that takes 224 seconds is not a gate — at fourteen phases and three attempts it is two and a half hours of re-proving code the phases never touched. Every scheduled gate is scoped to what the change can reach:
 
 | Tier | Scope | When |
 |---|---|---|
@@ -222,18 +193,9 @@ A suite that takes 224 seconds is not a gate — at fourteen phases and three at
 | **Phase** | Those specs, plus every spec written earlier in this run, plus the suites of modules importing the changed file | Once, when the attempt gate goes green |
 | **Wave** | The union of that wave's phase tiers, plus lint, typecheck, build, dist check | Once per wave |
 
-The attempt tier is only the phase's own spec files because spec-first named them: the traceability matrix lists the specs that gate each phase, so the inner loop asks only the questions this phase answers. That is the whole saving.
+The attempt tier is fast because the traceability matrix already names the specs that gate each phase. The phase tier is what makes that safe: **re-running every earlier spec** catches a phase that satisfies its own requirement by breaking a previous one, and **the importers' suites** catch what the change broke in consumers the specs never mention. A green spec proves the requirement is met; it does not prove nothing else broke.
 
-The phase tier is what makes the omission safe, and it has two parts for two different reasons. **Re-running every earlier spec** catches the phase that satisfies its own requirement by breaking a previous one — cheap, because these are targeted files the run wrote itself. **The importers' suites** catch what the change broke in consumers the specs never mention. Lint, typecheck and build stay at the wave boundary because they are fast; it is the test runner that is expensive.
-
-**The full suite runs in exactly two situations:**
-
-1. **Once at phase 0**, to capture the baseline. Without it no later number is interpretable, and one run is the price of reading every other run correctly.
-2. **As an escalation, when a failure will not localize** — a phase tier that comes back green while the sweep still reports a regression, or a failure whose origin the fix loop cannot find. Then it is a deliberate act: budgeted with `with_timeout`, logged in the findings log as an escalation with what prompted it, and named in the report. Never a reflex, never "to be safe".
-
-**Error scans are targeted too.** When a sweep returns a gap, re-run that one case — not the suite containing it. The failing case's own command goes in the sweep's output, so the fix loop never has to guess and never has to widen.
-
-**Never check a targeted run against the full-suite baseline.** "215 pass, 0 fail" is not "7084 pass, 59 fail". The brief states which number each tier is checked against, or a green subset gets read as a green repo.
+**The full suite runs in exactly two situations:** once at phase 0 to capture the baseline, and as an escalation when a failure will not localize, logged in the findings log with what prompted it. Never a reflex, never "to be safe". When a sweep returns a gap, re-run that one case, not the suite containing it. **Never check a targeted run against the full-suite baseline** — "215 pass, 0 fail" is not "7084 pass, 59 fail" — so the brief states which number each tier is checked against. Detail: `references/verify-loop.md`, section 8.
 
 ### The findings log
 
@@ -243,23 +205,16 @@ Passing sweeps get an entry too: a log that records only failures can't show tha
 
 **Out-of-scope findings are the reason the file exists.** They are the bugs the run found and was told not to fix, they are what a browser sweep is uniquely good at noticing, and a post capped at 40–100 words will not carry them.
 
-### One browser, proven healthy, reused
+### Browser and processes
 
-The most expensive failure mode here is a run that spends the night launching browsers instead of verifying with one.
+The most expensive failure mode here is a run that spends the night launching browsers instead of verifying with one. The recipes are in `references/verify-loop.md`, sections 1, 2, 9 and 10; the brief carries these rules:
 
-- **Reuse before starting.** A dev server already on the port whose `cwd` is the worktree gets reused; a Chrome already on the debugging port whose `--user-data-dir` is this run's profile gets reused. Neither is relaunched. A *foreign* process on either port is never killed — the dev server case stops the run, the Chrome case steps to the next port via `CHROME_DEVTOOLS_URL`.
-- **A port that answers is not a working browser.** Before the first sweep and at every heartbeat, the browser must pass a functional smoke test: navigate, evaluate, and write a real screenshot file. Those are the three things every sweep depends on, and `/json/version` still answers from a Chrome whose renderer has died.
-- **Two launch attempts for the whole run, then stop.** A relaunch loop ends the night with forty headless Chromes and zero verification. The third failure is a stop condition, not a retry.
-- **One tab, not one per check.** `--new-tab` once at the start, then navigate that same tab. Each extra tab is another renderer process.
-- **One codex agent at a time** — sweep, fix, audit or review, never two of them, never two phases in parallel.
-
-### Process ledger, memory, teardown
-
-Anything the run starts that outlives one command — dev server, Chrome, background codex — is recorded at spawn with its claimed port and PID, in a `## Process ledger` section the run appends to. Reused processes are recorded separately, because they must not be torn down.
-
-- **Between phases, a heartbeat:** app URL answers, browser passes the smoke test, no `codex exec` still running, no stopped background jobs, and two numbers — the RSS of this run's browser tree and the machine's free memory (`memory_pressure`). Anything stuck is killed and restarted, not waited on.
-- **Recycle on pressure, don't wait for the crash.** Browser tree over ~1.5 GB or system free under 15%: kill it by ledger PID and bring one back. A headless Chrome twenty sweeps deep is not the process it was at phase 1.
-- **Teardown runs on success, failure, and abort.** Kill by ledger PID, then one pattern kill scoped to this run's profile path to reap the renderer children; `pgrep` only to confirm nothing survived. A bare `pkill -f chrome` would take Ryan's own browser with it, and the brief must never contain one.
+- **Reuse before starting.** A dev server or Chrome already on the port, whose `cwd` or profile is this run's, is reused. A *foreign* process on either port is never killed.
+- **A port that answers is not a working browser.** Smoke-test it — navigate, evaluate, write a real screenshot file — before the first sweep and at every heartbeat.
+- **Two launch attempts for the whole run, then stop.** One tab, navigated, not one per check. **One codex agent at a time**, never two phases in parallel.
+- **Ledger everything the run starts** that outlives one command — dev server, Chrome, background codex — with its port and PID, in a `## Process ledger` section. Reused processes are recorded separately, because they must not be torn down.
+- **Heartbeat between phases, and recycle on pressure** — browser tree over ~1.5 GB or system free under 15% — rather than waiting for the crash.
+- **Teardown runs on success, failure, and abort,** and kills by ledger PID. A bare `pkill -f chrome` would take Ryan's own browser with it, and the brief must never contain one.
 
 ## The completion post
 
@@ -474,10 +429,7 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 - **The paste line is the whole handover, and it assumes a session that knows nothing.** It is the one part guaranteed to arrive, so two things are always in it and neither is paraphrased, shortened, or left to the brief body:
   - **The file paths, resolved and quoted.** This brief, the source plan, and the evidence directory, each as a real absolute path — `~/.claude/plans` is a symlink, so resolve it, and quote every one because the vault's path contains spaces. A fresh session cannot find a file it was not handed.
   - **The worktree clause.** Changes land in a new git worktree on a new feature branch cut from a freshly-pulled default branch; the default branch and Ryan's own checkout are off limits.
-- **Every requirement arrives with Ryan's expected result attached**, verbatim, plus how it was established. No expected result, no phase.
-- **Every phase's done-condition is its gate specs going green**, and each was red first for a recorded reason.
 - **Every phase ends in a verification command**, not "check it works".
-- **The author never clears its own artifact.** Brief, spec and diff each carry the other model's verdict block before they ship, are committed, or land. A verdict that exists only as "looked fine" did not happen.
 - **State the baseline numbers.** "5,781 tests, 0 fail; lint 42 warnings, 0 errors" turns an ambiguous red run into an obvious regression.
 - **Name the known flakes.** Otherwise the run treats one as a real failure and starts patching.
 - **Decisions already made go in as decisions**, not options. A brief that reopens a settled question wastes the run.
@@ -511,57 +463,6 @@ Everything else: keep going. Do not stop to ask whether it looks right.
 
 ## Common mistakes
 
-- **Assuming the expected result instead of asking.** Every gate passes; the run built the wrong thing, tested and committed
-- **Asking the spec questions as a numbered prose list instead of the interactive question tool.** Ryan answers "defaults" to eight questions at once; the one he would have changed is now an assumption
-- **Treating a probe or a live capture as the expected result.** Both measure CURRENT. You have just specified the bug as the requirement
-- **An EXPECTED with no named authority.** Nobody can tell later whether it was a decision or a guess
-- **Paraphrasing Ryan's expected result into the brief.** The assumption you avoided re-enters as your wording
-- **Negotiating an ambiguous issue in prose instead of asking for a live capture.** Rounds of clarification, and a spec written on the wrong reading anyway
-- **A live capture described in chat but never saved to the evidence dir.** The one piece of ground truth is gone when the run needs it
-- **Deriving an expected value from the implementation.** The spec asserts what the code does, so it passes whether the code is right or not
-- **Writing a spec blind to the harness, fixtures and interfaces.** Guaranteed missing-import and bad-selector failures — the exact ones that don't count as red
-- **Demanding `behavior-red` of a refactor or a perf change.** Unsatisfiable gate; the phase cannot start, or a fake failure gets manufactured to satisfy it
-- **Accepting any non-zero exit as red.** A missing runner, syntax error or zero tests executed all look like proof; none is
-- **Relying on commit order as the red evidence.** Proves text order only. Without a receipt, nothing shows the spec ever ran or why it failed
-- **An intentionally-red commit in a repo with CI on every push or bisect in use.** You have knowingly broken CI, cherry-picks and `git bisect` for a record a receipt could have carried
-- **Loosening an assertion and calling it a mechanical fix.** The one move that voids the scheme, wearing the costume of the one that's allowed
-- **Treating a spec that passes pre-implementation as a green phase.** Either the requirement was already met, the spec is wrong, or it isn't running — and the run can't tell which
-- **Linking the spec instead of copying its constraints.** Fresh session can't see it; invents its own interpretation
-- **Omitting the worktree path, or not forbidding per-phase worktrees.** A later phase builds against a tree missing the earlier ones; fails quietly
-- **A paste line with no worktree clause.** The run commits straight onto the default branch, inside Ryan's own checkout, overnight
-- **A paste line carrying `~` paths, an unresolved symlink, or a leftover placeholder.** The fresh session cannot find the brief it was told to follow, and improvises from the sentence alone
-- **Assuming the default branch is `main`, or cutting from a stale local copy of it.** Breaks outright on a `master`/`develop` repo, or lands the whole run on a base weeks behind origin
-- **A new worktree used before its install.** The first gate fails on missing dependencies and reads as a code failure
-- **Building from a stale copy of the plan.** Implements a superseded fix; the cite that was corrected is the one it follows
-- **Dropping the plan's unknowns.** Run "fixes" a bug the report was never about, and closes it
-- **"Run the tests" with no command or baseline.** Any red result reads as catastrophe or gets ignored
-- **No stop conditions.** Run guesses on the one question that needed a human
-- **Leaving publish/push/merge unqualified.** An unattended run does something outward-facing
-- **Writing the brief into the repo.** Plan docs get committed, against house rules
-- **A paste line naming a trigger this session doesn't have.** The brief is dead on arrival; nothing runs at all
-- **Printing the paste line before the brief audit ran.** The one reader who would have caught a wrong `EXPECTED` never saw it; the run builds it faithfully
-- **Committing a spec the other model never audited.** A tautology or a paraphrased requirement becomes the night's acceptance oracle
-- **Committing on a glance at the diff, or the author reviewing its own hunks.** An unexplained hunk lands with the fix, and nobody asked for it
-- **Naming a codex model in an invocation instead of `$CODEX_MODEL`.** The pin outlives the config; every brief silently runs last quarter's model
-- **Sweeping without the build-identity gate.** "Verified" against a stale bundle or a second server on the same port
-- **No attempt cap, or a third attempt that patches instead of diagnosing.** Patches forever against a wrong model of the bug
-- **Fixing out-of-scope bugs the sweep surfaced.** Unattended scope creep, in a diff nobody watched grow
-- **Writing `timeout 900 …`, or no time box at all.** No such binary on macOS; and one hang costs the whole window
-- **Gate helpers left to run under zsh.** zsh doesn't word-split, so a multi-file gate collapses to one bogus path and reports "no tests found" — which reads as green
-- **An unquoted `$RUN_DIR`.** The plans vault path contains spaces; the evidence write lands somewhere else or fails silently
-- **Treating "the CDP port answers" as a working browser.** Sweeps run against a dead renderer and report false negatives all night
-- **Relaunching the browser until it works.** Forty headless Chromes by morning, nothing verified
-- **Killing or tearing down a process the run didn't start.** Takes down Ryan's browser, or another session's dev server
-- **No teardown, or `pkill -f chrome` as the teardown.** Either leaks until the machine chokes, or kills everything he had open
-- **Evidence written to `/tmp`, or a teardown that deletes it.** The night's only proof is gone before it's read
-- **A findings log that skips passing sweeps, or omits out-of-scope finds.** No way to tell which phase broke what; the bugs the sweep found are lost
-- **Writing the post from memory instead of `/mr-markdown`.** Claims drift from the diff that actually landed
-- **Posting mid-plan on a bundled `ivtg-*` fix set.** Partial claims about fixes whose siblings are still red
-- **A post over its ceiling, or a per-wave post with nothing substantial.** The loop's only output goes unread, or the next real one gets skimmed
-- **Compressing the post or the findings log.** Tokens saved by making the only output Ryan reads useless
-- **A prompt that lets an agent narrate, or points at a file instead of quoting it.** Pays for preamble and re-reads on every phase, every attempt
-- **The full suite as a scheduled gate, per attempt, phase, or wave.** Hours of re-proving untouched code; the loop spends the night in the test runner
-- **A single test file as the only gate.** Misses what the change broke in the modules that import it
-- **Re-running a suite to reproduce one failing case.** Minutes per attempt to learn what the sweep already reported
-- **Comparing a targeted run against a full-suite baseline.** A green subset reads as a green repo
-- **An escalation full-suite run with no log entry saying why.** The one expensive run nobody can account for afterwards
+- **Gate helpers left to run under zsh.** zsh doesn't word-split, so a multi-file gate collapses to one bogus path and reports "no tests found", which reads as green. The brief's helper block runs under `bash` (`references/verify-loop.md`, top).
+- **A paste line naming a trigger this session doesn't have.** The brief is dead on arrival and nothing runs at all. Check `/goal`, `/testing-harness` and any other trigger against this session's skill list first.
+- **Naming a codex model in an invocation instead of `$CODEX_MODEL`.** The pin outlives the config, so every brief silently runs last quarter's model.
