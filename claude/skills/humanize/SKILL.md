@@ -38,7 +38,7 @@ Read the whole target before touching it.
 
 ## Modes
 
-- `/humanize [path]` — **full rewrite** (default). Structure may change: tables become prose, bullets merge, parallelism breaks, ordering shifts.
+- `/humanize [path]` — **full rewrite** (default). Structure may change: parallelism breaks, ordering shifts, a two-row table becomes a sentence. Lists stay lists unless the voice reference says otherwise.
 - `/humanize light [path]` — **sentence-level only**. Sections, tables, and bullets stay; only tell-carrying sentences are rewritten in place.
 
 ## Procedure
@@ -51,7 +51,7 @@ Read the whole target before touching it.
 
 ## Rules — invariants in both modes
 
-- Technical facts, numbers, file:line cites, URLs, identifiers, code blocks: byte-exact.
+- Technical facts, file:line cites, URLs, identifiers, code blocks: byte-exact. Numbers keep their values; only a thousands separator may go. A term in prose (not in code or backticks) takes the team's spelling.
 - Security warnings: never softened.
 - Commit messages: out of scope — repo commit format governs them.
 
@@ -59,6 +59,7 @@ Read the whole target before touching it.
 
 - **Fixing the surface and shipping the structure:** the strongest tells are parallelism, triads, and recap paragraphs, not vocabulary.
 - **Ending the rewrite with "In short: X, Y, and Z"** — the deleted bullet list restated as a new triad.
+- **Folding bullets into a wall of text:** a paragraph is not more human than a list, only harder to read. The tell is a list's uniform shape and bold labels, so fix those and keep the bullets.
 - **AI-does-casual for chat:** lowercase + emoji + tidy clauses is not a real casual register. Take casing, punctuation, typo level, emoji rate, and message length from the reference's samples and stats — and tell one story, do not summarize all the facts.
 - **Hedging everything:** hedges go only where the source text is genuinely uncertain, and in the hedge words the reference uses.
 - **Polishing the grammar:** comma splices, dropped articles, dropped apostrophes, and missing terminal periods are part of a voice when the reference shows them; do not fix them into AI-perfect sentences.

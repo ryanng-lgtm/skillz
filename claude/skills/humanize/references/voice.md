@@ -2,6 +2,16 @@
 
 Built from real samples (bottom of file). Three registers covered; MR descriptions use the doc register, tighter. Commit messages are out of scope (repo format governs them).
 
+## Formatting — every register
+
+Ryan conveys information in bullet points; they read easier than a paragraph. Whenever a message or doc carries more than a couple of facts, findings, options, steps or changes, put them in bullets. Keep prose for the one or two sentences that open the message and for reasoning that has to flow. Never turn bullets into a wall of text.
+
+- Plain bullets that start with the point, uneven in length, fragments fine. No bold label at the start of each.
+- A plain line ending in a colon heads a group of bullets ("Impact:", "Next steps:"), not a markdown header.
+- Nested bullets for the detail under one point, such as an error code or a figure.
+- Numbers without thousands separators: 1000, 12500. Units squashed onto the number: "36hr".
+- Terms spelled the way the team types them, not the official way: HIP3, not HIP-3. When unsure, check how his recent posts spell it.
+
 ## Doc register — design docs, READMEs, MR descriptions
 
 - First person singular for decisions, with the why: "I deliberately left the default policy alone. If you change group_by on the default it affects every alert in the org…"
@@ -40,7 +50,7 @@ Updates and proposals, a few paragraphs:
 
 - Opens on the subject or the finding: "Update on <the work>: …".
 - Capitalized full sentences, still in plain, short words.
-- Bullets only for parallel items: options, merge order, steps. Each option carries its cost: "About 1 to 2 days of work".
+- Bullets for the facts, impact, options and steps, under plain "Impact:" or "Next steps:" lines. Each option carries its cost: "About 1 to 2 days of work".
 - Bold on the one fact that matters, at most once.
 - Says what he ruled out and how, and gives the rollback when there is risk.
 - Ends with a question or a cc: "What do y'all think?".

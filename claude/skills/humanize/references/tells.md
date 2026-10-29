@@ -7,7 +7,8 @@ Work top-down: structural tells first (they survive sentence-level edits), then 
 - **Perfect parallelism.** Every bullet/cell/clause the same shape ("verb: detail, detail, detail"). Humans are uneven: one cell is three words, another rambles. Fix: vary shape and length deliberately; let one item get most of the words.
 - **Rule-of-three.** Triads of adjectives, examples, clauses, everywhere. Fix: two items, or four, or one item explained properly.
 - **Recap relocation.** Killing a bullet list but restating it as "In short: X, Y, and Z" — same tell, new position. A closing summary that re-enumerates the section is AI. Fix: end on the last real point, or on the one consequence that matters.
-- **Header-itis.** Sections and bold headers on a three-paragraph answer. Fix: prose with plain connectors.
+- **Header-itis.** Sections and bold headers on a three-paragraph answer. Fix: drop the headers; plain bullets or short paragraphs.
+- **Bold-label bullets.** Every bullet opens "**Thing:** detail". Fix: plain bullets that start with the point.
 - **Double summary.** Same claim at top and bottom. Fix: keep one.
 - **Symmetric coverage.** 3 pros / 3 cons; equal words on unequally important things. Fix: uneven emphasis — loud on the surprising part, one clause for the rest.
 - **Table-where-prose-belongs.** Tables for things with two rows or non-enumerable content. Fix: a sentence.
@@ -27,6 +28,8 @@ Work top-down: structural tells first (they survive sentence-level edits), then 
 - **LLM vocabulary.** leverage, robust, seamless, comprehensive, streamline, facilitate, utilize, "serves as", "acts as", "key" as adjective, "a variety of", ensure/ensures. Fix: the short verb ("use", "make sure").
 - **Compressed jargon asides.** "best-effort", "identity stamped", "not in the serving path". Precise, but nobody types "stamped" about a JSON field on a first draft. Fix: the phrase a person would type first ("written into the metadata").
 - **Nominalizations.** "performs deduplication of" → "dedupes".
+- **Official spellings.** "HIP-3" when the team types "HIP3"; a product's full or docs-cased name where people use the short one. Fix: spell it the way the voice samples, or the room it goes to, spell it.
+- **Thousands separators.** "1,000 markets", "12,500 rows". Fix: "1000", "12500".
 
 ## 4. Register / persona — the richest vein
 
@@ -54,8 +57,9 @@ Work top-down: structural tells first (they survive sentence-level edits), then 
 
 ## Anti-overcorrection — faking humanity is its own tell
 
+- Bullets are not a tell. Never merge a list into a paragraph to look human; fix the list's shape instead.
 - No injected typos or forced slang outside registers where the voice profile shows them.
 - No emoji unless the voice profile uses them (Ryan's chat register: none).
 - Never hedge something that is certain; never blur technical precision.
-- Code blocks, identifiers, numbers, URLs: byte-exact.
+- Code blocks, identifiers, URLs: byte-exact. Numbers keep their values; only a thousands separator may go.
 - "AI-does-casual" — lowercase + emoji + tidy parallel clauses — is not chat register. Check the voice profile's actual chat sample.
