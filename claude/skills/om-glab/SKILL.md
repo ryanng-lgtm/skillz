@@ -18,9 +18,7 @@ worktree, build, install and verification rules apply.
 
 Defaults: `~/Documents/GitLab/om-chat-cloud` for the GitLab GUI and
 `~/Documents/GitLab/openmarket-internal` for the daemon. `OM_GUI` and `OM_MONO`
-override those paths. Resolve and report both source branches, commits and
-dirty state before building; the alias builds their checked-out content and
-does not switch branches or update them to main.
+override those paths.
 
 ## Procedure
 

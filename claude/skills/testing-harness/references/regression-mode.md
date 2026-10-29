@@ -108,7 +108,7 @@ Baselines and runs share one shape, so replay is a directory comparison.
 `verdict.json` is the machine-readable result; the human surface is a report in
 the same spirit as the parity-check HTML.
 
-## Open questions for the next session
+## Open questions
 
 - Which routes make the default sweep list, and does it come from a config file
   or from the route table in the GUI source?

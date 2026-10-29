@@ -11,10 +11,6 @@ description: >-
 
 ## Overview
 
-Every OM World task gets the five steps below before implementation.
-Scale detail to the task, never skip steps because the change is small.
-An explicit user override takes precedence.
-
 Apply to om-world-service work and related changes in neighboring repos.
 Discover ownership from current code. Ordinary factual questions do not
 create tasks. Maintaining this skill does not recursively invoke it.
@@ -28,6 +24,8 @@ when invoked. Search for a missing skill before reporting a blocked step.
 Never claim a substitute ran as the named skill.
 
 **Core principle: Every OM World task gets the five steps below before implementation. Scale detail to the task, never skip steps because the change is small.**
+
+An explicit user override takes precedence.
 
 ## Route and clarify
 

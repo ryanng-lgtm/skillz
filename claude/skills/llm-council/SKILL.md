@@ -29,8 +29,6 @@ This is adapted from Andrej Karpathy's LLM Council. He dispatches queries to mul
 
 ## when to run the council
 
-The council is for questions where being wrong is expensive.
-
 Good council questions:
 
 - "Should I launch a $97 workshop or a $497 course?"
@@ -183,7 +181,7 @@ Keep your review under 200 words. Be direct.
 
 ### step 4: chairman synthesis
 
-This is the final step. One agent gets everything: the original question, all 5 advisor responses (now de-anonymized so you can see which advisor said what), and all 5 peer reviews.
+One agent gets everything: the original question, all 5 advisor responses (now de-anonymized so you can see which advisor said what), and all 5 peer reviews.
 
 The chairman's job is to produce the final council output. It follows this structure:
 

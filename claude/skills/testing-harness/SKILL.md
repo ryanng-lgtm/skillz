@@ -42,9 +42,9 @@ Parity-check is a **visual** verdict on one intended change. Regression is a
 **behavioral** verdict on everything around it — console, network, hydration,
 journeys. They are complementary; a change that ships clean on both is proven.
 
-> **Status.** `--parity-check` is live today, currently spelled `compare` (see
-> below); the mode flag is a rename, not new behavior. `--regression` is
-> **designed but not built** — the design of record is
+> **Status.** `--parity-check` runs as the `compare` command (see below). The
+> flag name is not built yet; it is a rename, not new behavior. `--regression`
+> is **designed but not built** — the design of record is
 > [references/regression-mode.md](references/regression-mode.md). Do not report
 > a regression verdict from this skill until that mode exists; use an ad-hoc
 > probe and say it was a probe.
@@ -272,8 +272,8 @@ Credentials are read at runtime from `~/Library/.../Obsidian/Local/creds.md`
 
 Sessions persist per account and target under
 `~/.claude/state/testing-harness/profiles/`, so login happens once and probes
-inherit it. Delete a profile directory to revoke. A profile still sitting at the
-old `~/.claude/state/om-chat-web/` path is honoured as a fallback.
+inherit it. Delete a profile directory to revoke. A profile under the legacy
+`~/.claude/state/om-chat-web/` path is honoured as a fallback.
 
 ## Environment
 

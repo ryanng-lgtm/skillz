@@ -38,8 +38,8 @@ no monorepo, no `om` binary, no daemon, and checks no openmarket package.
 (`--cloud`), or "Using om-build to put the checked-out branch on the simulator"
 (`--mobile`).
 
-**Every target builds from the main worktree, never a linked one.** Resolve it
-with `git worktree list --porcelain | awk '/^worktree /{print $2; exit}'` — the
+Resolve the main worktree with
+`git worktree list --porcelain | awk '/^worktree /{print $2; exit}'` — the
 first entry is always the main worktree, from wherever you start — and build
 there. A build off a feature worktree produces artifacts identical in shape to a
 correct one, so nothing downstream catches the mistake. If the user meant a
@@ -55,7 +55,7 @@ cross-fork alarm that exists; both forks can be green while drifting.
 
 ## `--hosted` — daemon `/rooms` at 127.0.0.1:31337
 
-`om upgrade` no longer works for standalone installs. It downloads from
+`om upgrade` does not work for standalone installs. It downloads from
 `github.com/openmarket-xyz/openmarket-releases`
 (`packages/cli/src/runner/update-check.ts:28`), that repo 404s unauthenticated,
 and there is no auth path in the updater: `prodDeps().fetchBytes` / `fetchText`
@@ -288,7 +288,7 @@ cd ~/Documents/GitLab/openmarket-chat && bun run rooms-client:status
 **Compare the constants, not the package number.** `package.json` says `0.43.0`
 on both the registry copy and the monorepo while their constants differ —
 published `0.43.0` still carries `VERSION = "0.106.0"`, monorepo source carries
-the current release. The package number stopped tracking the protocol era, so
+the current release. The package number does not track the protocol era, so
 `grep '"version"' package.json` is the wrong field to read. What matters:
 
 ```bash
@@ -504,7 +504,7 @@ worth reporting as such.
 | `GUI bun install` 404s on `@openmarket/rooms-client` | GUI repo `.env` missing, or its `NPM_READ_TOKEN` is revoked or lacks read on the scope | create or fix the GUI `.env` (step 1); verify with `gui-bun.sh "$GUI" install --frozen-lockfile`, never a different registry |
 | GUI builds but behaves oddly against the daemon | rooms-client era mismatch | compare `dist/version.js` constants in step 1 — NOT the package number; link to source |
 | GUI carries the previous release's version constants | linked `rooms-client` `dist/` is stale; it does not rebuild when the monorepo moves | rebuild `packages/rooms-client` before the GUI build (step 1) |
-| `bun run build` in `rooms-client` exits 2 with `TS2835` | three extensionless relative imports in `src/shared/` (`attention.ts:18`, `read-state.ts:16,17`); `tsc` emits anyway | expected today — confirm `dist/` is fresh and continue |
+| `bun run build` in `rooms-client` exits 2 with `TS2835` | three extensionless relative imports in `src/shared/` (`attention.ts:18`, `read-state.ts:16,17`); `tsc` emits anyway | expected while those imports stay extensionless — confirm `dist/` is fresh and continue |
 | Several `om` processes in Activity Monitor | each Claude Code session spawns two `om mcp serve --stdio` children (one `--catalog operator`); they outlive daemon restarts | `ps -o ppid=` — parented by a `claude` PID means not a leak; only PPID 1 is a daemon |
 | `Last error: ... You're reading too fast` after restart | the librarian scans rooms in a burst on startup and trips a read rate limit | pre-existing since 2026-08-09, self-resolves in ~5s; confirm `errors=[]` on the next `[schedule]` line before reporting it |
 | Huge diff / 14 MB file in `git status` | staged GUI assets not restored | `git checkout packages/cli/assets/rooms-gui/` |

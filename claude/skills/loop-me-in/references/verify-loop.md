@@ -163,9 +163,9 @@ ensure_chrome() {                       # at most TWO launch attempts for the wh
 Both parts must pass or the sweep result is void: rebuild, restart, re-gate. A failed gate
 is recorded as "not verified", never as "not landed".
 
-Both parts must **assert**. Printing a value is not a gate: an earlier version of this
-block printed the serving cwd without ever comparing it, and `$CD evaluate` exits 0 while
-printing `false`, so a missing sentinel passed at the shell level.
+Both parts must **assert**. Printing a value is not a gate: a block that prints the
+serving cwd without ever comparing it passes on any cwd, and `$CD evaluate` exits 0 while
+printing `false`, so a missing sentinel passes at the shell level.
 
 ```sh
 identity_gate() {    # returns non-zero if the thing under test is not this worktree's build
@@ -489,10 +489,10 @@ the gate rather than inheriting `bun tools/check-dist.ts` from a project that ha
 repo substitutes its own and the tier structure is unchanged.
 
 **Arrays, not strings.** Every list here is a bash array (`PHASE_SPEC_FILES`,
-`PHASE_IMPACTED`, `RUN_SPEC_FILES`, `WAVE_TESTS`), expanded as `"${arr[@]}"`. That is what
-makes the earlier "quote every path, never word-split" rule and these helpers consistent —
-the previous version relied on word-splitting and contradicted it. Initialise each as
-`declare -a NAME=()` at the top of the brief's helper block and append with `NAME+=("$x")`.
+`PHASE_IMPACTED`, `RUN_SPEC_FILES`, `WAVE_TESTS`), expanded as `"${arr[@]}"`, which keeps
+these helpers consistent with the "quote every path, never word-split" rule at the top of
+this file. Initialise each as `declare -a NAME=()` at the top of the brief's helper block
+and append with `NAME+=("$x")`.
 
 `PHASE_IMPACTED` is resolved **before the run**, during the spec session, using the repo's
 own dependency or test-selection tooling — not rediscovered at 3am with `grep`. A grep for

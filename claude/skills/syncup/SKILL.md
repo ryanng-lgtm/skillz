@@ -281,16 +281,13 @@ With 0 ahead there is nothing to replay, so skip Phase 2 entirely and attempt th
 directly. A fast-forward does not touch the worktree, so uncommitted work is untouched and the
 repo takes zero extra writes. Only if it fails with *"untracked working tree file would be
 overwritten"* (an incoming commit adds a path the user has untracked) do you fall back: make the
-Phase 2 WIP commit, `git rebase "origin/${DEF}"`, resolve, and unwind via Phase 5.
+Phase 2 WIP commit, `git rebase "origin/${DEF}"`, resolve, and unwind via Phase 5. The WIP commit
+turns that untracked file into a tracked one so the rebase resolves it as an ordinary conflict.
+Never delete the untracked file to make room.
 
 A non-zero pre-WIP ahead count means the user has real commits sitting on their default branch.
 Do not rebase, do not merge, do not "clean it up". Report the count and the commit subjects, and
 ask what they want before touching it.
-
-Fast-forwarding a dirty worktree can also fail with *"untracked working tree file would be
-overwritten"* when an incoming commit adds a file the user has untracked locally. The Phase 2 WIP
-commit is what prevents this — it turns that untracked file into a tracked one so the rebase
-resolves it as an ordinary conflict. Never delete the untracked file to make room.
 
 ## Phase 4 — rebase and resolve
 

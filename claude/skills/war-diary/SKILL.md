@@ -34,11 +34,6 @@ item in `War Diaries.md`.
   digests the day's transcripts. This includes **VSCode / IDE-extension** sessions:
   they share the same `~/.claude/projects/` store as the CLI, so the scan covers them.
 
-## When to use
-
-- User provides a GitLab `.atom` export and asks to update their war diary / board.
-- Triggers: "update my war diary", "log my day", "/war-diary <file>.atom".
-
 ## Inputs
 
 1. The `.atom` file path (required for review/MR activity).
@@ -51,8 +46,7 @@ conventions and changes over time. Follow what it says over this skill if they d
 
 ## Folder layout (`Team/<Name>/`) — placement matters
 
-Notes are filed into status/type subfolders. The note's **content/creation is unchanged**;
-what's new is **where it lives**, and that it **moves** as its status changes.
+Notes are filed into status/type subfolders, and a note **moves** as its status changes.
 
 - **`Today/`** — work done today (from sessions or GitLab activity) that isn't yet
   merged and isn't a pure plan. Default home for new in-progress dev work.
@@ -116,7 +110,7 @@ Group work by **work item / theme**, not per-commit. Then, per theme:
    (respect existing `### sub-headings`; on a shared item prefix the name
    `- 2026-06-16 #alice — …`). Then **re-file** it if its status changed (step 5).
    Never make a duplicate.
-2. **New note** → create it (title/body as before: `# <Title>`, area prefix optional,
+2. **New note** → create it (`# <Title>`, area prefix optional,
    then `## daily log`), and place it by type/status:
 
 | Today's work is… | Where it goes |

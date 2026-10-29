@@ -100,7 +100,6 @@ fails on:
   `[[Title]]` that matches more than one file.
 - **Temporary docs** (handoffs, one-off briefings, requests for another agent
   or a human) are named `TMP Title.md`, with no number and no frontmatter.
-  - Their status is "temporary — delete once acted on".
   - The script ignores them.
   - Once they've been acted on, fold any lasting facts into a numbered doc
     and delete the TMP file.

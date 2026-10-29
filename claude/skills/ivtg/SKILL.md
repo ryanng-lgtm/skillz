@@ -11,7 +11,7 @@ description: >-
 
 ## Overview
 
-The user feeds issues one at a time. Each issue gets investigated by an Opus agent, reviewed by a codex agent, and written into one shared plan file, which is demuddied once the session ends. **The terminal state of this skill is a written plan. No code is ever changed here** — implementation happens only when the user says so, in a later turn, outside this skill.
+The user feeds issues one at a time. Each issue gets investigated by an Opus agent, reviewed by a codex agent, and written into one shared plan file, which is demuddied once the session ends. Implementation happens only when the user says so, in a later turn, outside this skill.
 
 Repo-agnostic: every repo path comes from the user at session start, never from the current working directory alone.
 

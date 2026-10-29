@@ -16,8 +16,7 @@ description: >-
 The reviewer reads the MR commit by commit, and CI runs every test the MR
 adds on every pipeline after it. `/regroup` trims the tests the branch adds
 to the absolutely necessary ones, then rewrites `base..HEAD` into commits
-that each make one step of the change, in reading order. Only tests and
-testdata change; the script proves everything else at the tip unchanged.
+that each make one step of the change, in reading order.
 
 **Core principle: only tests and testdata change; the script proves everything else at the tip unchanged.**
 
