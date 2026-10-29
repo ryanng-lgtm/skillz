@@ -1,13 +1,12 @@
 ---
 name: syncup
 description: >-
-  Use when the user wants one or more local repos brought up to date with their
-  default branch, or their open GitLab MRs or GitHub PRs rebased onto their target
-  branches, including when the worktree has uncommitted changes or the user names
-  a stack (om-chat, fe, tc, be). Trigger: /syncup [repo|stack ...],
-  $syncup [repo|stack ...], "sync up my repos", "sync the FE stack",
-  "rebase everything on main", "get me on latest main", "update my MRs",
-  "rebase my MRs", "rebase my PRs".
+  Use when local repos need bringing up to date with their default branch, or
+  open GitLab MRs or GitHub PRs need rebasing onto their targets, including
+  with uncommitted work or a named stack (om-chat, fe, tc, be). Trigger:
+  /syncup [repo|stack ...], $syncup [repo|stack ...], "sync up my repos",
+  "rebase everything on main", "get me on latest main", "rebase my MRs",
+  "rebase my PRs".
 ---
 
 # syncup — bring selected repos and MRs up to date

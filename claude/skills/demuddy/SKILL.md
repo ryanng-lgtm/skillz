@@ -1,17 +1,14 @@
 ---
 name: demuddy
 description: >-
-  Use when a plan, spec, or design doc has accumulated edits from multiple
-  discussion rounds and is about to be handed to an implementing agent (or
-  human) — symptoms include date-stamped decisions, "considered and rejected"
-  passages, the same rule stated in several sections, bold
-  "Verified:"/"Decision:" framing, or sections ordered by when they were added
-  rather than build order. Also use when a code change has landed with
-  comments that narrate the change ("now uses", "fixed per review", "Step
-  1:"), restate the code, or are too long or full of jargon for a newcomer to
-  follow. Trigger: /demuddy [path], /demuddy comments [path|rev], $demuddy
-  [path], $demuddy comments [path|rev], "de-muddy", "editorial pass", "clean
-  this plan for handover", "clean up the comments on this branch".
+  Use when a much-edited plan, spec or design doc is about to be handed to an
+  implementer and still carries discussion residue: dated decisions, rejected
+  options, rules repeated across sections, sections in the order they were
+  written. Also use when a landed change left comments that narrate the
+  change, restate the code, or are too long or jargon-heavy for a newcomer.
+  Trigger: /demuddy [path], /demuddy comments [path|rev], $demuddy [path],
+  "editorial pass", "clean this plan for handover", "clean up the comments on
+  this branch".
 ---
 
 # demuddy — editorial pass for handover-ready plans

@@ -1,11 +1,9 @@
 ---
 name: test-audit
 description: >-
-  Use when writing, changing, reviewing, or sweeping tests — invoke every time,
-  for any new or changed test, and when hunting low-value,
-  implementation-coupled, or duplicative tests and the test-only production
-  seams they demand, or pruning a whole subsystem's test surface.
-  Trigger: /test-audit.
+  Use when writing, changing, reviewing or sweeping tests: every new or
+  changed test, and any hunt for low-value, implementation-coupled or
+  duplicate tests or the test-only seams they demand. Trigger: /test-audit.
 ---
 
 # test-audit — gate new tests and prune low-value ones

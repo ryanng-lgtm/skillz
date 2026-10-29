@@ -3,11 +3,10 @@ name: shared-dev
 description: >-
   Use when a backend change (tsdb-gateway, metadata-instrument, streamd,
   stream-deduplicated, live-feed, kiyotaka-go, replayer) has to be tested
-  locally against real data — "let's test this locally", "spin up shared-dev",
-  "probe this end to end", "check it against the clones", "pull more data from
-  prod for this probe" — or a shared-dev run has to be torn down, or public on
-  the dev tsdb brought up to main. Trigger: /shared-dev [repo ...] [--fe]
-  [--keep] | /shared-dev down | /shared-dev rebaseline.
+  locally against real data, a shared-dev run has to be torn down, or public
+  on the dev tsdb brought up to main. Trigger: /shared-dev [repo ...] [--fe]
+  [--keep], /shared-dev down, /shared-dev rebaseline, "spin up shared-dev",
+  "let's test this locally", "check it against the clones".
 ---
 
 # shared-dev — run the change against real data, probe it, tear down

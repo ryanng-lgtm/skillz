@@ -1,16 +1,11 @@
 ---
 name: llm-council
 description: >-
-  Use when the user presents a genuine decision with stakes, multiple options,
-  and context that suggests they want it pressure-tested from multiple angles.
-  Do NOT trigger on simple yes/no questions, factual lookups, or casual 'should
-  I' without a meaningful tradeoff (e.g. 'should I use markdown' is not a
-  council question). Trigger: /llm-council, $llm-council. MANDATORY TRIGGERS:
-  'council this', 'run the council', 'war room this', 'pressure-test this',
-  'stress-test this', 'debate this'. STRONG TRIGGERS (use when combined with a
-  real decision or tradeoff): 'should I X or Y', 'which option', 'what would you
-  do', 'is this the right move', 'validate this', 'get multiple perspectives',
-  'I can't decide', 'I'm torn between'.
+  Use when the user faces a real decision with stakes and several options and
+  wants it pressure-tested from several angles, not for a yes/no question, a
+  factual lookup or a casual 'should I'. Trigger: /llm-council, $llm-council,
+  "council this", "run the council", "war room this", "pressure-test this",
+  "stress-test this", "debate this".
 ---
 
 # llm-council — pressure-test a decision with five advisors and a chairman

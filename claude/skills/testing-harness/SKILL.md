@@ -1,12 +1,11 @@
 ---
 name: testing-harness
 description: >-
-  Use when a change has to be proven in the real running product rather than in
-  tests — visually diffing the cloud deployment against the local daemon,
-  screenshotting a route, sending or reading a DM through the real UI, checking whether the local
-  daemon is serving the working tree, writing a one-off browser probe against a
-  logged-in session, or walking an end-to-end journey through the GUI. Trigger:
-  /testing-harness, $testing-harness.
+  Use when a change has to be proven in the running OM Chat GUI rather than in
+  tests: a cloud-versus-local visual diff, a route screenshot, a DM sent or
+  read through the real UI, checking the daemon serves the working tree, or a
+  one-off browser probe or journey. Trigger: /testing-harness,
+  $testing-harness.
 user-invocable: true
 ---
 

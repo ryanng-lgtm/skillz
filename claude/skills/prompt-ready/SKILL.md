@@ -1,11 +1,10 @@
 ---
 name: prompt-ready
 description: >-
-  Use when the user wants to turn raw, natural-language requests into clean,
-  self-contained, copy-paste-ready prompts for a different Claude/LLM session,
-  or asks for prompt-engineering / prompt-ready behavior. Trigger:
-  /prompt-ready, $prompt-ready, "prompt-ready mode", "make this prompt-ready",
-  "turn my messages into prompts", "act as my prompt engineer".
+  Use when the user wants their raw requests turned into self-contained,
+  copy-paste-ready prompts for another LLM session. Trigger: /prompt-ready,
+  $prompt-ready, "prompt-ready mode", "make this prompt-ready", "turn my
+  messages into prompts", "act as my prompt engineer".
 ---
 
 # prompt-ready — turn raw requests into copy-paste-ready prompts

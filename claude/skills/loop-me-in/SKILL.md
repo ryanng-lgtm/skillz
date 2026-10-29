@@ -1,16 +1,13 @@
 ---
 name: loop-me-in
 description: >-
-  Use when a fix plan, spec, or design doc (an /ivtg fix plan, a
-  superpowers:writing-plans plan, a dated plan in the vault) is approved and needs
-  to become a file that a fresh session can execute unattended and prove its own
-  changes landed — "make this runnable", "turn this plan into a loop", "so I can
-  paste it and let it rip" — or when the last run kept pulling Ryan back in to
-  confirm a change had landed, or finished green having fixed something adjacent
-  to the actual complaint. Do NOT use for a plan still under discussion (run
-  /demuddy first) or a one-line change you'd just do. Trigger: /loop-me-in [path],
-  "make this runnable", "turn this plan into a loop", "so I can paste it and let
-  it rip".
+  Use when an approved fix plan, spec or design doc has to become a brief a
+  fresh session can run unattended and prove its own changes landed, or when
+  the last run kept pulling Ryan back in or went green having fixed something
+  next to the actual complaint. Not for a plan still under discussion (run
+  /demuddy first) or a one-line change. Trigger: /loop-me-in [path],
+  $loop-me-in [path], "make this runnable", "turn this plan into a loop", "so
+  I can paste it and let it rip".
 ---
 
 # loop-me-in — a plan in, a self-driving brief out

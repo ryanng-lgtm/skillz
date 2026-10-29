@@ -1,7 +1,10 @@
 ---
 name: om-glab
 description: >-
-  Use when the local OM daemon and its /rooms GUI have to be built from source and installed from the GitLab GUI checkout (om-chat-cloud), linked to openmarket-internal, instead of the GitHub openmarket-chat default that om-build uses. Do not use it for the hosted /chat/ cloud deploy or for om-build's cloud or mobile targets. Trigger: /om-glab [--gate|--force|--no-gui], $om-glab.
+  Use when the local OM daemon and its /rooms GUI have to be built from the
+  GitLab GUI checkout (om-chat-cloud) instead of om-build's GitHub default.
+  Trigger: /om-glab [--gate|--force|--no-gui], $om-glab.
+disable-model-invocation: true
 ---
 
 # om-glab — build and install the OM daemon with its /rooms GUI from the GitLab checkout

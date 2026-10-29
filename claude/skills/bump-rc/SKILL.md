@@ -1,10 +1,10 @@
 ---
 name: bump-rc
 description: >-
-  Use when a change to @openmarket/rooms-client has to reach the GUIs — it
-  needs a new npm release, or openmarket-chat and openmarket-chat-cloud still
-  pin the old version — or when choosing the semver bump for a rooms-client
-  release. Trigger: /bump-rc [version], $bump-rc [version].
+  Use when a change to @openmarket/rooms-client has to reach the GUIs, or when
+  choosing the semver bump for a rooms-client release. Trigger: /bump-rc
+  [version], $bump-rc [version].
+disable-model-invocation: true
 ---
 
 # bump-rc — release rooms-client and repin its consumers

@@ -1,12 +1,10 @@
 ---
 name: regroup
 description: >-
-  Use when a branch's commits or tests need cleaning up for review — a finished
-  run left many TDD-style commits (red/green, wip, "fix test") or a pile of
-  near-duplicate tests on a branch about to become an MR, commits mix tests and
-  code, a commit is too big to review, or Ryan asks to squash, regroup, tidy or
-  clean up commits or trim tests. Works on any branch, whatever its commit count.
-  Trigger: /regroup [--base REF].
+  Use when a branch's commits or tests need cleaning up for review: TDD-style
+  commit noise, near-duplicate tests, or commits that mix tests and code or
+  are too big to review. Trigger: /regroup [--base REF].
+disable-model-invocation: true
 ---
 
 # regroup — trim a branch's tests and rewrite its commits for the reviewer

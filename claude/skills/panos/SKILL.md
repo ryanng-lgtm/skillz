@@ -2,9 +2,9 @@
 name: panos
 description: >-
   Use when MRs Ryan opened or pushed have landed on GitLab and need the review
-  Panos (pan26, the usual blocking backend reviewer) would give, before Panos
-  sees them. Trigger: /panos [MR ...] [--model MODEL], "review this like Panos",
-  "assume you are Panos", "now that the work has landed, review and fix it".
+  Panos (pan26) would give, before Panos sees them. Trigger: /panos [MR ...]
+  [--model MODEL], "review this like Panos", "assume you are Panos", "now that
+  the work has landed, review and fix it".
 ---
 
 # panos — review landed MRs as Panos, fix what is real
