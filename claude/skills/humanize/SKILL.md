@@ -2,11 +2,12 @@
 name: humanize
 description: >-
   Use when Claude-authored text (design doc, MR description, README section,
-  chat/message draft) needs to read like a specific person wrote it — before
-  pasting into Discord or GitLab, before publishing a doc, or when text shows AI
-  tells like perfect parallelism, em-dash qualifiers, "Crucially,", recap
-  paragraphs, zero first person. Trigger: /humanize [light] [--voice <path>]
-  [path], $humanize [light] [--voice <path>] [path].
+  OM Chat post, reply draft, chat or comment draft) needs to read like a
+  specific person wrote it — before posting it to OM Chat, Discord, GitLab or
+  GitHub, before handing over a reply draft, before publishing a doc, or when
+  text shows AI tells like jargon, perfect parallelism, em-dash qualifiers,
+  "Crucially,", recap paragraphs, zero first person. Trigger: /humanize [light]
+  [--voice <path>] [path], $humanize [light] [--voice <path>] [path].
 ---
 
 # humanize — make Claude output read like a real person wrote it
@@ -22,7 +23,8 @@ Surface cleanup is not enough: dropping "Crucially," and bold bullets while keep
 The voice reference is any file that describes how one person writes: register profiles, voice rules, lexicon, boundaries, and verbatim samples. Accepted shapes include the bundled profile at [references/voice.md](references/voice.md) and selfmd persona cards (markdown with a `Card data` JSON block).
 
 1. `--voice <path>` argument wins.
-2. Else ask the user for a path before reading the target. Offer the bundled `references/voice.md` as one option and free text for any other file. Do not guess or silently default.
+2. Else, when the user invoked the skill, ask for a path before reading the target. Offer the bundled `references/voice.md` as one option and free text for any other file. Do not guess.
+3. Else, when it runs unprompted on a message about to be shown or posted, use the bundled `references/voice.md` without asking.
 
 Read the whole reference. Use its prose sections; when a JSON card block only repeats the prose, skip it. Verbatim samples and measured stats are the ground truth: when a rule and a sample disagree, trust the sample.
 
@@ -45,7 +47,7 @@ Read the whole target before touching it.
 2. Detect the target's register — chat message / design doc / MR description / README / channel escalation — and match the closest register in the voice reference. If the reference covers no register close to the target (a chat-only card asked to voice a design doc), say so and use the bundled `references/voice.md` for that register.
 3. Rewrite per mode, working through tells.md top-down: structural first (they survive sentence-level edits), then sentence/lexical, then register/persona, then content-shape. Apply the reference's voice rules and lexicon, bounded by its boundaries and "never" list and by the anti-overcorrection rules in tells.md.
 4. Verify invariants below.
-5. Report changes grouped by tell category, plus anything deliberately kept (e.g. a table that earns its keep), and name the voice reference used.
+5. Report changes grouped by tell category, plus anything deliberately kept (e.g. a table that earns its keep), and name the voice reference used. When it ran unprompted, skip the report and show only the rewritten text.
 
 ## Rules — invariants in both modes
 

@@ -86,6 +86,10 @@ During a run, commit as often as TDD needs. When a run finishes with commits on 
 
 Whenever a subagent makes a git commit, it must ALWAYS: first stage its changes (`git add`), then invoke the `/commit` skill to commit what's staged — no raw `git commit` from subagents. When dispatching any subagent that may commit, include this requirement explicitly in its prompt.
 
+## Messages for other people — all projects
+
+Any message or comment written for other people to read (an OM Chat room or DM post, a reply I'll send, a Discord message, a GitLab or GitHub comment) goes through the `humanize` skill before you show it to me or post it, without my asking. That strips the jargon and AI prose and puts it in my voice. MR descriptions and commit messages are the exception: `mr-markdown` and `commit` cover them.
+
 ## Personal skills
 
 My skills live in the skillz repo (`~/Documents/github/skillz`), linked into `~/.claude/skills`. Its README lists every one.

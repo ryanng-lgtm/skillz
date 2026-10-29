@@ -90,6 +90,10 @@ Every commit goes through the `$commit` skill (`~/.codex/skills/commit/SKILL.md`
 
 Whenever a subagent makes a git commit, it must ALWAYS do the same: first stage its changes (`git add`), then follow the `commit` skill. When dispatching any subagent that may commit, include this requirement explicitly in its prompt.
 
+## Messages for other people — all projects
+
+Any message or comment written for other people to read (an OM Chat room or DM post, a reply I'll send, a Discord message, a GitLab or GitHub comment) goes through the `humanize` skill before you show it to me or post it, without my asking: read and follow `~/.codex/skills/humanize/SKILL.md`. That strips the jargon and AI prose and puts it in my voice. MR descriptions and commit messages are the exception: `mr-markdown` and `commit` cover them.
+
 ## Personal skills
 
 My skills live in the skillz repo (`~/Documents/github/skillz`), linked into `~/.codex/skills`. Its README lists every one. When I mention one as `$name`, or type its slash trigger (`/name`) out of Claude habit, read and follow `~/.codex/skills/<name>/SKILL.md` before doing anything else.
