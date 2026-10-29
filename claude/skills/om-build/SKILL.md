@@ -285,11 +285,12 @@ wire contract than the daemon:
 cd ~/Documents/GitLab/openmarket-chat && bun run rooms-client:status
 ```
 
-**Compare the constants, not the package number.** `package.json` says `0.43.0`
-on both the registry copy and the monorepo while their constants differ —
-published `0.43.0` still carries `VERSION = "0.106.0"`, monorepo source carries
-the current release. The package number does not track the protocol era, so
-`grep '"version"' package.json` is the wrong field to read. What matters:
+**Compare the constants, not the package number.** The package number in
+`package.json` moves only when `/bump-rc` cuts a release. The `VERSION`
+constants in `src/version.ts` move on every daemon release, and a published copy
+keeps the ones from the day it was published. The package number does not track
+the protocol era, so `grep '"version"' package.json` is the wrong field to read.
+What matters:
 
 ```bash
 grep VERSION ~/Documents/GitLab/openmarket-internal/packages/rooms-client/dist/version.js
@@ -302,9 +303,9 @@ status line says `registry copy`, link the GUI to the monorepo source:
 OM_REPO=~/Documents/GitLab/openmarket-internal bun run rooms-client:link
 ```
 
-Stay linked. There is no "unlink once it publishes" milestone while the package
-number is frozen — an unlink hands the GUI constants one or more releases behind
-the daemon it talks to.
+Stay linked. A registry copy keeps the constants from its publish day while the
+daemon's move on every release, so an unlink usually hands the GUI constants one
+or more releases behind the daemon it talks to.
 
 **A linked `rooms-client` does NOT rebuild itself when the monorepo moves.**
 `src/version.ts` bumps on every release, so a GUI built against a stale linked
