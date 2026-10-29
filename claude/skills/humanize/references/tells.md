@@ -9,6 +9,7 @@ Work top-down: structural tells first (they survive sentence-level edits), then 
 - **Recap relocation.** Killing a bullet list but restating it as "In short: X, Y, and Z" — same tell, new position. A closing summary that re-enumerates the section is AI. Fix: end on the last real point, or on the one consequence that matters.
 - **Header-itis.** Sections and bold headers on a three-paragraph answer. Fix: drop the headers; plain bullets or short paragraphs.
 - **Bold-label bullets.** Every bullet opens "**Thing:** detail". Fix: plain bullets that start with the point.
+- **List-everything.** One reason or one story chopped into bullets. Fix: a short paragraph.
 - **Double summary.** Same claim at top and bottom. Fix: keep one.
 - **Symmetric coverage.** 3 pros / 3 cons; equal words on unequally important things. Fix: uneven emphasis — loud on the surprising part, one clause for the rest.
 - **Table-where-prose-belongs.** Tables for things with two rows or non-enumerable content. Fix: a sentence.

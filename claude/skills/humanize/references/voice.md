@@ -4,8 +4,9 @@ Built from real samples (bottom of file). Three registers covered; MR descriptio
 
 ## Formatting — every register
 
-Ryan conveys information in bullet points; they read easier than a paragraph. Whenever a message or doc carries more than a couple of facts, findings, options, steps or changes, put them in bullets. Keep prose for the one or two sentences that open the message and for reasoning that has to flow. Never turn bullets into a wall of text.
+Ryan picks the shape that reads easiest for each part. Bullets carry a set of separate facts, findings, options, steps or changes. A short paragraph of one to three sentences carries one idea, a reason, or a story that has to flow; not every point belongs in a list. A wall of text and a list of one-line bullets for a single thought are both wrong.
 
+- Bullets never end with a period, even when a bullet is a full sentence
 - Plain bullets that start with the point, uneven in length, fragments fine. No bold label at the start of each.
 - A plain line ending in a colon heads a group of bullets ("Impact:", "Next steps:"), not a markdown header.
 - Nested bullets for the detail under one point, such as an error code or a figure.

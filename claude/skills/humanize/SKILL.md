@@ -3,7 +3,9 @@ name: humanize
 description: >-
   Use when Claude-authored text (design doc, MR description, README section,
   OM Chat post, reply draft, chat or comment draft) needs to read like a
-  specific person wrote it — before posting it to OM Chat, Discord, GitLab or
+  specific person wrote it and be laid out for its reader (bullets or short
+  paragraphs, queries with their result rows, mermaid diagrams, tables of
+  numbers) — before posting it to OM Chat, Discord, GitLab or
   GitHub, before handing over a reply draft, before publishing a doc, or when
   text shows AI tells like jargon, perfect parallelism, em-dash qualifiers,
   "Crucially,", recap paragraphs, zero first person. Trigger: /humanize [light]
@@ -38,14 +40,26 @@ Read the whole target before touching it.
 
 ## Modes
 
-- `/humanize [path]` — **full rewrite** (default). Structure may change: parallelism breaks, ordering shifts, a two-row table becomes a sentence. Lists stay lists unless the voice reference says otherwise.
+- `/humanize [path]` — **full rewrite** (default). Structure may change: parallelism breaks, ordering shifts, and each part takes the display that suits it (below).
 - `/humanize light [path]` — **sentence-level only**. Sections, tables, and bullets stay; only tell-carrying sentences are rewritten in place.
+
+## Display — full mode
+
+Shape each part of the target for the reader, not for uniformity. A message can mix shapes: a sentence to open, bullets for the findings, a code block for the proof.
+
+- **Separate facts, options, or steps:** bullets.
+- **One idea, a reason, or a short story:** a paragraph of one to three sentences.
+- **A claim that rests on a database query run in this session:** the query and its result rows, each in a code block, copied from the session's output. Trim long results and say how many rows were cut.
+- **A flow, a sequence, or how several parts connect,** when prose would take more than a few sentences: a mermaid diagram, with the prose cut to what the diagram doesn't show.
+- **Numbers compared across two or more things:** a markdown table.
+
+Build these only from what the session already holds: queries actually run, rows actually returned, numbers actually measured. Never write a query or a row that wasn't run, and don't run new ones to decorate a message. Use a table or diagram only where the destination renders it: OM Chat, GitLab and GitHub render both, Discord renders neither, so fall back to bullets or a code block there. The voice reference's formatting rules, such as bullet punctuation and spelling, apply inside every shape.
 
 ## Procedure
 
 1. Resolve the voice reference (above) and read [references/tells.md](references/tells.md) (taxonomy).
 2. Detect the target's register — chat message / design doc / MR description / README / channel escalation — and match the closest register in the voice reference. If the reference covers no register close to the target (a chat-only card asked to voice a design doc), say so and use the bundled `references/voice.md` for that register.
-3. Rewrite per mode, working through tells.md top-down: structural first (they survive sentence-level edits), then sentence/lexical, then register/persona, then content-shape. Apply the reference's voice rules and lexicon, bounded by its boundaries and "never" list and by the anti-overcorrection rules in tells.md.
+3. Rewrite per mode, working through tells.md top-down: structural first (they survive sentence-level edits), then sentence/lexical, then register/persona, then content-shape. In full mode, shape each part per Display. Apply the reference's voice rules and lexicon, bounded by its boundaries and "never" list and by the anti-overcorrection rules in tells.md.
 4. Verify invariants below.
 5. Report changes grouped by tell category, plus anything deliberately kept (e.g. a table that earns its keep), and name the voice reference used. When it ran unprompted, skip the report and show only the rewritten text.
 
@@ -60,6 +74,7 @@ Read the whole target before touching it.
 - **Fixing the surface and shipping the structure:** the strongest tells are parallelism, triads, and recap paragraphs, not vocabulary.
 - **Ending the rewrite with "In short: X, Y, and Z"** — the deleted bullet list restated as a new triad.
 - **Folding bullets into a wall of text:** a paragraph is not more human than a list, only harder to read. The tell is a list's uniform shape and bold labels, so fix those and keep the bullets.
+- **Bulleting everything:** a single reason or a short story split into one-line bullets reads as AI too. Write it as a sentence or three.
 - **AI-does-casual for chat:** lowercase + emoji + tidy clauses is not a real casual register. Take casing, punctuation, typo level, emoji rate, and message length from the reference's samples and stats — and tell one story, do not summarize all the facts.
 - **Hedging everything:** hedges go only where the source text is genuinely uncertain, and in the hedge words the reference uses.
 - **Polishing the grammar:** comma splices, dropped articles, dropped apostrophes, and missing terminal periods are part of a voice when the reference shows them; do not fix them into AI-perfect sentences.
