@@ -202,8 +202,8 @@ Name a sentinel per phase while writing the brief: a new `data-testid`, a new ro
 spec written → spec audit (other model) → spec commit (red, for the stated reason)
    │
    ▼
-build → identity gate → run this phase's spec + sweep → spec green, acceptance rows
-                                  │                     landed, no in-scope regressions?
+build → identity gate → run this phase's specs + sweep → specs green, acceptance rows
+                                  │                      landed, no in-scope regressions?
                                   ├─ yes → diff review (other model), commit, next phase
                                   └─ no  → fix agent (implementation only, never the
                                            spec) → attempt += 1 → back to build
@@ -221,11 +221,11 @@ A suite that takes 224 seconds is not a gate — at fourteen phases and three at
 
 | Tier | Scope | When |
 |---|---|---|
-| **Attempt** | **This phase's spec file**, plus `typecheck` | Every build inside the fix loop |
-| **Phase** | That spec, plus every spec written earlier in this run, plus the suites of modules importing the changed file | Once, when the attempt gate goes green |
+| **Attempt** | **This phase's spec files**, plus `typecheck` | Every build inside the fix loop |
+| **Phase** | Those specs, plus every spec written earlier in this run, plus the suites of modules importing the changed file | Once, when the attempt gate goes green |
 | **Wave** | The union of that wave's phase tiers, plus lint, typecheck, build, dist check | Once per wave |
 
-The attempt tier is a single spec file because spec-first made it one: the phase exists to satisfy one requirement, so the inner loop asks one question. That is the whole saving.
+The attempt tier is only the phase's own spec files because spec-first named them: the traceability matrix lists the specs that gate each phase, so the inner loop asks only the questions this phase answers. That is the whole saving.
 
 The phase tier is what makes the omission safe, and it has two parts for two different reasons. **Re-running every earlier spec** catches the phase that satisfies its own requirement by breaking a previous one — cheap, because these are targeted files the run wrote itself. **The importers' suites** catch what the change broke in consumers the specs never mention. Lint, typecheck and build stay at the wave boundary because they are fast; it is the test runner that is expensive.
 
@@ -399,18 +399,17 @@ in-scope gaps, out-of-scope findings, the spec-audit and diff-review verdict
 blocks, and the screenshot and console-log paths.
 
 ## Phases
-Numbered, one requirement each. Every phase carries: the requirement it
-satisfies, its spec file and that spec's recorded red failure, the change, the
-files, the sentinel that proves the build under test is this one, the
-acceptance rows the sweep must return a verdict on, the command gate, and what
-"done" looks like — which is always "this spec is green and the diff review
-said commit".
-One requirement = one spec = one phase = one commit pair (spec red, then
-implementation green).
+Numbered. Every phase carries: the requirements it satisfies, the spec files
+that gate it (from the traceability matrix) and each spec's recorded red
+failure, the change, the files, the sentinel that proves the build under test
+is this one, the acceptance rows the sweep must return a verdict on, the
+command gate, and what "done" looks like — which is always "its gate specs are
+green and the diff review said commit".
+Each phase is one commit pair: its specs red, then implementation green.
 
 ## Gates
-Three scoped commands per repo — attempt tier (this phase's spec file plus
-typecheck), phase tier (that spec plus every earlier spec in the run plus the
+Three scoped commands per repo — attempt tier (this phase's spec files plus
+typecheck), phase tier (those specs plus every earlier spec in the run plus the
 importers' suites), wave tier (the union of the wave's phase tiers plus lint,
 typecheck, build, dist check). The full suite is
 not a tier: it runs once at phase 0 for the baseline, and thereafter only as a
@@ -479,7 +478,7 @@ Everything else: keep going. Do not stop to ask whether it looks right.
   - **The file paths, resolved and quoted.** This brief, the source plan, and the evidence directory, each as a real absolute path — `~/.claude/plans` is a symlink, so resolve it, and quote every one because the vault's path contains spaces. A fresh session cannot find a file it was not handed.
   - **The worktree clause.** Changes land in a new git worktree on a new feature branch cut from a freshly-pulled default branch; the default branch and Ryan's own checkout are off limits.
 - **Every requirement arrives with Ryan's expected result attached**, verbatim, plus how it was established. No expected result, no phase.
-- **Every phase's done-condition is its spec going green**, and that spec was red first for a recorded reason.
+- **Every phase's done-condition is its gate specs going green**, and each was red first for a recorded reason.
 - **Every phase ends in a verification command**, not "check it works".
 - **The author never clears its own artifact.** Brief, spec and diff each carry the other model's verdict block before they ship, are committed, or land. A verdict that exists only as "looked fine" did not happen.
 - **State the baseline numbers.** "5,781 tests, 0 fail; lint 42 warnings, 0 errors" turns an ambiguous red run into an obvious regression.

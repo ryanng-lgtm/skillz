@@ -532,9 +532,9 @@ report, so the one expensive run of the night is always accountable.
 
 | Tier | Green means |
 |---|---|
-| spec-red | the phase's spec FAILS, for the reason the requirement predicts — recorded before any implementation |
-| attempt | the phase's spec file passes, typecheck clean |
-| phase | that spec, every earlier spec in the run, and every importer's suite pass, typecheck clean |
+| spec-red | each of the phase's specs FAILS, for the reason its requirement predicts — recorded before any implementation |
+| attempt | the phase's spec files pass, typecheck clean |
+| phase | those specs, every earlier spec in the run, and every importer's suite pass, typecheck clean |
 | wave | the union of the wave's phase tiers passes, plus lint, typecheck, build, dist check |
 | escalation | the phase-0 full-suite baseline, with zero new failures and no new failing suite names |
 
