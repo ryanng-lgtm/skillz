@@ -4,30 +4,32 @@ Ryan's agent skills and global instructions, shared across machines. One source 
 
 ## Skill index
 
-| Skill | Agents | What it does |
-| --- | --- | --- |
-| [`bump-rc`](claude/skills/bump-rc/SKILL.md) | Claude, Codex | Releases `@openmarket/rooms-client`, choosing the version bump from what changed, and repins both GUI consumers. |
-| [`commit`](claude/skills/commit/SKILL.md) | Claude, Codex | Commits only what is already staged, with a short message in the repo's style. |
-| [`demuddy`](claude/skills/demuddy/SKILL.md) | Claude, Codex | Makes a much-edited plan handover-ready, or cleans up the comments a code change left behind, keeping every gotcha and cite. |
-| [`docs-knowledge-base`](claude/skills/docs-knowledge-base/SKILL.md) | Claude, Codex | Looks up and records durable facts in a nested markdown docs dir, with `INDEX.md` tables generated and checked by `build-index.py`. |
-| [`graphify`](claude/skills/graphify/SKILL.md) | Claude, Codex (own copy) | Turns code, docs, papers, images or video into a knowledge graph to query instead of grepping. |
-| [`humanize`](claude/skills/humanize/SKILL.md) | Claude, Codex | Rewrites Claude-authored text so it reads like Ryan wrote it. |
-| [`ivtg`](claude/skills/ivtg/SKILL.md) | Claude, Codex | Investigates issues one at a time across the named repos and writes each up as a fix plan. Never implements. |
-| [`llm-council`](claude/skills/llm-council/SKILL.md) | Claude, Codex | Runs a decision past five advisors who analyse it independently, review each other anonymously, and synthesise a verdict. |
-| [`loop-me-in`](claude/skills/loop-me-in/SKILL.md) | Claude, Codex (own copy) | Turns an approved plan into a brief a fresh session can run unattended and prove its own changes landed. |
-| [`mr-markdown`](claude/skills/mr-markdown/SKILL.md) | Claude, Codex | Writes the MR description for the current branch: a full draft, cut to 200 words, then stripped of jargon. |
-| [`om-build`](claude/skills/om-build/SKILL.md) | Claude, Codex | Builds an OM Chat GUI from source (the daemon's `/rooms` GUI, the hosted `/chat/` fork, or the OpenFloor iOS app) and swaps it onto the live install or the simulator. |
-| [`om-glab`](claude/skills/om-glab/SKILL.md) | Claude, Codex | Builds and installs the local daemon with the GitLab chat GUI instead of `om-build`'s GitHub default. |
-| [`panos`](claude/skills/panos/SKILL.md) | Claude | Reviews landed MRs the way Panos would, verifies every finding, and fixes and pushes the real ones. |
-| [`prompt-ready`](claude/skills/prompt-ready/SKILL.md) | Claude, Codex | Turns raw requests into self-contained, copy-paste-ready prompts for another session. |
-| [`regroup`](claude/skills/regroup/SKILL.md) | Claude | Trims a branch's tests to the necessary ones and rewrites its commits for review, leaving the code byte-identical. |
-| [`shared-dev`](claude/skills/shared-dev/SKILL.md) | Claude | Brings up the backend services a change needs in shared-dev, probes main against the branch with real data, and tears down. |
-| [`socratic-teacher`](claude/skills/socratic-teacher/SKILL.md) | Claude, Codex | Teaching mode: one guiding question per turn, never the full solution. |
-| [`syncup`](claude/skills/syncup/SKILL.md) | Claude, Codex | Rebases the working branch and every behind MR or PR onto its target, resolving conflicts and keeping uncommitted work. |
-| [`test-audit`](claude/skills/test-audit/SKILL.md) | Claude | Gates new or changed tests on the behaviour they protect, and sweeps out low-value ones. |
-| [`testing-harness`](claude/skills/testing-harness/SKILL.md) | Claude, Codex | Proves a change in the running OM Chat GUI with cloud-versus-local visual diffs and browser probes. |
-| [`war-diary`](claude/skills/war-diary/SKILL.md) | Claude, Codex | Turns a day's GitLab activity and Claude Code sessions into War Diaries notes and Kanban cards. |
-| [`world-todo`](claude/skills/world-todo/SKILL.md) | Claude, Codex | Plans every OM World service change before implementation, however small. |
+Agnostic is `yes` when a skill's job works in any codebase, so it can be [exported](#export) to Claude Desktop or anywhere else. Personal defaults such as a vault path don't count against it; a skill about one product, service or person is `no`.
+
+| Skill | Agents | Agnostic | What it does |
+| --- | --- | --- | --- |
+| [`bump-rc`](claude/skills/bump-rc/SKILL.md) | Claude, Codex | no | Releases `@openmarket/rooms-client`, choosing the version bump from what changed, and repins both GUI consumers. |
+| [`commit`](claude/skills/commit/SKILL.md) | Claude, Codex | yes | Commits only what is already staged, with a short message in the repo's style. |
+| [`demuddy`](claude/skills/demuddy/SKILL.md) | Claude, Codex | yes | Makes a much-edited plan handover-ready, or cleans up the comments a code change left behind, keeping every gotcha and cite. |
+| [`docs-knowledge-base`](claude/skills/docs-knowledge-base/SKILL.md) | Claude, Codex | yes | Looks up and records durable facts in a nested markdown docs dir, with `INDEX.md` tables generated and checked by `build-index.py`. |
+| [`graphify`](claude/skills/graphify/SKILL.md) | Claude, Codex (own copy) | yes | Turns code, docs, papers, images or video into a knowledge graph to query instead of grepping. |
+| [`humanize`](claude/skills/humanize/SKILL.md) | Claude, Codex | yes | Rewrites Claude-authored text so it reads like Ryan wrote it. |
+| [`ivtg`](claude/skills/ivtg/SKILL.md) | Claude, Codex | yes | Investigates issues one at a time across the named repos and writes each up as a fix plan. Never implements. |
+| [`llm-council`](claude/skills/llm-council/SKILL.md) | Claude, Codex | yes | Runs a decision past five advisors who analyse it independently, review each other anonymously, and synthesise a verdict. |
+| [`loop-me-in`](claude/skills/loop-me-in/SKILL.md) | Claude, Codex (own copy) | yes | Turns an approved plan into a brief a fresh session can run unattended and prove its own changes landed. |
+| [`mr-markdown`](claude/skills/mr-markdown/SKILL.md) | Claude, Codex | yes | Writes the MR description for the current branch: a full draft, cut to 200 words, then stripped of jargon. |
+| [`om-build`](claude/skills/om-build/SKILL.md) | Claude, Codex | no | Builds an OM Chat GUI from source (the daemon's `/rooms` GUI, the hosted `/chat/` fork, or the OpenFloor iOS app) and swaps it onto the live install or the simulator. |
+| [`om-glab`](claude/skills/om-glab/SKILL.md) | Claude, Codex | no | Builds and installs the local daemon with the GitLab chat GUI instead of `om-build`'s GitHub default. |
+| [`panos`](claude/skills/panos/SKILL.md) | Claude | no | Reviews landed MRs the way Panos would, verifies every finding, and fixes and pushes the real ones. |
+| [`prompt-ready`](claude/skills/prompt-ready/SKILL.md) | Claude, Codex | yes | Turns raw requests into self-contained, copy-paste-ready prompts for another session. |
+| [`regroup`](claude/skills/regroup/SKILL.md) | Claude | yes | Trims a branch's tests to the necessary ones and rewrites its commits for review, leaving the code byte-identical. |
+| [`shared-dev`](claude/skills/shared-dev/SKILL.md) | Claude | no | Brings up the backend services a change needs in shared-dev, probes main against the branch with real data, and tears down. |
+| [`socratic-teacher`](claude/skills/socratic-teacher/SKILL.md) | Claude, Codex | yes | Teaching mode: one guiding question per turn, never the full solution. |
+| [`syncup`](claude/skills/syncup/SKILL.md) | Claude, Codex | yes | Rebases the working branch and every behind MR or PR onto its target, resolving conflicts and keeping uncommitted work. |
+| [`test-audit`](claude/skills/test-audit/SKILL.md) | Claude | yes | Gates new or changed tests on the behaviour they protect, and sweeps out low-value ones. |
+| [`testing-harness`](claude/skills/testing-harness/SKILL.md) | Claude, Codex | no | Proves a change in the running OM Chat GUI with cloud-versus-local visual diffs and browser probes. |
+| [`war-diary`](claude/skills/war-diary/SKILL.md) | Claude, Codex | no | Turns a day's GitLab activity and Claude Code sessions into War Diaries notes and Kanban cards. |
+| [`world-todo`](claude/skills/world-todo/SKILL.md) | Claude, Codex | no | Plans every OM World service change before implementation, however small. |
 
 `openmarket` and `om-chat` ship with the `om` CLI and are vendored here so both agents get the same copy; they are not listed. `socratic-teacher`, `docs-knowledge-base` and the skill template are adapted from [wooneusean/skills](https://github.com/wooneusean/skills).
 
@@ -35,10 +37,10 @@ Ryan's agent skills and global instructions, shared across machines. One source 
 
 Skills that set something up once per machine or repo. They live in `setup/` and install like any other skill, but only run when you invoke them.
 
-| Skill | Agents | What it does |
-| --- | --- | --- |
-| [`graphify-setup`](setup/graphify-setup/SKILL.md) | Claude, Codex | Installs graphify and builds a never-committed graph for one repo or several merged ones, with git hooks that keep it current. |
-| [`status-line`](setup/status-line/SKILL.md) | Claude | Sets the Claude Code status line (model, folder, branch, context, usage limits, effort), changing only `statusLine` in `settings.json`. |
+| Skill | Agents | Agnostic | What it does |
+| --- | --- | --- | --- |
+| [`graphify-setup`](setup/graphify-setup/SKILL.md) | Claude, Codex | yes | Installs graphify and builds a never-committed graph for one repo or several merged ones, with git hooks that keep it current. |
+| [`status-line`](setup/status-line/SKILL.md) | Claude | yes | Sets the Claude Code status line (model, folder, branch, context, usage limits, effort), changing only `statusLine` in `settings.json`. |
 
 ## Structure
 
@@ -57,7 +59,8 @@ skillz/
 ├── hook-install.sh    # registers the sync hooks; install.sh runs it
 ├── hook.sh            # runs sync.sh for an edit inside the repo, for a tool hook
 ├── sync.sh            # commits and pushes each turn, pulls at session start
-└── check.py           # checks skills, Codex links, the index and skill paths agree
+├── check.py           # checks skills, Codex links, the index and skill paths agree
+└── export.py          # zips the agnostic skills for Claude Desktop and elsewhere
 ```
 
 ## Installation
@@ -88,11 +91,23 @@ Re-running is safe. It refreshes links, removes links to skills the repo dropped
 
 Invoke a skill as `/name` in Claude Code or `$name` in Codex, or describe the task. Each skill's `description` says when it applies and lists its arguments and trigger phrases.
 
+## Export
+
+```bash
+python3 -I export.py              # writes to ~/Downloads/skillz-skills
+python3 -I export.py --out DIR
+```
+
+`export.py` zips every skill marked Agnostic `yes` in the tables above. It runs `check.py` first and stops if the repo is out of step. It writes:
+
+- `skillz-skills/<name>.zip`, one per skill with the skill's folder at its root. In Claude Desktop, open Settings > Skills > Upload a skill and drop them all in at once.
+- `skillz-skills.zip`, every skill folder in one archive, to unzip into any skills directory.
+
 ## Adding a skill
 
 1. Write `claude/skills/<name>/SKILL.md` from [`templates/skill-template.md`](templates/skill-template.md), or `setup/<name>/SKILL.md` for a one-time setup.
 2. If it works the same under Codex, link it: `ln -s ../../claude/skills/<name> codex/skills/<name>` (or `../../setup/<name>`).
-3. Add its row to the [skill index](#skill-index) or the [one-time setup](#one-time-setup) table.
+3. Add its row to the [skill index](#skill-index) or the [one-time setup](#one-time-setup) table, with Agnostic set to `yes` or `no`.
 4. Run `python3 -I check.py` and `./install.sh --links-only`.
 
 [`CLAUDE.md`](CLAUDE.md) has the full rules agents follow here.

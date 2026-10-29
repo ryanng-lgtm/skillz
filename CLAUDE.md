@@ -15,7 +15,7 @@ Every skill follows `templates/skill-template.md` for its frontmatter, body, and
 
 ## Adding, removing, or renaming a skill
 
-Update the skill's row in the `README.md` skill index, or its one-time setup table, in the same change. Those tables are the only full list; a skill missing from them is invisible. The vendored `openmarket` and `om-chat` are the one exception.
+Update the skill's row in the `README.md` skill index, or its one-time setup table, in the same change. Its Agnostic cell (`yes` or `no`) decides whether `export.py` zips it for Claude Desktop. Those tables are the only full list; a skill missing from them is invisible. The vendored `openmarket` and `om-chat` are the one exception.
 
 On a rename or removal, also update every mention of the old name in `claude/CLAUDE.md`, `codex/AGENTS.md`, and other skills, and remove the Codex symlink if there is one. `install.sh` drops the dead links it leaves under `~/.claude` and `~/.codex`.
 

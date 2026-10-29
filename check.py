@@ -7,7 +7,8 @@ Prints one line per problem and exits 1 when there is any:
   layout   each skill follows templates/skill-template.md
   links    each Codex symlink points at the Claude or setup skill of the same name
   readme   the README skill index and one-time setup table list every skill,
-           in order, with its SKILL.md link and the agents that have it
+           in order, with its SKILL.md link, the agents that have it, and
+           Agnostic set to yes or no
   paths    each ~/.claude/skills/... or ~/.codex/skills/... path a doc or
            script names exists in this repo, or in the work skills checkout
            when that is present
@@ -132,8 +133,8 @@ def table_rows(lines, heading):
     for line in lines[lines.index(heading) + 1:]:
         if line.startswith("## "):
             break
-        if m := re.match(r"\| \[`([^`]+)`\]\(([^)]+)\) \| ([^|]+) \|", line):
-            rows[m.group(1)] = (m.group(2), m.group(3).strip())
+        if m := re.match(r"\| \[`([^`]+)`\]\(([^)]+)\) \| ([^|]+) \| ([^|]+) \|", line):
+            rows[m.group(1)] = (m.group(2), m.group(3).strip(), m.group(4).strip())
     return rows
 
 
@@ -154,13 +155,15 @@ def check_readme(home, codex, linked):
         if list(rows) != sorted(rows):
             report("README.md", f"{where} is not in alphabetical order")
         for n in sorted(want & set(rows)):
-            link, cell = rows[n]
+            link, cell, agnostic = rows[n]
             path = f"{home.get(n, 'codex/skills')}/{n}/SKILL.md"
             if link != path:
                 report("README.md", f"{n} links to {link}, not {path}")
             expected = agents(n, home, codex, linked)
             if cell != expected:
                 report("README.md", f"{n} lists agents {cell!r}, not {expected!r}")
+            if agnostic not in ("yes", "no"):
+                report("README.md", f"{n} has Agnostic {agnostic!r}, not yes or no")
 
 
 def text_files():
@@ -199,13 +202,18 @@ def check_paths(home, codex):
                 report(rel, f"names {mention}, which does not exist")
 
 
-def main():
-    # Where each Claude skill lives: claude/skills, or setup for one-time setup.
+def homes():
+    """Where each Claude skill lives: claude/skills, or setup for one-time setup."""
     home = {n: "claude/skills" for n in skills("claude/skills")}
     for n in skills("setup"):
         if n in home:
             report(f"setup/{n}", "a skill of the same name is in claude/skills")
         home[n] = "setup"
+    return home
+
+
+def main():
+    home = homes()
     codex = skills("codex/skills")
     linked = check_skills(home, codex)
     check_readme(home, codex, linked)
