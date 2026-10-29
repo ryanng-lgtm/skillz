@@ -3,8 +3,7 @@ name: testing-harness
 description: >-
   Use when a change has to be proven in the real running product rather than in
   tests — visually diffing the cloud deployment against the local daemon,
-  sweeping the running app for regressions after a change, screenshotting a
-  route, sending or reading a DM through the real UI, checking whether the local
+  screenshotting a route, sending or reading a DM through the real UI, checking whether the local
   daemon is serving the working tree, writing a one-off browser probe against a
   logged-in session, or walking an end-to-end journey through the GUI. Trigger:
   /testing-harness, $testing-harness.
@@ -29,37 +28,26 @@ project's `node_modules`.
 node ~/.claude/skills/testing-harness/scripts/om-chat.mjs <command> [flags]
 ```
 
-## The two modes
+## The mode
 
-Both answer "did my change break something", from opposite directions.
+`--parity-check` answers *did the UI change land, and only where I meant it
+to?* It compares the cloud deployment (before) against the local daemon
+(after), visually. It runs as the `compare` command (see below); the flag name
+is not built yet, and it is a rename, not new behavior.
 
-| Mode | Question it answers | Compares |
-| --- | --- | --- |
-| `--parity-check` | *Did the UI change land, and only where I meant it to?* | cloud (before) vs local daemon (after), visually |
-| `--regression` | *Did anything else quietly break?* | the running app against invariants and a recorded baseline |
-
-Parity-check is a **visual** verdict on one intended change. Regression is a
-**behavioral** verdict on everything around it — console, network, hydration,
-journeys. They are complementary; a change that ships clean on both is proven.
-
-> **Status.** `--parity-check` runs as the `compare` command (see below). The
-> flag name is not built yet; it is a rename, not new behavior. `--regression`
-> is **designed but not built** — the design of record is
-> [references/regression-mode.md](references/regression-mode.md). Do not report
-> a regression verdict from this skill until that mode exists; use an ad-hoc
-> probe and say it was a probe.
+A visual diff says nothing about console errors, failed requests or a broken
+flow. For those, use an ad-hoc probe and say the result came from a probe.
 
 ## Procedure
 
-### 1. Run doctor first — both modes
+### 1. Run doctor first
 
 ```sh
 doctor            # verify the wiring before trusting any verdict
 ```
 
 `--parity-check` refuses to capture if doctor finds problems (override with
-`--force`), and `--regression` inherits the same gate. This is not ceremony — a
-report showing "no change", or a regression run showing "clean", is worthless if
+`--force`). This is not ceremony — a report showing "no change" is worthless if
 the real cause was a stale bundle or the wrong daemon. Doctor reports:
 
 - whether `/rooms` is serving the **vite dev proxy** (your working tree), a built
@@ -97,46 +85,15 @@ route gets side-by-side, a drag slider, a blink toggle, and a client-side
 pixel-diff heatmap. The header stamps both repos' branch and commit, so two
 builds of the same code can never be silently compared.
 
-### 3. `--regression`
-
-Targeted at the latest changes rather than at one intended visual delta. Four
-legs, over one shared run artifact:
-
-| Leg | What it catches |
-| --- | --- |
-| **Runtime health sweep** | console errors, uncaught pageerrors, failed or unexpected network calls, websocket drops, stub/blank renders |
-| **Critical journeys** | a fixed suite of real flows — hydrate, open a DM, send and confirm rendered, reload, reconnect |
-| **Self-baseline diff** | drift against a run recorded on `main` and replayed on the branch |
-| **Change-driven targeting** | maps the branch's diff onto which routes and journeys to exercise, so a run stays fast |
-
-Network and console are **scraped on every leg**, not just the sweep — the
-request log and the console log are part of the run artifact, so a journey that
-passes while quietly firing a 500 is still a finding. Injecting temporary debug
-logging into the page to capture data a probe can't otherwise reach is a
-supported technique, not a hack.
-
-Baselines and runs share one on-disk shape:
-
-```
-~/.claude/state/testing-harness/
-  baselines/<branch>@<sha>/    shots/  dom.json  network.jsonl  console.jsonl  meta.json
-  runs/<timestamp>/            the same, plus verdict.json
-```
-
-Full design — leg-by-leg semantics, the record/replay contract, baseline
-staleness rules, and the open questions still to settle — is in
-[references/regression-mode.md](references/regression-mode.md). Read it before
-implementing or extending this mode.
-
-### 4. Ad-hoc probes
+### 3. Ad-hoc probes
 
 A probe answers one question once against a live, already-logged-in page, then
 gets thrown away. Reach for one when the question is about the DOM or the
 runtime rather than about a rendered route: does this element exist, what
 `data-` attributes did the component ship, what does the console log on mount,
-does the websocket reconnect after an offline flip. It is also the honest
-stand-in while `--regression` does not exist yet — just say the result came from
-a probe, not from a mode.
+does the websocket reconnect after an offline flip. Injecting temporary debug
+logging into the page to capture data a probe can't otherwise reach is a
+supported technique, not a hack.
 
 Start from the scaffold — copy it out, edit the `QUESTION` block, run it with
 plain `node`:
@@ -153,8 +110,8 @@ the template: Playwright resolved out of this skill's `node_modules`, and
 what `login` wrote, so the page comes up authenticated with no login step.
 
 **Do not grow a probe into a command.** If you find yourself adding flags,
-defaults, or an output format, the question was repeatable — it belongs in a
-`--regression` leg instead.
+defaults, or an output format, the question is repeatable: stop and propose it
+as an `om-chat.mjs` command instead.
 
 #### Selectors that are known-good
 
@@ -175,7 +132,7 @@ timeout tuned on a warm run goes flaky on a cold one.
 
 #### Journey rules
 
-These govern the critical-journeys leg and any hand-written journey probe:
+These govern any hand-written journey probe:
 
 - **Assert the observable, not the action.** "Clicked send" proves nothing. Wait
   for the message to appear in `.message-row` — which is exactly what the `send`
@@ -198,7 +155,7 @@ in the rendered thread.
 
 A probe or a journey bypasses that guard entirely — it is raw Playwright against
 a logged-in production session. The same approval rule applies to anything a
-probe, a journey, or a regression leg posts, reacts to, or deletes.
+probe or a journey posts, reacts to, or deletes.
 
 ## Common mistakes
 
@@ -220,7 +177,7 @@ probe, a journey, or a regression leg posts, reacts to, or deletes.
 
 ## Utility verbs
 
-Not modes — tools both modes use, and useful on their own.
+Not modes — tools that `--parity-check` and probes use, and useful on their own.
 
 ```sh
 login   --target cloud                   # establish or refresh the saved session
