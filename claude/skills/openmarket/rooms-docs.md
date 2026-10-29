@@ -30,6 +30,7 @@ If two docs plausibly match, ask which one rather than guessing.
 | `doc_write` | Create (no baseRev) or update (baseRev required) Markdown | Never use it for .excalidraw; always give a change note; conflicts return the head to merge and retry |
 | `canvas_update` | Atomically publish a Canvas scene and fitted SVG preview | Existing .excalidraw docs only; read first, preserve the full scene, pass baseRev |
 | `doc_propose` | Suggest a change without writing it: the full content queues for human review | Always safe; the explicit always-queue verb, and the right one for someone else's doc |
+| `doc_patch` | Edit by exact anchors without resending the doc | `propose` queues like `doc_propose`, `write` follows `doc_write`; one bad edit writes nothing |
 | `doc_move` | Move/rename and/or refile one doc's home channel | Any member; identity, history, pills survive |
 | `doc_move_many` | Bulk move/refile by folder prefix OR exact paths | Prefix preserves subtrees; exact paths use basenames |
 | `doc_revert` | Restore an earlier revision as a NEW head | Content-level; use doc_history to pick; proposes on the same rule as `doc_write` |
@@ -46,6 +47,8 @@ Doc verbs run against the USER's rights, so the server refuses what they cannot 
 ## Core workflows
 
 **Edit a doc.** `doc_read` → change the content → `doc_write` with `baseRev` = the headRev you read and a note saying what changed. On `status: "conflict"` the result carries the current head: merge your change INTO the head content and retry with the new baseRev. Never resend your original text unmerged, that would erase the other author's landed work. On `status: "proposal"` nothing was published: say the edit is queued for the operator and stop.
+
+**Edit part of a large doc.** For a few rows in a long doc, use `doc_patch` instead of resending it: `doc_read`, copy each anchor exactly from the content (a whole row or heading, long enough to occur once), and pass the headRev as `baseRev`. On `doc_patch_anchor`, `doc_read` again and pick a unique anchor. `status: "proposed"` means queued, not published.
 
 **Edit or draw in a Canvas.** `doc_read` by docId → parse the complete Excalidraw scene → add/update only the intended elements while preserving the rest → render a complete SVG whose viewBox fits every visible element → `canvas_update` with both full artifacts and the read headRev. Pass `content` as the JSON scene object directly (a JSON-encoded string is also accepted). The complete `elements` array is required; the tool inherits omitted stable envelope, `appState`, and empty `files` fields from the head it just read so rebuilding a drawing cannot fail merely because one unchanged wrapper field was dropped. The scene and preview commit atomically. On `status: "conflict"`, merge the intended element changes into `head.content`, regenerate the preview, and retry at `head.rev`. Never send Canvas JSON through `doc_write`. A credentialed agent without direct write cannot queue this through the Markdown proposal path; report the grant command returned by the tool instead of claiming an edit landed.
 
