@@ -6,8 +6,10 @@ usage: python3 -I usage.py [DAYS] [--calibrate]
 Reads the Claude Code transcripts under ~/.claude/projects changed in the last
 DAYS days (default 30), subagents included, and prints one row per skill:
   runs     times its text was loaded, from a Skill tool call or a /command
-  tok/run  tokens each run loaded, on average
-  total    tokens all its runs loaded
+  tok/run  tokens of SKILL.md each run loaded, on average
+  refs     tokens of its other files (references, templates) each run then
+           read, on average, counting each file once per run
+  total    tokens all its runs loaded, SKILL.md and other files together
   now      tokens its SKILL.md loads today
   desc     tokens its description adds to every session, or "-" for a
            manual-only skill (disable-model-invocation: true), whose
@@ -17,8 +19,7 @@ Tokens are characters / 2.76. That ratio was fitted against the API's own
 usage numbers: tokens = 0.362 x chars + 115 over 225 runs, r = 0.98.
 --calibrate refits it from the transcripts and prints the fit.
 
-It counts only the text a run loads, not the reference files the skill reads
-afterwards or the work it does.
+It counts the text a skill makes Claude read, not the rest of the work it does.
 """
 import json
 import pathlib
@@ -77,13 +78,24 @@ def prompt_tokens(usage):
 
 
 def runs_in(path, names):
-    """Yield (skill, chars loaded, prompt growth or None) for each run in one transcript."""
+    """Yield (skill, SKILL.md chars, other-file chars, prompt growth or None) per run."""
     records = []
     for line in path.open(errors="replace"):
         try:
             records.append(json.loads(line))
         except ValueError:
             pass
+    results = {}
+    for record in records:
+        content = (record.get("message") or {}).get("content")
+        if record.get("type") == "user" and isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    out = block.get("content")
+                    if isinstance(out, list):
+                        out = "".join(b.get("text", "") for b in out if isinstance(b, dict))
+                    results[block.get("tool_use_id")] = len(out or "")
+    anchors = []
     for i, record in enumerate(records):
         skill = None
         content = (record.get("message") or {}).get("content")
@@ -96,8 +108,10 @@ def runs_in(path, names):
                 if m := COMMAND.search(text):
                     skill = m.group(1)
                     break
-        if skill not in names:
-            continue
+        if skill in names:
+            anchors.append((i, skill))
+    for n, (i, skill) in enumerate(anchors):
+        record = records[i]
         # The skill's text arrives as the isMeta user messages before the next turn.
         chars, j = 0, i + 1
         while j < len(records) and records[j].get("type") != "assistant":
@@ -106,12 +120,27 @@ def runs_in(path, names):
             j += 1
         if not chars:
             continue  # denied or interrupted before the text loaded
+        # Other files of the skill read before its next run: Read calls, or
+        # shell reads that name the file.
+        end = next((k for k, s in anchors[n + 1:] if s == skill), len(records))
+        seen, refs = set(), 0
+        for record2 in records[j:end]:
+            content2 = (record2.get("message") or {}).get("content")
+            if record2.get("type") != "assistant" or not isinstance(content2, list):
+                continue
+            for block in content2:
+                if not isinstance(block, dict) or block.get("type") != "tool_use":
+                    continue
+                arg = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("command") or ""
+                if f"/skills/{skill}/" in arg and "SKILL.md" not in arg and arg not in seen:
+                    seen.add(arg)
+                    refs += results.get(block.get("id"), 0)
         growth = None
         if record.get("type") == "assistant" and j < len(records):
             before = (record.get("message") or {}).get("usage") or {}
             after = (records[j].get("message") or {}).get("usage") or {}
             growth = prompt_tokens(after) - prompt_tokens(before) - before.get("output_tokens", 0)
-        yield skill, chars, growth
+        yield skill, chars, refs, growth
 
 
 def main():
@@ -120,11 +149,13 @@ def main():
     cutoff = time.time() - days * 86400
     files = skill_files()
     loaded = {n: [] for n in files}
+    extra = {n: [] for n in files}
     pairs = []
     transcripts = [p for p in PROJECTS.rglob("*.jsonl") if p.stat().st_mtime >= cutoff]
     for path in transcripts:
-        for skill, chars, growth in runs_in(path, files):
+        for skill, chars, refs, growth in runs_in(path, files):
             loaded[skill].append(chars)
+            extra[skill].append(refs)
             if growth is not None and growth > 200 and chars > 800:
                 pairs.append((chars, growth))
 
@@ -143,15 +174,17 @@ def main():
         manual = re.search(r"^disable-model-invocation:\s*true\s*$", fm, re.M)
         desc = None if manual else tok(len(name) + len(description(fm)))
         always += desc or 0
-        runs = loaded[name]
-        rows.append((sum(runs), name, len(runs), tok(statistics.mean(runs)) if runs else 0,
-                     tok(sum(runs)), tok(len(path.read_text())), desc))
+        runs, refs = loaded[name], extra[name]
+        rows.append((sum(runs) + sum(refs), name, len(runs),
+                     tok(statistics.mean(runs)) if runs else 0,
+                     tok(statistics.mean(refs)) if refs else 0,
+                     tok(sum(runs) + sum(refs)), tok(len(path.read_text())), desc))
 
     print(f"{len(transcripts)} transcripts from the last {days} days")
     print(f"descriptions in every session: ~{always} tokens\n")
-    print(f"{'skill':20} {'runs':>5} {'tok/run':>8} {'total':>8} {'now':>7} {'desc':>5}")
-    for _, name, runs, per, total, now, desc in sorted(rows, key=lambda r: (-r[0], r[1])):
-        print(f"{name:20} {runs:5} {per:8} {total:8} {now:7} {desc if desc is not None else '-':>5}")
+    print(f"{'skill':20} {'runs':>5} {'tok/run':>8} {'refs':>6} {'total':>8} {'now':>7} {'desc':>5}")
+    for _, name, runs, per, refs, total, now, desc in sorted(rows, key=lambda r: (-r[0], r[1])):
+        print(f"{name:20} {runs:5} {per:8} {refs:6} {total:8} {now:7} {desc if desc is not None else '-':>5}")
 
 
 if __name__ == "__main__":
