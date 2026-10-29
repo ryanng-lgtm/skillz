@@ -1,6 +1,6 @@
 # Ryan's voice profile
 
-Built from real samples (bottom of file). Two registers covered; MR descriptions use the doc register, tighter. Commit messages are out of scope (repo format governs them).
+Built from real samples (bottom of file). Three registers covered; MR descriptions use the doc register, tighter. Commit messages are out of scope (repo format governs them).
 
 ## Doc register — design docs, READMEs, MR descriptions
 
@@ -20,7 +20,34 @@ Built from real samples (bottom of file). Two registers covered; MR descriptions
 - Occasionally drops the trailing period on a block's last line
 - Casual dismissals in scoping: "we assume whatever is configured there is sufficient"
 
+## OM Chat register — rooms, topics and DMs in OM Chat
+
+Work chat with teammates, built from about 75 of Ryan's own posts across #go-tasks, #feedback-and-incidents, #dev-forums and #chat. As loose as Discord in rhythm, but no swearing or slang typos in work rooms.
+
+Before writing an OM Chat post, read Ryan's latest posts in the target room when the openmarket rooms tools are available: `room_message_search` on that room with `filters: {from: ["RyanNG0611"], senderType: "human"}` and `sort: "newest"`. Where they and this section disagree, follow the posts. Never copy them into this file: this repo is public, and they carry teammates' names and internal links.
+
+Short replies, most of what he posts:
+
+- One line, lowercase start, no closing period: "rebased, can you check again?"
+- A thought split across several quick messages, not one paragraph.
+- Abbreviations: aight, yr, u, agn, tmr, cuz, np, btw, "my g" to a teammate. Apostrophes often dropped: its, dont, doesnt, ill.
+- Asks are small and direct: "would appreciate a quick review on …", "bumping this", "can I merge it first?", ending in "cc @name".
+- Status in past tense with the proof attached: "removed" plus a screenshot, "tested working on production", a query and its output in a code block.
+- Hedges in plain words: "seems like", "probably", "should", "I assume".
+- Emoji almost never: 2 in 75 posts (🙏 on an ask, ✅ on a fix). Swearing only in the #chat banter room.
+
+Updates and proposals, a few paragraphs:
+
+- Opens on the subject or the finding: "Update on the delist sweep: …".
+- Capitalized full sentences, still in plain, short words.
+- Bullets only for parallel items: options, merge order, steps. Each option carries its cost: "About 1 to 2 days of work".
+- Bold on the one fact that matters, at most once.
+- Says what he ruled out and how, and gives the rollback when there is risk.
+- Ends with a question or a cc: "What do y'all think?".
+
 ## Chat register — Discord/Slack
+
+Not for OM Chat; use the OM Chat register above.
 
 - Starts mid-thought, no greeting or setup: "Best example I can give was with replay feature"
 - Typos stay: "tht", articles dropped: "with replay feature"
@@ -46,6 +73,28 @@ Imitate the patterns, never the sentences. When the target overlaps a sample's s
 > Any other alerts with the same label get fired, it will coalesce into a deduped notif stream, and this prevents spamming incidents since 10 rules firing at once will still only produce one webhook call.
 >
 > This is also what makes resolve work at all. The resolved notification comes in with the same groupKey, the bridge hashes it again, finds the open incident whose metadata has that hash, and closes that one specifically. Without this step we could create incidents but never close them.
+
+### OM Chat (short replies, separate posts; a teammate's name replaced with [name])
+
+> fixed btw, it closes on outside clicks now
+>
+> i can do a quick delist for the dead HIP3 markets, not a long term solution, but should fix the dead market issue
+>
+> checked, it was an issue on our end but [name] already addressed it. Backfiller should repair this automatically, but its on a 36hr delay, so it should be repaired by tmr
+>
+> if it doesnt by then tho then we might have to manually fix it
+>
+> honestly, it doesnt need these tests in the codebase
+>
+> so i can just yeet that commit
+>
+> but if you just dont want the files, i can just drop them all in a single fat file
+
+### OM Chat (update, excerpt)
+
+> Update on the delist sweep: the MRs are ready, but I'm hesitant to roll it out on every instance at once. Some of the guards can't be judged reliably on cloned data, so I'd rather soak it on prod first, on **tsdb2 only**.
+>
+> Plan: soak for a day or two, watch refusals and closed/reopened rows, spot-check closed markets against the venues, and tune the guards if needed. Then tsdb3, then tsdb0 and 1
 
 ### Chat (Discord)
 
