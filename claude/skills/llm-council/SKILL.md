@@ -278,7 +278,7 @@ Format the output as:
 {content}
 ```
 
-Keep it scannable. Use bullet points. Include the before/after examples where relevant.
+Keep it scannable. Use bullet points.
 
 ### step 6: save the transcript (optional)
 
