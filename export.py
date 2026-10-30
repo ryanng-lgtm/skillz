@@ -69,6 +69,9 @@ def main():
         help="directory for the per-skill zips (default: %(default)s)",
     )
     out = os.path.abspath(parser.parse_args().out)
+    if os.path.commonpath([out, REPO]) == REPO:
+        print(f"export: {out} is inside the repo, which sync publishes; pick a folder outside it")
+        return 1
 
     if check.main() != 0:
         print("export: fix what check.py reports first; nothing written")

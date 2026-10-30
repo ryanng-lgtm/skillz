@@ -94,11 +94,11 @@ Invoke a skill as `/name` in Claude Code or `$name` in Codex, or describe the ta
 ## Export
 
 ```bash
-python3 -I export.py              # writes to ~/Downloads/skillz-skills
-python3 -I export.py --out DIR
+python3 -I export.py                         # writes to ~/Downloads/skillz-skills
+python3 -I export.py --out ~/Desktop/skills  # any folder outside this repo
 ```
 
-`export.py` zips every skill marked Agnostic `yes` in the tables above. It runs `check.py` first and stops if the repo is out of step. It writes:
+`export.py` zips every skill marked Agnostic `yes` in the tables above. It runs `check.py` first and stops if the repo is out of step, and refuses a folder inside the repo, since sync would publish the zips. It writes:
 
 - `skillz-skills/<name>.zip`, one per skill with the skill's folder at its root. In Claude Desktop, open Settings > Skills > Upload a skill and drop them all in at once.
 - `skillz-skills.zip`, every skill folder in one archive, to unzip into any skills directory.
