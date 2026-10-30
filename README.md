@@ -60,7 +60,7 @@ skillz/
 ├── hook.sh            # runs sync.sh for an edit inside the repo, for a tool hook
 ├── sync.sh            # commits and pushes each turn, pulls at session start
 ├── check.py           # checks skills, Codex links, the index and skill paths agree
-└── export.py          # zips the agnostic skills for Claude Desktop and elsewhere
+└── export.py          # packs the agnostic skills into one plugin zip
 ```
 
 ## Installation
@@ -94,14 +94,14 @@ Invoke a skill as `/name` in Claude Code or `$name` in Codex, or describe the ta
 ## Export
 
 ```bash
-python3 -I export.py                         # writes to ~/Downloads/skillz-skills
-python3 -I export.py --out ~/Desktop/skills  # any folder outside this repo
+python3 -I export.py                             # writes ~/Downloads/skillz.zip
+python3 -I export.py --out ~/Desktop/skillz.zip  # any path outside this repo
 ```
 
-`export.py` zips every skill marked Agnostic `yes` in the tables above. It runs `check.py` first and stops if the repo is out of step, and refuses a folder inside the repo, since sync would publish the zips. It writes:
+`export.py` packs every skill marked Agnostic `yes` in the tables above into one plugin zip: `skillz/.claude-plugin/plugin.json` plus `skillz/skills/<name>/` for each skill. It runs `check.py` first and stops if the repo is out of step, and refuses a path inside the repo, since sync would publish the zip.
 
-- `skillz-skills/<name>.zip`, one per skill with the skill's folder at its root. In Claude Desktop, open Settings > Skills > Upload a skill and drop them all in at once.
-- `skillz-skills.zip`, every skill folder in one archive, to unzip into any skills directory.
+- In Claude Desktop or claude.ai, upload it at Customize > Plugins > Add > Upload plugin. Every skill comes in at once.
+- Anywhere else, unzip it and copy the folders under `skillz/skills/` into that tool's skills directory.
 
 ## Adding a skill
 

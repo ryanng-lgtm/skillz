@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""Zip the skills the README marks Agnostic yes, to upload anywhere.
+"""Pack the skills the README marks Agnostic yes into one plugin zip.
 
-usage: python3 -I export.py [--out DIR]
+usage: python3 -I export.py [--out FILE]
 
-Writes DIR/<name>.zip for each skill, with the skill's folder at the zip's
-root (the layout Claude Desktop's skill upload takes), and DIR.zip with every
-skill folder in one archive. DIR defaults to ~/Downloads/skillz-skills.
+Writes FILE (default ~/Downloads/skillz.zip) holding one plugin folder:
+skillz/.claude-plugin/plugin.json and skillz/skills/<name>/ for each skill.
+Claude Desktop and claude.ai take it at Customize > Plugins > Add > Upload
+plugin; the skills/ folder also unzips into any skills directory.
 
 Runs check.py first and writes nothing while it fails, so a stale README
 can't pick the wrong skills.
 """
 import argparse
-import glob
+import datetime
+import json
 import os
 import re
 import sys
@@ -21,6 +23,7 @@ REPO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, REPO)  # -I leaves the script's directory off sys.path
 import check  # noqa: E402
 
+PLUGIN = "skillz"
 SKIP_DIRS = {"__pycache__", "node_modules"}
 SKIP_FILES = {".DS_Store"}
 NAME = re.compile(r"^[a-z0-9-]{1,64}$")
@@ -50,6 +53,8 @@ def upload_problems(name, folder):
         fields, _ = check.frontmatter(fh.read().splitlines())
     if not NAME.match(name):
         yield f"{name}: name must be 1-64 lowercase letters, digits or hyphens"
+    if fields.get("name") != name:
+        yield f"{name}: frontmatter name is {fields.get('name')!r}, not the folder name"
     desc = fields.get("description", "")
     if not desc:
         yield f"{name}: description is empty"
@@ -57,20 +62,28 @@ def upload_problems(name, folder):
         yield f"{name}: description is {len(desc)} characters, over {MAX_DESCRIPTION}"
 
 
-def add(zf, name, folder):
-    for path in files(folder):
-        zf.write(path, os.path.join(name, os.path.relpath(path, folder)))
+def manifest():
+    # Date and time, so each export carries a higher version than the last.
+    now = datetime.datetime.now()
+    version = f"{now.year}.{now.month * 100 + now.day}.{now.hour * 100 + now.minute}"
+    return json.dumps({
+        "name": PLUGIN,
+        "version": version,
+        "description": "Ryan's codebase-agnostic skills, exported from the skillz repo.",
+    }, indent=2) + "\n"
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Zip the agnostic skills.")
+    parser = argparse.ArgumentParser(description="Pack the agnostic skills into one plugin zip.")
     parser.add_argument(
-        "--out", default=os.path.expanduser("~/Downloads/skillz-skills"),
-        help="directory for the per-skill zips (default: %(default)s)",
+        "--out", default=os.path.expanduser("~/Downloads/skillz.zip"),
+        help="the zip to write (default: %(default)s)",
     )
     out = os.path.abspath(parser.parse_args().out)
+    if not out.endswith(".zip"):
+        out += ".zip"
     if os.path.commonpath([out, REPO]) == REPO:
-        print(f"export: {out} is inside the repo, which sync publishes; pick a folder outside it")
+        print(f"export: {out} is inside the repo, which sync publishes; pick a path outside it")
         return 1
 
     if check.main() != 0:
@@ -85,16 +98,14 @@ def main():
         print("export: nothing written")
         return 1
 
-    os.makedirs(out, exist_ok=True)
-    for old in glob.glob(os.path.join(out, "*.zip")):
-        os.remove(old)
-    with zipfile.ZipFile(out + ".zip", "w", zipfile.ZIP_DEFLATED) as everything:
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{PLUGIN}/.claude-plugin/plugin.json", manifest())
         for name, folder in skills.items():
-            with zipfile.ZipFile(os.path.join(out, name + ".zip"), "w", zipfile.ZIP_DEFLATED) as zf:
-                add(zf, name, folder)
-            add(everything, name, folder)
-            print(f"  {name}.zip")
-    print(f"export: {len(skills)} skills in {out}/, all of them in {out}.zip")
+            for path in files(folder):
+                zf.write(path, os.path.join(PLUGIN, "skills", name, os.path.relpath(path, folder)))
+            print(f"  {name}")
+    print(f"export: {len(skills)} skills in {out}")
     return 0
 
 
