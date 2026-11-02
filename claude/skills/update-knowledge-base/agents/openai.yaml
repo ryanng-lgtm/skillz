@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update knowledge base"
+  short_description: "Fold a conversation's durable findings into a docs dir or vault"
+  default_prompt: "Use $update-knowledge-base to record what this conversation found in the knowledge base I name."
