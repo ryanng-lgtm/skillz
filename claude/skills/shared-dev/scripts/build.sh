@@ -9,7 +9,8 @@
 #
 # --replace MOD=DIR builds against a library worktree (kiyotaka-go,
 # replayer) through a temporary modfile next to the output; the source tree's
-# go.mod is never edited.
+# go.mod is never edited. A go.mod replace to a host path outside the tree
+# works too: `go mod vendor` copies it into vendor/ before the container runs.
 #
 # Usage:
 #   build.sh --src DIR --pkg ./cmd/X --out FILE [--image IMG] [--replace MOD=DIR ...]
@@ -17,7 +18,7 @@
 set -euo pipefail
 
 usage() {
-	sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
 	exit 2
 }
 
@@ -40,37 +41,13 @@ src="$(cd "$src" && pwd -P)"
 out_dir="$(mkdir -p "$(dirname "$out")" && cd "$(dirname "$out")" && pwd -P)"
 name="$(basename "$out")"
 
-# A replace to a path outside the source tree would not exist in the
-# container, and would build something other than the branch.
-outside=0
-while IFS= read -r line; do
-	target="$(printf '%s\n' "$line" | sed -E 's/.*=>[[:space:]]*([^[:space:]]+).*/\1/')"
-	case "$target" in
-	/* | ./* | ../*) ;;
-	*) continue ;;
-	esac
-	case "$target" in
-	/*) resolved="$target" ;;
-	*) resolved="$src/$target" ;;
-	esac
-	resolved="$(python3 -I -c 'import os, sys; print(os.path.normpath(sys.argv[1]))' "$resolved")"
-	case "$resolved/" in
-	"$src"/*) ;;
-	*)
-		printf 'build.sh: go.mod replaces a module with a path outside %s:\n  %s\n' "$src" "$line" >&2
-		outside=1
-		;;
-	esac
-done < <(grep -E '=>' "$src/go.mod" || true)
-[ "$outside" -eq 0 ] || exit 1
-
 modfile_flag=""
 if [ "${#replaces[@]}" -gt 0 ]; then
 	modfile="$out_dir/.$name.mod"
 	cp "$src/go.mod" "$modfile"
 	[ -f "$src/go.sum" ] && cp "$src/go.sum" "${modfile%.mod}.sum"
 	for r in "${replaces[@]}"; do
-		go mod edit -modfile="$modfile" -replace="$r"
+		go mod edit -replace="$r" "$modfile"
 	done
 	(cd "$src" && go mod vendor -modfile="$modfile")
 	modfile_flag="-modfile=/out/.$name.mod"

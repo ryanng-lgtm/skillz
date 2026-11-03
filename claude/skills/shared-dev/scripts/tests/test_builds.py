@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -17,15 +18,16 @@ def git(cwd, *args):
     subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True, text=True)
 
 
-def stub_bin(root, *, file_says="ELF 64-bit LSB executable, ARM aarch64, statically linked"):
-    """Stub docker, go and file that log their arguments; docker writes $STUB_OUT."""
+def stub_bin(root, *, file_says="ELF 64-bit LSB executable, ARM aarch64, statically linked", go=True):
+    """Stub docker, go (unless go=False) and file; docker and go log their arguments, docker writes $STUB_OUT."""
     bin_dir = root / "stubbin"
     bin_dir.mkdir()
     log = root / "calls.log"
     (bin_dir / "docker").write_text(
         f'#!/bin/sh\necho "docker $*" >> {log}\n[ -n "$STUB_OUT" ] && printf fakebinary > "$STUB_OUT"\nexit 0\n'
     )
-    (bin_dir / "go").write_text(f'#!/bin/sh\necho "go $*" >> {log}\nexit 0\n')
+    if go:
+        (bin_dir / "go").write_text(f'#!/bin/sh\necho "go $*" >> {log}\nexit 0\n')
     (bin_dir / "file").write_text(f'#!/bin/sh\necho "$1: {file_says}"\n')
     for f in bin_dir.iterdir():
         f.chmod(0o755)
@@ -48,13 +50,13 @@ def make_repo(root, name="tsdb-gateway", gomod="module x\n"):
 
 
 class BuildShTests(unittest.TestCase):
-    def run_build(self, root, src, out, file_says=None, extra=()):
+    def run_build(self, root, src, out, file_says=None, extra=(), go=True, cwd=None):
         kwargs = {"file_says": file_says} if file_says else {}
-        bin_dir, log = stub_bin(root, **kwargs)
+        bin_dir, log = stub_bin(root, go=go, **kwargs)
         env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "STUB_OUT": str(out)}
         proc = subprocess.run(
             ["bash", str(BUILD_SH), "--src", str(src), "--pkg", "./cmd/tsdb-gateway", "--out", str(out), *extra],
-            env=env, capture_output=True, text=True,
+            env=env, capture_output=True, text=True, cwd=cwd,
         )
         calls = log.read_text() if log.exists() else ""
         return proc, calls
@@ -80,18 +82,16 @@ class BuildShTests(unittest.TestCase):
             self.assertNotEqual(proc.returncode, 0)
             self.assertIn("Mach-O", proc.stderr)
 
-    def test_build_refuses_outside_replace(self):
+    def test_build_accepts_outside_replace(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            line = "replace gitlab.com/x/lib => ../../elsewhere/lib"
-            src = make_repo(root, gomod=f"module x\n\n{line}\n")
-            before = subprocess.run(["git", "-C", str(src), "status", "--porcelain"], capture_output=True, text=True).stdout
+            (root / "kiyotaka-go").mkdir()
+            gomod = "module x\n\nreplace gitlab.com/x/kiyotaka-go => ../kiyotaka-go\n"
+            src = make_repo(root, gomod=gomod)
             proc, calls = self.run_build(root, src, root / "out" / "tsdb-gateway")
-            after = subprocess.run(["git", "-C", str(src), "status", "--porcelain"], capture_output=True, text=True).stdout
-            self.assertNotEqual(proc.returncode, 0)
-            self.assertIn(line, proc.stderr)
-            self.assertNotIn("docker", calls)
-            self.assertEqual(before, after)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("docker run", calls)
+            self.assertEqual((src / "go.mod").read_text(), gomod)
 
     def test_build_allows_replace_inside_src(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -112,6 +112,23 @@ class BuildShTests(unittest.TestCase):
             self.assertIn(f"-replace=gitlab.com/x/kiyotaka-go={lib}", calls)
             self.assertIn("-modfile=/out/.tsdb-gateway.mod", calls)
             self.assertEqual((src / "go.mod").read_text(), "module x\n")
+
+    @unittest.skipUnless(shutil.which("go"), "needs a real go toolchain")
+    def test_build_library_replace_from_outside_any_module(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lib = root / "lib"
+            lib.mkdir()
+            (lib / "go.mod").write_text("module a.com/lib\n\ngo 1.22\n")
+            (lib / "lib.go").write_text("package lib\n\nfunc V() string { return \"lib\" }\n")
+            gomod = "module x\n\ngo 1.22\n\nrequire a.com/lib v0.0.0\n"
+            src = make_repo(root, gomod=gomod)
+            (src / "main.go").write_text('package main\n\nimport "a.com/lib"\n\nfunc main() { println(lib.V()) }\n')
+            proc, _ = self.run_build(root, src, root / "out" / "tsdb-gateway", go=False, cwd=root,
+                                     extra=["--replace", f"a.com/lib={lib}"])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue((src / "vendor" / "a.com" / "lib" / "lib.go").exists())
+            self.assertEqual((src / "go.mod").read_text(), gomod)
 
 
 class BuildsPyTests(unittest.TestCase):
@@ -181,6 +198,25 @@ class BuildsPyTests(unittest.TestCase):
             self.assertEqual(prov["source"], "worktree")
             self.assertRegex(prov["sha256"], r"^[0-9a-f]{64}$")
             self.assertTrue(re.match(r"^[0-9a-f]{40}$", prov["head"]))
+
+    def test_provenance_records_outside_gomod_replace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "kiyotaka-go").mkdir()
+            work = make_repo(root)
+            (work / "go.mod").write_text(
+                "module x\n\nreplace (\n\tgitlab.com/x/kiyotaka-go => ../kiyotaka-go\n"
+                "\tgitlab.com/x/lf v1.2.3 => ./submodules/live-feed\n)\n"
+            )
+            change = Change(repo="tsdb-gateway", worktree=work, branch="main", head="h" * 40, base="origin/main",
+                            base_sha="b" * 40, files=["go.mod"], uncommitted=True)
+            run_dir = root / "run"
+            bin_dir, _ = stub_bin(root)
+            out_path = run_dir / "bin" / "tsdb-gateway"
+            with patch.dict(os.environ, {"PATH": f"{bin_dir}:{os.environ['PATH']}", "STUB_OUT": str(out_path)}):
+                out = builds.worktree_build(change, "tsdb-read", run_dir)
+            prov = json.loads(out.with_name("tsdb-gateway.json").read_text())
+            self.assertEqual(prov["replace"], {"gitlab.com/x/kiyotaka-go": str((root / "kiyotaka-go").resolve())})
 
 
 if __name__ == "__main__":

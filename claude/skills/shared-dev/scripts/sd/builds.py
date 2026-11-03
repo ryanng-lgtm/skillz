@@ -48,6 +48,22 @@ def _provenance(out, *, repo, source, worktree, head, uncommitted, replace=None)
     return record
 
 
+def _outside_replaces(src):
+    """Local-path replaces in src's go.mod that point outside src, as {module: path}."""
+    src = Path(src).resolve()
+    found = {}
+    for line in (src / "go.mod").read_text().splitlines():
+        left, arrow, right = line.partition("=>")
+        target = right.split()[0] if arrow and right.split() else ""
+        if not target.startswith(("/", "./", "../")):
+            continue
+        path = (src / target).resolve()
+        if not path.is_relative_to(src):
+            module = left.split()[1] if left.split()[0] == "replace" else left.split()[0]
+            found[module] = str(path)
+    return found
+
+
 def worktree_build(change, service, run_dir, replace=None):
     """Build service's binary from the session worktree into run_dir/bin."""
     name = MAP["binaries"][service]["name"]
@@ -58,7 +74,8 @@ def worktree_build(change, service, run_dir, replace=None):
     _build(change.worktree, service, out, replace)
     dirty = bool(_git(change.worktree, "status", "--porcelain", "--untracked-files=normal"))
     _provenance(out, repo=change.repo, source="worktree", worktree=change.worktree,
-                head=_git(change.worktree, "rev-parse", "HEAD"), uncommitted=dirty, replace=replace)
+                head=_git(change.worktree, "rev-parse", "HEAD"), uncommitted=dirty,
+                replace={**_outside_replaces(change.worktree), **(replace or {})})
     return out
 
 
