@@ -60,6 +60,8 @@ def upload_problems(name, folder):
         yield f"{name}: description is empty"
     elif len(desc) > MAX_DESCRIPTION:
         yield f"{name}: description is {len(desc)} characters, over {MAX_DESCRIPTION}"
+    if "<" in desc or ">" in desc:
+        yield f"{name}: description has < or >, which the upload rejects as XML tags"
 
 
 def manifest():

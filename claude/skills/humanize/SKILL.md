@@ -9,7 +9,7 @@ description: >-
   GitHub, before handing over a reply draft, before publishing a doc, or when
   text shows AI tells like jargon, perfect parallelism, em-dash qualifiers,
   "Crucially,", recap paragraphs, zero first person. Trigger: /humanize [light]
-  [--voice <path>] [path], $humanize [light] [--voice <path>] [path].
+  [--voice PATH] [path], $humanize [light] [--voice PATH] [path].
 ---
 
 # humanize — make Claude output read like a real person wrote it
@@ -24,7 +24,7 @@ Surface cleanup is not enough: dropping "Crucially," and bold bullets while keep
 
 The voice reference is any file that describes how one person writes: register profiles, voice rules, lexicon, boundaries, and verbatim samples. Accepted shapes include the bundled profile at [references/voice.md](references/voice.md) and selfmd persona cards (markdown with a `Card data` JSON block).
 
-1. `--voice <path>` argument wins.
+1. `--voice PATH` argument wins.
 2. Else, when the user invoked the skill, ask for a path before reading the target. Offer the bundled `references/voice.md` as one option and free text for any other file. Do not guess.
 3. Else, when it runs unprompted on a message about to be shown or posted, use the bundled `references/voice.md` without asking.
 
