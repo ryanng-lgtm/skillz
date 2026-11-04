@@ -213,6 +213,9 @@ final post (100 words maximum); a large feature gets meaningful completed-wave p
 path and only claims supported by completed gates. A canary can report and continue
 without waiting for human review; stop only on its stated tripwire.
 
+End every run, finished, stopped or blocked, with `$summary` as the final reply: the
+repos touched, the merge order and what is left for Ryan.
+
 ## Required brief sections
 
 Write these in order, copying concrete facts and commands rather than linking context:
@@ -236,7 +239,8 @@ Write these in order, copying concrete facts and commands rather than linking co
 10. **Gates** — exact tier commands, baseline counts/timings, mandatory completion and
     any explicitly deferred gates; missing evidence never counts as green.
 11. **Open questions** — every remaining unknown, classified as prerequisite or report.
-12. **Completion report** — local findings path, authorized destinations/cadence and caps.
+12. **Completion report** — local findings path, authorized destinations/cadence and caps,
+    and the closing `$summary`.
 13. **Commit and authority rules** — carried-forward permissions and scoped `$commit`.
 14. **Stop and recovery conditions** — preparation blockers, runtime phase failures,
     dependent-phase skips, whole-run blockers, cleanup and goal/checkpoint handling.
