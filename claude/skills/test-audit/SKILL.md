@@ -3,20 +3,23 @@ name: test-audit
 description: >-
   Use when writing, changing, reviewing or sweeping tests: every new or
   changed test, and any hunt for low-value, implementation-coupled or
-  duplicate tests or the test-only seams they demand. Trigger: /test-audit.
+  duplicate tests or the test-only seams they demand. Trigger: /test-audit,
+  /test-audit enforce [path|rev].
 ---
 
 # test-audit — gate new tests and prune low-value ones
 
 ## Overview
 
-Three modes, one value bar. Authoring mode gates every new or changed test at
+Four modes. Authoring mode gates every new or changed test at
 write time. Audit mode runs focused sweeps of tests that re-assert source,
 duplicate stronger proof, couple behavior to implementation, or keep test-only
 production seams alive. Continue broad audits as separate coherent follow-up
 batches; optimize for confidence, not deletion count. Campaign mode prunes one
 whole subsystem's test surface (every test file a plugin or core area owns);
-before starting one, read [CAMPAIGN.md](CAMPAIGN.md).
+before starting one, read [CAMPAIGN.md](CAMPAIGN.md). Enforce mode
+(`/test-audit enforce`) prunes first: every test in scope goes unless it names
+the bug only it catches; before starting one, read [ENFORCE.md](ENFORCE.md).
 
 **Core principle: Tests justify their maintenance cost by protecting behavior, a credible regression, or an independently meaningful contract.**
 
@@ -158,7 +161,7 @@ Report:
 
 ## Junk patterns
 
-The shared checklist for both modes: the authoring gate rejects a new test that
+The shared checklist for every mode: the authoring gate rejects a new test that
 matches one, and audits hunt for existing tests that do.
 
 - assertion-free coverage probes;

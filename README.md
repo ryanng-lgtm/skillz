@@ -27,7 +27,7 @@ Agnostic is `yes` when a skill's job works in any codebase, so it can be [export
 | [`socratic-teacher`](claude/skills/socratic-teacher/SKILL.md) | Claude, Codex | yes | Teaching mode: one guiding question per turn, never the full solution. |
 | [`summary`](claude/skills/summary/SKILL.md) | Claude, Codex | yes | Ends a run or long session with the repos touched, their merge order and what is left for the user, every state read live. |
 | [`syncup`](claude/skills/syncup/SKILL.md) | Claude, Codex | yes | Rebases the working branch and every behind MR or PR onto its target, resolving conflicts and keeping uncommitted work. |
-| [`test-audit`](claude/skills/test-audit/SKILL.md) | Claude | yes | Gates new or changed tests on the behaviour they protect, and sweeps out low-value ones. |
+| [`test-audit`](claude/skills/test-audit/SKILL.md) | Claude | yes | Gates new or changed tests on the behaviour they protect, and sweeps out low-value ones; `enforce` deletes every test that can't name the bug only it catches. |
 | [`testing-harness`](claude/skills/testing-harness/SKILL.md) | Claude, Codex | no | Proves a change in the running OM Chat GUI with cloud-versus-local visual diffs and browser probes. |
 | [`update-knowledge-base`](claude/skills/update-knowledge-base/SKILL.md) | Claude, Codex | yes | Folds a conversation's durable findings into the docs dir or vault the user names, each fact in the doc that owns it, and discards the session residue. |
 | [`war-diary`](claude/skills/war-diary/SKILL.md) | Claude, Codex | no | Turns a day's GitLab activity and Claude Code sessions into War Diaries notes and Kanban cards. |
