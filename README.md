@@ -25,6 +25,7 @@ Agnostic is `yes` when a skill's job works in any codebase, so it can be [export
 | [`regroup`](claude/skills/regroup/SKILL.md) | Claude | yes | Trims a branch's tests to the necessary ones and rewrites its commits for review, leaving the code byte-identical. |
 | [`shared-dev`](claude/skills/shared-dev/SKILL.md) | Claude | no | Brings up the backend services a change needs in shared-dev, probes main against the branch with real data, and tears down. |
 | [`socratic-teacher`](claude/skills/socratic-teacher/SKILL.md) | Claude, Codex | yes | Teaching mode: one guiding question per turn, never the full solution. |
+| [`summary`](claude/skills/summary/SKILL.md) | Claude, Codex | yes | Ends a run or long session with the repos touched, their merge order and what is left for the user, every state read live. |
 | [`syncup`](claude/skills/syncup/SKILL.md) | Claude, Codex | yes | Rebases the working branch and every behind MR or PR onto its target, resolving conflicts and keeping uncommitted work. |
 | [`test-audit`](claude/skills/test-audit/SKILL.md) | Claude | yes | Gates new or changed tests on the behaviour they protect, and sweeps out low-value ones. |
 | [`testing-harness`](claude/skills/testing-harness/SKILL.md) | Claude, Codex | no | Proves a change in the running OM Chat GUI with cloud-versus-local visual diffs and browser probes. |
