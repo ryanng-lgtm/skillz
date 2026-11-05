@@ -21,8 +21,8 @@ script call below when it does.
 **Core principle: only tests and testdata change; the script proves everything else at the tip unchanged.**
 
 ```bash
-R=~/.claude/skills/regroup/scripts/regroup.py
-python3 -I $R <stats|apply|check> ...      # from inside the repo
+R="${CLAUDE_SKILL_DIR}/scripts/regroup.py"   # Codex: scripts/regroup.py in this SKILL.md's folder
+python3 -I "$R" <stats|apply|check> ...      # from inside the repo
 ```
 
 The base defaults to the merge base with `origin/HEAD` (then `origin/main`,
@@ -33,15 +33,15 @@ The base defaults to the merge base with `origin/HEAD` (then `origin/main`,
 - The run is finished and the suite passed at `HEAD` after its last commit.
 - No uncommitted changes to tracked files (`apply` refuses them); untracked
   files are fine.
-- The branch has no merge commits; rebase it first (`/syncup`).
-- Already pushed: the rewrite needs a force push, which is Ryan's call. If
-  the MR has review comments or approvals, tell him the reviewer loses their
-  place before he decides.
+- The branch has no merge commits; rebase it first.
+- Already pushed: the rewrite needs a force push, which is the user's call.
+  If the MR has review comments or approvals, tell them the reviewer loses
+  their place before they decide.
 
 ## 1. Read
 
 ```bash
-python3 -I $R stats          # prints the base it used
+python3 -I "$R" stats        # prints the base it used
 git diff <base>..HEAD
 ```
 
@@ -99,8 +99,8 @@ before the fix.
 - The trim changes tests and testdata only. Code it shows to be dead or
   untested stays as it is, with no new test written for it; report it.
 
-Run the suite, then commit the trim on the branch with `/commit` before
-planning. The plan takes test files at the tip, so the trim folds into the
+Run the suite, then commit the trim on the branch with the commit skill
+before planning. The plan takes test files at the tip, so the trim folds into the
 one tests commit and `apply`'s tree check covers it.
 
 If `stats` offered nothing, showed no problems, and the trim removed
@@ -133,10 +133,10 @@ code in a skills repo), map it in the plan's `kinds` (fnmatch; `*` crosses
 misclassification only: a data file outside the test directories is code,
 and no path is remapped to move it to another commit.
 
-Messages follow the `/commit` rules: one summary line in the repo's style,
-at most 3 bullets, no AI trailer.
+Messages follow the commit skill's rules: one summary line in the repo's
+style, at most 3 bullets, no AI trailer.
 
-Write the plan to the scratchpad:
+Write the plan to a scratch directory outside the repo:
 
 ```json
 {
@@ -155,8 +155,8 @@ at its tip version.
 ## 4. Apply
 
 ```bash
-python3 -I $R apply plan.json --dry-run      # until no "!" lines
-python3 -I $R apply plan.json
+python3 -I "$R" apply plan.json --dry-run    # until no "!" lines
+python3 -I "$R" apply plan.json
 ```
 
 `apply` builds the commits off to the side and refuses when a changed file
@@ -170,7 +170,7 @@ and move the branch.
 ## 5. Verify
 
 ```bash
-python3 -I $R check --against refs/regroup/<branch>/<time> --exec "<build>" [--link node_modules]
+python3 -I "$R" check --against refs/regroup/<branch>/<time> --exec "<build>" [--link node_modules]
 ```
 
 - `--against`: the tip's tree must match the backup's. Identical trees
@@ -182,7 +182,7 @@ python3 -I $R check --against refs/regroup/<branch>/<time> --exec "<build>" [--l
   module the package has at that commit (`compileall` checks syntax only),
   with plain `python3`; `-I` drops the repo root from the import path.
   ```python
-  # <scratchpad>/build.py, run as --exec "python3 <scratchpad>/build.py"
+  # <scratch>/build.py, run as --exec "python3 <scratch>/build.py"
   import importlib, pkgutil, sys
   sys.path.insert(0, "")
   import calc
@@ -196,7 +196,7 @@ python3 -I $R check --against refs/regroup/<branch>/<time> --exec "<build>" [--l
 
 ## 6. Report
 
-Show Ryan:
+Show the user:
 
 - the old and new `git log --oneline` with each commit's size (`stats`
   before and after), the backup ref and the check result;
@@ -206,7 +206,7 @@ Show Ryan:
   test runs, whether the trim stopped them or they never ran.
 
 Never push. A branch that was already pushed goes up with
-`git push --force-with-lease` only on his go.
+`git push --force-with-lease` only on the user's go.
 
 Undo the regroup with `git reset --keep <backup>`; when there is a trim
 commit, `<backup>^` is the tip before the trim. Backups stay under

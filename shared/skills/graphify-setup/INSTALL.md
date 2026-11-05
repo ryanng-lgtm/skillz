@@ -2,7 +2,7 @@
 
 **Audience: a coding agent** (Claude Code or similar) executing this autonomously. Self-contained and repo-agnostic — nothing here assumes a specific project, language, or hook manager; repo-specific decisions come from survey steps at run time. Read the whole file, then start at Step 0.
 
-All CLI behavior, flags, file formats, and timings stated below were verified against graphify (package `graphifyy`) and real graph output on 2026-07-27. Treat them as fact; re-verify only if a command's output contradicts them.
+All CLI behavior, flags, file formats, and timings stated below were verified against graphify (package `graphifyy`) and real graph output on 2026-07-27, and Step 1's skill install against graphify 0.9.56 on 2026-10-30. Treat them as fact; re-verify only if a command's output contradicts them.
 
 ## Modes
 
@@ -14,10 +14,11 @@ Step 0 picks one. Every later step branches on it.
 ## Goal state (all verifiable in Step 8)
 
 1. graphify installed and importable
-2. `.graphifyignore` scoping scans — junk and media excluded; nested repos excluded in SINGLE, targeted in CROSS
-3. Nothing graphify-related visible in `git status`, via `.git/info/exclude`
-4. post-commit + post-checkout hooks auto-rebuilding each repo's code graph
-5. SINGLE: fresh `graphify-out/graph.json` at the repo root. CROSS: fresh per-repo graphs, a merged graph at the workspace root, and a wrapper keeping the merge current.
+2. graphify's own skill installed for each agent on this machine, unless the user declined it
+3. `.graphifyignore` scoping scans — junk and media excluded; nested repos excluded in SINGLE, targeted in CROSS
+4. Nothing graphify-related visible in `git status`, via `.git/info/exclude`
+5. post-commit + post-checkout hooks auto-rebuilding each repo's code graph
+6. SINGLE: fresh `graphify-out/graph.json` at the repo root. CROSS: fresh per-repo graphs, a merged graph at the workspace root, and a wrapper keeping the merge current.
 
 ## Invariants — hold these through every step
 
@@ -93,7 +94,9 @@ bash is unaffected. The Step 6 wrapper is `#!/bin/sh`, so it splits correctly wh
 
 **VERIFY (CROSS):** the workspace root is not a git repo, or is one that contains no repo from `REPOS` as a subdirectory. Otherwise `MERGED_OUT` sits inside a hooked repo — pick a location outside every repo in `REPOS` and record that instead.
 
-## Step 1 — Install uv + graphify
+## Step 1 — Install graphify and its skill
+
+### 1a. uv + graphify
 
 Skip pieces already present.
 
@@ -103,6 +106,35 @@ uv tool install graphifyy   # package is "graphifyy", command is "graphify"; no-
 ```
 
 **VERIFY:** `graphify --help` prints a usage block. If `graphify` is not on PATH, resolve the interpreter via `uv tool run graphifyy python -c "import sys; print(sys.executable)"` and use it with `-m graphify` for every later command.
+
+### 1b. graphify's own skill
+
+graphify ships its own agent skill, separate from this runbook. This runbook calls it **the graphify skill**, and nothing before this step assumes it exists. graphify installs it standalone under its own name, so once installed the user runs it as `/graphify` in Claude Code and `$graphify` in Codex; those forms appear below only as commands for the user to type.
+
+Install it for each agent on this machine (`command -v claude`, `command -v codex`; the agent running this runbook counts as present), skipping an agent that is absent:
+
+- **Claude Code:** `graphify install --platform claude`. It copies the skill to `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/graphify/` and appends the three lines below to `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/CLAUDE.md`, creating the file if missing. It edits the user's own instructions, so ask first and name both changes. On no, skip it: Step 4 falls back to the CLI, and the report gives this command to run later.
+- **Codex:** `graphify install --platform codex`. It copies the skill to `$HOME/.codex/skills/graphify/` (graphify ignores `CODEX_HOME`) and changes nothing else. Run it without asking.
+
+The lines the Claude install appends (graphify 0.9.56), where `<SKILL.md>` is the path on its `skill installed` line:
+
+```text
+# graphify
+- **graphify** (`<SKILL.md>`) - any input to knowledge graph. Trigger: `/graphify`
+When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
+```
+
+If an agent's skill folder already holds a `SKILL.md`, skip that agent and record the skill as present: a reinstall overwrites it, writing through a symlinked folder into whatever the link points at.
+
+The install ends by suggesting `/graphify .`. Do not run it here; Step 4 builds the graph once the ignore rules exist.
+
+**Record** what this run did; the report carries it and Rollback acts only on it:
+
+- each skill folder it installed: the `skill installed` path without `/SKILL.md`;
+- for Claude Code, the `CLAUDE.md` path and its install line: `created at` (file is new, block appended), `skill registered in` (block appended), or `already registered (no change)` (nothing appended);
+- every other agent as present, declined, or absent, never as installed.
+
+**VERIFY:** for each agent installed, the output has a `skill installed  ->  <path>` line and that `SKILL.md` exists. If the record says the block was appended, `CLAUDE.md` holds exactly the three lines above; if they differ, record the lines it did append. A session started before this step may not list the skill yet, so Step 4 checks this session's skill list instead of assuming it.
 
 ## Step 2 — Author `.graphifyignore` before any scan
 
@@ -210,8 +242,8 @@ git status --porcelain | grep -i graphify    # must print nothing (exit 1)
 
 ### SINGLE
 
-- **Inside Claude Code with the graphify skill available:** invoke `/graphify` — full pipeline including LLM semantic extraction of docs. Preferred.
-- **Headless / no skill:** code-only graph, no LLM:
+- **The graphify skill is in this session's skill list:** run it on the repo root — full pipeline including LLM semantic extraction of docs. Preferred.
+- **Headless / no skill in this session:** code-only graph, no LLM:
 
 ```bash
 mkdir -p graphify-out
@@ -226,8 +258,8 @@ Two passes: extract each repo into its own `graphify-out/`, then merge.
 
 **Pass 1 — per repo.** The scan unit is one repo; each ends up with its own `graphify-out/graph.json`.
 
-- **With the graphify skill:** the skill pipeline writes all intermediates to `graphify-out/` **in the current working directory**. Run it once per repo with cwd inside that repo. Running it from the workspace root once per repo clobbers a single shared output dir, and you get one repo's graph wearing every repo's name.
-- **Headless / no skill:** run the CLI from the workspace root — `extract` places `graphify-out/` *inside* the scanned path, so there is nothing to clobber:
+- **The graphify skill is in this session's skill list:** the skill pipeline writes all intermediates to `graphify-out/` **in the current working directory**. Run it once per repo with cwd inside that repo. Running it from the workspace root once per repo clobbers a single shared output dir, and you get one repo's graph wearing every repo's name.
+- **Headless / no skill in this session:** run the CLI from the workspace root — `extract` places `graphify-out/` *inside* the scanned path, so there is nothing to clobber:
 
 ```bash
 for r in $REPOS; do
@@ -279,7 +311,7 @@ graphify hook status   # expect: post-commit: installed / post-checkout: install
 
 The installer is husky-aware: with `core.hooksPath=.husky/_` it writes `.husky/post-commit` and `.husky/post-checkout` (user level, not the `_` shim dir). It appends between markers when a hook file already exists.
 
-Hook behavior: post-commit re-extracts only committed-changed code files, runs detached so the commit returns instantly, and skips during rebase/merge/cherry-pick. post-checkout does a full code rebuild on branch switch. Bypass once with `GRAPHIFY_SKIP_HOOK=1`. Hooks are AST-only — doc changes need a manual `/graphify --update`.
+Hook behavior: post-commit re-extracts only committed-changed code files, runs detached so the commit returns instantly, and skips during rebase/merge/cherry-pick. post-checkout does a full code rebuild on branch switch. Bypass once with `GRAPHIFY_SKIP_HOOK=1`. Hooks are AST-only — doc changes need a manual `--update` run of the graphify skill.
 
 **VERIFY:** hook files exist at the location matching that repo's `HOOKS_PATH` from Step 0 — `.husky/` when husky, else `.git/hooks/`. If husky is active but the files landed in `.git/hooks/`, they are dead code: report the mismatch. If hooks landed anywhere not covered by Step 3's exclude block (custom hooksPath), add those paths to `.git/info/exclude` now.
 
@@ -441,6 +473,8 @@ for i,a in enumerate(repos):
 
 Zero shared labels is not automatically a failure — repos with genuinely no common symbols, packages, or concepts show zero. Report the count and a sample either way and let the user judge. Shared generic method names (`.start()`, `.stop()`) are weak evidence; a shared package name or domain type is strong evidence.
 
+**Check 7 — the graphify skill, once per machine.** Every agent Step 1b installed it for still has `SKILL.md` in its skill folder.
+
 ## Rollback
 
 **SINGLE** — from the repo root:
@@ -460,13 +494,41 @@ rm -f "$MERGED_OUT" <workspace-root>/graphify-remerge.sh
 # and delete the graphify-remerge-start/end block from post-commit and post-checkout
 ```
 
+**The graphify skill** is machine-wide and serves other repos, so remove it only when the user asks, and only what Step 1b's record says this setup installed. With no record, such as in a later session, ask the user which folders and which `CLAUDE.md` block this setup added; never infer it from what exists. A folder recorded as present, and any other `# graphify` section, belong to the user.
+
+For each skill folder the record lists as installed, with no trailing slash so a symlink is never followed:
+
+```bash
+d="<skill folder from the record>"
+if [ -L "$d" ]; then rm "$d"; elif [ -d "$d" ]; then rm -r "$d"; fi
+```
+
+If the record says the block was appended, remove that exact block and nothing else. The script holds Step 1b's three lines; use the recorded lines instead if Step 1b recorded different ones.
+
+```bash
+python3 - "<CLAUDE.md from the record>" "<SKILL.md path from the record>" <<'EOF'
+import sys
+md, skill = sys.argv[1], sys.argv[2]
+block = ("# graphify\n"
+         f"- **graphify** (`{skill}`) - any input to knowledge graph. Trigger: `/graphify`\n"
+         "When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.\n")
+text = open(md).read()
+if text.count(block) != 1:
+    sys.exit(f"{md}: exact block found {text.count(block)} times; left unchanged")
+open(md, "w").write(text.replace(block, ""))
+print("removed")
+EOF
+```
+
+If the record says `created at` and the file is now empty, delete it. `graphify uninstall` is not a substitute: it removes only the Claude skill folder, leaves the Codex skill and the block, and looks for agent files to edit in the current directory.
+
 ## Report back to the user
 
-State plainly: which mode was used and why; what was installed and where; the exact `.graphifyignore` exclusions chosen and why, especially nested clones and media; that everything is local-only via `.git/info/exclude`; and graph size (nodes/edges/communities).
+State plainly: which mode was used and why; what was installed and where; for each agent, whether the graphify skill was installed, already present, declined, or skipped because the agent is absent, with `graphify install --platform claude` for a declined Claude Code install; Step 1b's record in full, so a later rollback can use it; the exact `.graphifyignore` exclusions chosen and why, especially nested clones and media; that everything is local-only via `.git/info/exclude`; and graph size (nodes/edges/communities).
 
 Name these limitations every time:
 
-- Hooks are AST-only. Doc changes need a manual `/graphify --update` — per repo in CROSS, and the merged graph inherits it.
+- Hooks are AST-only. Doc changes need a manual update — per repo in CROSS, and the merged graph inherits it. Give the user the command that runs the graphify skill's update: `/graphify . --update` in Claude Code, `$graphify . --update` in Codex. With no graphify skill, `graphify extract .` does it headless through an LLM backend, as in Step 4's CROSS pass.
 - **CROSS:** graphify's own hooks maintain per-repo graphs, not the merged one. Say whether the Step 6 wrapper was installed. If it was, the merged graph refreshes on every commit and branch switch, a few seconds behind the per-repo rebuild it waits on. If it was not, `MERGED_OUT` is a snapshot as of the last manual merge — give the user the `merge-graphs` command and say plainly that nothing warns them when it is stale.
 - **CROSS:** the merged graph is a union with namespaced ids, so no edges cross repo boundaries; cross-repo insight comes from shared labels. Report the Step 8 check 6 count so the user knows how much the merge actually connects.
 - **CROSS:** every read command needs `--graph "$MERGED_OUT"`.

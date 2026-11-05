@@ -1,11 +1,11 @@
 ---
 name: graphify-setup
 description: >-
-  Use when a repo, or a workspace of sibling repos, needs a local graphify
-  knowledge graph that is never committed and that git hooks keep current: a
-  project with no graphify-out/graph.json, a graph that predates its ignore
-  rules, or several repos to merge into one graph. Trigger: /graphify-setup,
-  $graphify-setup.
+  Use when graphify needs its one-time setup: graphify or its own agent skill
+  is not installed on this machine, a repo or a workspace of sibling repos has
+  no graphify-out/graph.json, a graph predates its ignore rules, or several
+  repos need merging into one graph that is never committed and that git hooks
+  keep current. Trigger: /graphify-setup, $graphify-setup.
 disable-model-invocation: true
 ---
 
@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 ## Overview
 
-[`INSTALL.md`](INSTALL.md) in this skill's directory is a self-contained agent runbook. It installs graphify, builds a local graph for one repo or for several merged into one, keeps everything it creates out of git and out of the graph, and installs the hooks that keep the graph current.
+One-time setup, per machine and per repo. [`INSTALL.md`](INSTALL.md) in this skill's directory is a self-contained agent runbook. It installs graphify and graphify's own skill for each agent on the machine, builds a local graph for one repo or for several merged into one, keeps everything it creates out of git and out of the graph, and installs the hooks that keep the graph current.
 
 **Core principle: run `INSTALL.md` exactly as if the user had dropped that file into a fresh session. It is the whole procedure; this file adds nothing to it.**
 

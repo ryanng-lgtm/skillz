@@ -84,7 +84,7 @@ from frontmatter, never edited by hand.**
 
 ```bash
 DOCS=~/workspace/docs
-SKILL=~/.claude/skills/docs-knowledge-base   # ~/.codex/skills/... under Codex
+SKILL="${CLAUDE_SKILL_DIR}"   # Codex: this SKILL.md's folder
 mkdir -p "$DOCS/scripts"
 cp "$SKILL/scripts/build-index.py" "$DOCS/scripts/"
 cp "$SKILL/templates/conventions.md" "$DOCS/CLAUDE.md"

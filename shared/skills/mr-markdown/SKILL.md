@@ -25,7 +25,7 @@ The MR is written in three stages. Each stage saves its version to a file in a w
    - `## Summary` — one or two sentences on the overall change. Add a mermaid diagram only when the user asked for one, or when the change reworks a flow that those sentences cannot make clear. Most MRs have no diagram.
    - `## Problem` — what was broken / missing / motivating the work.
    - `## Solution` — what the change does, as bullet points.
-   - `## Dependencies`, only when the change has related MRs: one this MR needs merged first, one that needs this MR, or the same change in another repo. Find them in the session and in the branch's target (a target other than the default branch is another MR's branch). One bullet per MR: its full GitLab reference (`openmarketxyz/go-backend/kiyotaka-go!79`, or `!79` within the same project), which GitLab renders as a link, then how it relates, merge order first, saying when it has already merged. Take references from the session or `glab`, never guess one.
+   - `## Dependencies`, only when the change has related MRs: one this MR needs merged first, one that needs this MR, or the same change in another repo. Find them in the session and in the branch's target (a target other than the default branch is another MR's branch). One bullet per MR: its full GitLab reference (`group/project!79`, or `!79` within the same project), which GitLab renders as a link, then how it relates, merge order first, saying when it has already merged. Take references from the session or `glab`, never guess one.
    - `## How to test` — numbered, concrete verification steps from step 2, including the expected result at the end (what the reviewer should see when it works). Note preconditions first if any.
 
 4. **Stage 2, cut to 200 words** (`<dir>/2-short.md`). Cut content, never grammar: drop repetition, implementation detail that does not change behavior, and any sentence or bullet that does not change what the reader knows. Sentences stay whole. The title, every section, each test step's expected result and every dependency stay. Count the words outside a diagram:
@@ -38,7 +38,7 @@ The MR is written in three stages. Each stage saves its version to a file in a w
    - A semicolon, or a dash used as punctuation (`—`, `–`, ` - `). Make it two sentences, or use a comma or parentheses.
    - Ultra-condensed wording: dropped articles, fragments standing in for sentences, colon-chained lists, arrows, `w/`, `&` or `+` for "and", slash pairs such as `read/write`, made-up abbreviations. "A fraction, like the other ratios. Under two bars: NULL." becomes "Like the other ratios it is a fraction, and it is NULL for a market with fewer than two bars."
    - Jargon a reviewer from another team would stop at. Use the plain word. File, symbol and flag names stay exact.
-   - AI prose: "ensure", "robust", "seamless", "leverage", "comprehensive", "not just X but Y", lists of three, a trailing ", ensuring …" clause, a closing recap. The full list is in the `humanize` skill's `references/tells.md`, and the doc register in `voice.md` beside it is how Ryan writes MRs.
+   - AI prose: "ensure", "robust", "seamless", "leverage", "comprehensive", "not just X but Y", lists of three, a trailing ", ensuring …" clause, a closing recap. The full list is in the humanize skill's `references/tells.md`. When the user has a `Voice file` setting (the humanize skill's voice resolution says where it lives), write in that file's doc register.
 
    Then the stage 2 count on `3-final.md` is still 200 or less, and this prints nothing (code is skipped):
 

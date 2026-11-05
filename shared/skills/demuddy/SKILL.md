@@ -31,7 +31,7 @@ A sentence is residue when a reader who never saw the conversation or the earlie
 
 ## Target
 
-**In-place rewrite is destructive and this vault is not version-controlled** — `~/.claude/plans` resolves into iCloud with no git, so a bad pass has no local undo.
+**In-place rewrite is destructive:** a plan outside version control has no undo for a bad pass.
 
 - With a path: use it.
 - Without a path: resolve candidates **read-only**, then print the absolute path and a content hash and ask which. "Most recently edited" and "most recently discussed" are different orderings, and the conversation may have mentioned a scratch copy, a generated plan, or a stale duplicate. Never break the ambiguity by guessing.
@@ -114,4 +114,4 @@ A compliant output is a **fixed point**: running demuddy again produces no subst
 - **Merging two rules that differ by actor, scope, or exception.**
 - **Reordering sections but not the cross-references, anchors, or the title — or moving a hazard after the irreversible step it guards.**
 - **Compressing a verification matrix into vagueness** — matrices are instructions; keep every cell.
-- **Rewriting in place before the coverage check**, in a vault with no version control.
+- **Rewriting in place before the coverage check**, in a file with no version control.

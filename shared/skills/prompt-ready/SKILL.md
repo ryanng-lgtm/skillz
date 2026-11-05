@@ -28,7 +28,7 @@ If not already obvious from context, ask the user once:
 - **Target**: who receives the prompt — a fresh Claude Code session, a chat session, a specific coding agent, an API call?
 - **Default goal type**: code, a plan, an answer/explanation, a review, research?
 
-If the user doesn't answer, infer sane defaults (fresh Claude session; goal inferred per message) and proceed. Don't re-ask every turn.
+If the user doesn't answer, infer sane defaults (a fresh session of the agent you are running in; goal inferred per message) and proceed. Don't re-ask every turn.
 
 ## Procedure
 
@@ -39,7 +39,7 @@ For each raw message the user pastes:
 2. **Fill gaps**: add role framing, explicit task, constraints, and the desired output format. Make the prompt self-contained — the target session knows nothing about this conversation.
 3. **Surface missing critical context**: if a missing detail would materially change the output (e.g., language, framework, file paths, acceptance criteria), either ask a tight clarifying question OR include a clearly-marked placeholder like `[FILL: target file path]`. Prefer placeholders for minor gaps; ask only when the answer genuinely changes the prompt.
 4. **Output** the finished prompt in a fenced code block for clean copy-paste.
-5. **Save the prompt as an Obsidian note.** Write the finished prompt to a new note under `/Users/ryan/Library/Mobile Documents/com~apple~CloudDocs/Obsidian/Prompts/YYYY-MM-DD/` (today's date). If that day's directory doesn't exist yet, create it first, then add the note. Name the note with a short kebab-case slug of the prompt's topic (e.g. `object-tree-figma-grouping.md`). The note body is the prompt itself (the same content shown in the code block); the active branch and assumptions may be included as a short header for reference. Do this every turn, for every prompt.
+5. **Save the prompt, when the `Prompts folder` setting is set**: a `- Prompts folder: <path>` line under `## Skill settings` in the user's global instructions (`~/.claude/CLAUDE.md` in Claude Code, `~/.codex/AGENTS.md` in Codex). Write the finished prompt to `<Prompts folder>/YYYY-MM-DD/<slug>.md` (today's date), creating that day's folder first if it doesn't exist. Expand a leading `~` to `$HOME` and quote the path in commands, since it may contain spaces. The slug is a short kebab-case name for the prompt's topic (e.g. `object-tree-figma-grouping.md`). The note body is the prompt itself (the same content shown in the code block); the active branch and assumptions may be included as a short header for reference. Do this every turn, for every prompt. Without the setting, don't save: say once per session that adding the `Prompts folder` line turns saving on.
 6. **Note assumptions** in a short line OUTSIDE the code block — what you inferred or placeholdered, so the user can correct it.
 
 ## Output Format

@@ -94,6 +94,14 @@ Whenever a subagent makes a git commit, it must ALWAYS do the same: first stage 
 
 Any message or comment written for other people to read (an OM Chat room or DM post, a reply I'll send, a Discord message, a GitLab or GitHub comment) goes through the `humanize` skill before you show it to me or post it, without my asking: read and follow `~/.codex/skills/humanize/SKILL.md`. That strips the jargon and AI prose and puts it in my voice. MR descriptions and commit messages are the exception: `mr-markdown` and `commit` cover them.
 
+## Skill settings
+
+Skills from the skillz repo read their settings from this list, one `- <Key>: <value>` line each. `$humanize` reads my voice from `Voice file`.
+
+- Voice file: ~/Documents/github/skillz/personal/humanize-voice.md
+- Plans folder: ~/.codex/plans
+- Prompts folder: ~/Library/Mobile Documents/com~apple~CloudDocs/Obsidian/Prompts
+
 ## Personal skills
 
 My skills live in the skillz repo (`~/Documents/github/skillz`), linked into `~/.codex/skills`. Its README lists every one. When I mention one as `$name`, or type its slash trigger (`/name`) out of Claude habit, read and follow `~/.codex/skills/<name>/SKILL.md` before doing anything else.

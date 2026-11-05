@@ -16,7 +16,7 @@ You ask one AI a question, you get one answer. That answer might be great. It mi
 
 The council fixes this. It runs your question through 5 independent advisors, each thinking from a fundamentally different angle. Then they review each other's work. Then a chairman synthesizes everything into a final recommendation that tells you where the advisors agree, where they clash, and what you should actually do.
 
-This is adapted from Andrej Karpathy's LLM Council. He dispatches queries to multiple models, has them peer-review each other anonymously, then a chairman produces the final answer. We do the same thing inside Claude using sub-agents with different thinking lenses instead of different models.
+This is adapted from Andrej Karpathy's LLM Council. He dispatches queries to multiple models, has them peer-review each other anonymously, then a chairman produces the final answer. We do the same thing inside one agent session using sub-agents with different thinking lenses instead of different models.
 
 **Core principle: The council is for questions where being wrong is expensive.**
 
@@ -76,15 +76,15 @@ Only cares about one thing: can this actually be done, and what's the fastest pa
 
 When the user says "council this" (or any trigger phrase), do two things before framing:
 
-**A. Scan the workspace for context.** The user's question is often just the tip of the iceberg. Their Claude setup likely contains files that would dramatically improve the council's output. Before framing, quickly scan for and read any relevant context files:
+**A. Scan the workspace for context.** The user's question is often just the tip of the iceberg. Their agent setup likely contains files that would dramatically improve the council's output. Before framing, quickly scan for and read any relevant context files:
 
-- `CLAUDE.md` or `claude.md` in the project root or workspace (business context, preferences, constraints)
+- `CLAUDE.md`, `claude.md` or `AGENTS.md` in the project root or workspace (business context, preferences, constraints)
 - Any `memory/` folder (audience profiles, voice docs, business details, past decisions)
 - Any files the user explicitly referenced or attached
 - Recent council transcripts in this folder (to avoid re-counciling the same ground)
 - Any other context files that seem relevant to the specific question (e.g., if they're asking about pricing, look for revenue data, past launch results, audience research)
 
-Use `Glob` and quick `Read` calls to find these. Don't spend more than 30 seconds on this. You're looking for the 2-3 files that would give advisors the context they need to give specific, grounded advice instead of generic takes.
+Use quick file searches and reads to find these. Don't spend more than 30 seconds on this. You're looking for the 2-3 files that would give advisors the context they need to give specific, grounded advice instead of generic takes.
 
 **B. Frame the question.** Take the user's raw question AND the enriched context and reframe it as a clear, neutral prompt that all five advisors will receive. The framed question should include:
 

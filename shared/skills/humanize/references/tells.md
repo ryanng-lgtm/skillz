@@ -60,7 +60,7 @@ Work top-down: structural tells first (they survive sentence-level edits), then 
 
 - Bullets are not a tell. Never merge a list into a paragraph to look human; fix the list's shape instead.
 - No injected typos or forced slang outside registers where the voice profile shows them.
-- No emoji unless the voice profile uses them (Ryan's chat register: none).
+- No emoji unless the voice profile uses them.
 - Never hedge something that is certain; never blur technical precision.
 - Code blocks, identifiers, URLs: byte-exact. Numbers keep their values; only a thousands separator may go.
 - "AI-does-casual" — lowercase + emoji + tidy parallel clauses — is not chat register. Check the voice profile's actual chat sample.
