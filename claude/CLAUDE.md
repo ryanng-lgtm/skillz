@@ -98,6 +98,6 @@ Skills from the skillz repo read their settings from this list, one `- <Key>: <v
 - Plans folder: ~/.claude/plans
 - Prompts folder: ~/Library/Mobile Documents/com~apple~CloudDocs/Obsidian/Prompts
 
-## Personal skills
+## My skills
 
-My skills live in the skillz repo (`~/Documents/github/skillz`), linked into `~/.claude/skills`. Its README lists every one.
+My skills live in the skillz repo (`~/Documents/github/skillz`), linked into `~/.claude/skills`: the shared ones, which other devs install as the `skillz` plugin, and my personal ones. Its README lists both.

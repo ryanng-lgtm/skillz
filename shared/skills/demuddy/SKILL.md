@@ -46,7 +46,7 @@ These categories survive in substance, not just as headings:
 - **Hedges** ("probably", "I believe", "appears to") — each marks an unverified assumption. Keep the hedge, or move the claim to Assumptions or Open questions. State it plainly only after verifying it, recorded as contract 2 requires.
 - `file:line` cites, URLs, identifiers, numbers, limits, thresholds
 - Invariants, conventions, verification matrices (**every cell**)
-- **Risks, unknowns, open questions, assumptions** — an editorial pass may never answer, resolve, or drop one. Downstream skills mine exactly this section; `loop-me-in` reads it hardest, because "does this fix even address the report?" lives there.
+- **Risks, unknowns, open questions, assumptions** — an editorial pass may never answer, resolve, or drop one. Downstream skills mine exactly this section; the dev-loop skill reads it hardest, because "does this fix even address the report?" lives there.
 - **Rationale** for any deliberate deviation — the sentence that stops the next implementer "correcting" it
 - **Negative results and evidence** — "the streaming version OOMed at 250k records" is why an option is closed
 - Dependencies, rollback constraints, compatibility limits, security and performance concerns

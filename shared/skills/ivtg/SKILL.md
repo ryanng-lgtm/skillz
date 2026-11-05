@@ -39,7 +39,7 @@ The user pastes an issue. Immediately:
 When the investigator returns:
 
 1. Write its findings into that issue's section (Investigation + Fix plan). Set `**Status:** in review`.
-2. Write the review prompt to `<scratch>/ivtg-issue-<N>-prompt.md`:
+2. Once per session, create a working directory with `mktemp -d "<parent>/ivtg.XXXXXX"`, where `<parent>` is this session's scratchpad directory, else `${TMPDIR:-/tmp}`. `<scratch>` below is the path it prints. Write the review prompt to `<scratch>/ivtg-issue-<N>-prompt.md`:
 
 ```text
 Review this fix plan against the actual code in the repos you can read.

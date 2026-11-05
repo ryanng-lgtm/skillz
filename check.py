@@ -12,7 +12,11 @@ Prints one line per problem and exits 1 when there is any:
   paths    each ~/.claude/skills/... or ~/.codex/skills/... path a doc or
            script names exists in this repo, or in the work skills checkout
            when that is present
+  leaks    shared/, the plugin every install copies, holds no symlink and no
+           personal marker, and the plugin manifests and marketplaces exist
+           and name the same plugin
 """
+import json
 import os
 import re
 import sys
@@ -30,6 +34,20 @@ HOMES = ("shared/skills", "personal")
 # The README table that lists the skills of each home.
 TABLES = {"## Shared skills": "shared/skills", "## Personal skills": "personal"}
 SKILL_PATH = re.compile(r"~/\.(claude|codex)/skills/([A-Za-z0-9][A-Za-z0-9_.-]*)(/[A-Za-z0-9_./-]*)?")
+# The plugin root: Claude Code and Codex copy this folder, and nothing else, into
+# every install.
+PLUGIN_ROOT = "shared"
+PLUGIN_MANIFESTS = ("shared/.claude-plugin/plugin.json", "shared/.codex-plugin/plugin.json")
+MARKETPLACES = (".claude-plugin/marketplace.json", ".agents/plugins/marketplace.json")
+# Personal data that must never reach the plugin, matched case-insensitively.
+# Words match whole, so the GitHub handle ryanng-lgtm in the manifests is not
+# "Ryan"; path fragments match anywhere.
+LEAK_WORDS = ("Ryan", "OM Chat", "openmarket", "kiyotaka")
+LEAK_PATHS = ("/Users/", "~/Documents", "Mobile Documents", "~/.claude/skills/", "~/.codex/skills/")
+LEAK_MARKERS = [
+    *((m, re.compile(rf"\b{re.escape(m)}\b", re.IGNORECASE)) for m in LEAK_WORDS),
+    *((m, re.compile(re.escape(m), re.IGNORECASE)) for m in LEAK_PATHS),
+]
 
 problems = []
 
@@ -207,6 +225,64 @@ def check_paths(home, codex):
                 report(rel, f"names {mention}, which does not exist")
 
 
+def load_json(rel):
+    try:
+        with open(os.path.join(REPO, rel)) as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        report(rel, "missing")
+    except (OSError, ValueError) as err:
+        report(rel, f"is not valid JSON: {err}")
+    return None
+
+
+def check_manifests():
+    names = {}
+    for rel in PLUGIN_MANIFESTS:
+        if (data := load_json(rel)) is not None:
+            names[rel] = data.get("name")
+    for rel in MARKETPLACES:
+        if (data := load_json(rel)) is not None:
+            for i, entry in enumerate(data.get("plugins", [])):
+                names[f"{rel} plugins[{i}]"] = entry.get("name")
+    if len(set(names.values())) > 1:
+        listed = ", ".join(f"{where} = {name!r}" for where, name in names.items())
+        report(PLUGIN_ROOT, f"manifests and marketplaces name different plugins: {listed}")
+
+
+def plugin_files():
+    """Yield each file under the plugin root, reporting each symlink instead."""
+    for root, dirs, files in os.walk(os.path.join(REPO, PLUGIN_ROOT)):
+        for name in sorted(dirs + files):
+            path = os.path.join(root, name)
+            if os.path.islink(path):
+                report(os.path.relpath(path, REPO), "is a symlink; the plugin must hold real files")
+        dirs[:] = sorted(d for d in dirs if not os.path.islink(os.path.join(root, d)))
+        for name in sorted(files):
+            path = os.path.join(root, name)
+            if not os.path.islink(path):
+                yield path
+
+
+def leaks():
+    """Report symlinks and personal markers anywhere in the plugin root."""
+    check_manifests()
+    for path in plugin_files():
+        with open(path, "rb") as fh:
+            data = fh.read()
+        try:
+            if b"\0" in data:
+                continue  # binary, such as a .pyc
+            lines = data.decode("utf-8").splitlines()
+        except UnicodeDecodeError:
+            continue
+        rel = os.path.relpath(path, REPO)
+        for n, line in enumerate(lines, 1):
+            for marker, pattern in LEAK_MARKERS:
+                if pattern.search(line):
+                    report(f"{rel}:{n}", f"personal marker '{marker}'")
+
+
 def homes():
     """Where each Claude skill lives: shared/skills or personal."""
     home = {}
@@ -225,6 +301,7 @@ def main():
     linked = check_skills(home, codex)
     check_readme(home, codex, linked)
     check_paths(home, codex)
+    leaks()
     for p in problems:
         print(p)
     if problems:

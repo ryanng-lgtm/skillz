@@ -1,7 +1,7 @@
 ---
 name: summary
 description: >-
-  Use when a loop-me-in run, an unattended brief or a long working session
+  Use when a dev-loop run, an unattended brief or a long working session
   ends or pauses and the user needs to know where things stand: which repos
   were touched, the order their MRs or PRs merge in, and what is left for them
   to do. Trigger: /summary, $summary, "give me a rundown", "which repos were

@@ -1,0 +1,16 @@
+{
+  "name": "skillz",
+  "owner": {
+    "name": "ryanng-lgtm"
+  },
+  "metadata": {
+    "description": "The skillz plugin: dev-workflow skills for Claude Code and Codex."
+  },
+  "plugins": [
+    {
+      "name": "skillz",
+      "source": "./shared",
+      "description": "Dev-workflow skills for Claude Code and Codex: commits and MR descriptions, plan cleanup, issue investigation, unattended dev loops, branch syncing, test audits, docs knowledge bases and more."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "skillz",
+  "plugins": [
+    {
+      "name": "skillz",
+      "source": {
+        "source": "local",
+        "path": "./shared"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

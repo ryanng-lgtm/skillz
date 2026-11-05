@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Pack the skills the README lists under Shared skills into one plugin zip.
+"""Pack the shared/ plugin into one zip for Claude Desktop and claude.ai.
 
 usage: python3 -I export.py [--out FILE]
 
-Writes FILE (default ~/Downloads/skillz.zip) holding one plugin folder:
-skillz/.claude-plugin/plugin.json and skillz/skills/<name>/ for each skill.
-Claude Desktop and claude.ai take it at Customize > Plugins > Add > Upload
-plugin; the skills/ folder also unzips into any skills directory.
+Writes FILE (default ~/Downloads/skillz.zip) holding shared/ as one plugin
+folder, skillz/: the manifests plus skillz/skills/<name>/ for each skill. The
+zipped .claude-plugin/plugin.json gets a dated version, so each upload counts
+as newer than the last; the repo's manifest stays unversioned. Claude Desktop
+and claude.ai take the zip at Customize > Plugins > Add > Upload plugin; the
+skills/ folder also unzips into any skills directory.
 
-Runs check.py first and writes nothing while it fails, so a stale README
-can't pick the wrong skills.
+Runs check.py first and writes nothing while it fails, so a personal marker
+can't ship in the zip.
 """
 import argparse
 import datetime
@@ -24,16 +26,12 @@ sys.path.insert(0, REPO)  # -I leaves the script's directory off sys.path
 import check  # noqa: E402
 
 PLUGIN = "skillz"
+ROOT = os.path.join(REPO, check.PLUGIN_ROOT)
+MANIFEST = ".claude-plugin/plugin.json"
 SKIP_DIRS = {"__pycache__", "node_modules"}
 SKIP_FILES = {".DS_Store"}
 NAME = re.compile(r"^[a-z0-9-]{1,64}$")
 MAX_DESCRIPTION = 1024
-
-
-def shared():
-    with open(os.path.join(REPO, "README.md")) as fh:
-        lines = fh.read().splitlines()
-    return sorted(check.table_rows(lines, "## Shared skills"))
 
 
 def files(folder):
@@ -61,18 +59,16 @@ def upload_problems(name, folder):
 
 
 def manifest():
+    with open(os.path.join(ROOT, MANIFEST)) as fh:
+        data = json.load(fh)
     # Date and time, so each export carries a higher version than the last.
     now = datetime.datetime.now()
-    version = f"{now.year}.{now.month * 100 + now.day}.{now.hour * 100 + now.minute}"
-    return json.dumps({
-        "name": PLUGIN,
-        "version": version,
-        "description": "Ryan's codebase-agnostic skills, exported from the skillz repo.",
-    }, indent=2) + "\n"
+    data["version"] = f"{now.year}.{now.month * 100 + now.day}.{now.hour * 100 + now.minute}"
+    return json.dumps(data, indent=2) + "\n"
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Pack the shared skills into one plugin zip.")
+    parser = argparse.ArgumentParser(description="Pack the shared/ plugin into one zip.")
     parser.add_argument(
         "--out", default=os.path.expanduser("~/Downloads/skillz.zip"),
         help="the zip to write (default: %(default)s)",
@@ -88,9 +84,11 @@ def main():
         print("export: fix what check.py reports first; nothing written")
         return 1
 
-    home = check.homes()
-    skills = {n: os.path.join(REPO, home[n], n) for n in shared()}
-    problems = [p for n, f in skills.items() for p in upload_problems(n, f)]
+    skills = check.skills(os.path.join(check.PLUGIN_ROOT, "skills"))
+    problems = [
+        p for n in skills
+        for p in upload_problems(n, os.path.join(ROOT, "skills", n))
+    ]
     if problems:
         print("\n".join(problems))
         print("export: nothing written")
@@ -98,11 +96,15 @@ def main():
 
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"{PLUGIN}/.claude-plugin/plugin.json", manifest())
-        for name, folder in skills.items():
-            for path in files(folder):
-                zf.write(path, os.path.join(PLUGIN, "skills", name, os.path.relpath(path, folder)))
-            print(f"  {name}")
+        for path in files(ROOT):
+            rel = os.path.relpath(path, ROOT)
+            entry = f"{PLUGIN}/{rel}"
+            if rel == os.path.normpath(MANIFEST):
+                info = zipfile.ZipInfo.from_file(path, entry)  # keeps mode and date
+                zf.writestr(info, manifest(), zipfile.ZIP_DEFLATED)
+            else:
+                zf.write(path, entry)
+    print("\n".join(f"  {n}" for n in skills))
     print(f"export: {len(skills)} skills in {out}")
     return 0
 

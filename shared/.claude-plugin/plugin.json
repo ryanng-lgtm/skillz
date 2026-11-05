@@ -1,0 +1,9 @@
+{
+  "name": "skillz",
+  "description": "Dev-workflow skills for Claude Code and Codex: commits and MR descriptions, plan cleanup, issue investigation, unattended dev loops, branch syncing, test audits, docs knowledge bases and more.",
+  "author": {
+    "name": "ryanng-lgtm",
+    "url": "https://github.com/ryanng-lgtm"
+  },
+  "license": "MIT"
+}

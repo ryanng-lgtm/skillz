@@ -178,8 +178,9 @@ mkdir -p "$HOME/.local/bin"
 link "$REPO/personal/om-build/scripts/hosted.sh" "$HOME/.local/bin/om-hosted"
 link "$REPO/personal/om-glab/scripts/hosted.sh" "$HOME/.local/bin/om-glab"
 
-# A statusLine that still runs the status line skill under its old name,
-# status-line, follows it to claude-statusline. Any other is left alone.
+# Repoint a statusLine that runs this skill under its old name, status-line, or
+# by an unquoted explicit path, to its current command. Any other is left
+# alone.
 python3 -I "$REPO/personal/claude-statusline/scripts/install.py" --migrate
 
 # ---- Work skills (not carried by this repo; relinked when present) ---------

@@ -20,3 +20,7 @@ history.jsonl
 
 # skill dependency trees — reinstalled per machine, never tracked
 node_modules/
+
+# Python bytecode — written by running check.py, export.py and skill scripts
+__pycache__/
+*.pyc
