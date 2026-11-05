@@ -13,7 +13,7 @@ This repository is the single source of truth for Ryan's agent setup: skills and
 
 Every skill follows `templates/skill-template.md` for its frontmatter, body, and supporting files. Read it before writing a skill or restructuring one.
 
-`openmarket`, `om-chat`, `graphify` and `desloppify` are vendored from the tools that ship them. Do not edit them by hand. `desloppify` is upstream's `docs/SKILL.md` plus that agent's overlay (`docs/CLAUDE.md` or `docs/CODEX.md`), with upstream's `LICENSE` beside it, which its license requires.
+`openmarket`, `om-chat`, `graphify` and `desloppify` are vendored from the tools that ship them. Do not edit them by hand. `desloppify` is upstream's `docs/SKILL.md` plus that agent's overlay (`docs/CLAUDE.md` or `docs/CODEX.md`), with upstream's `LICENSE` beside it, which its license requires. Its `## Installing the CLI` section, above `<!-- desloppify-begin -->`, and `scripts/install.sh` are ours: keep them when refreshing.
 
 ## Shared skills hold nothing personal
 

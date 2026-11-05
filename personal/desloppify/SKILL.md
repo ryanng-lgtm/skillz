@@ -7,6 +7,10 @@ description: >
   fixing individual bugs.
 ---
 
+## Installing the CLI
+
+This section and `scripts/install.sh` were added in the skillz repo; the rest of this file is upstream's. Before the first `desloppify` command, run `bash "${CLAUDE_SKILL_DIR}/scripts/install.sh"`. It installs the CLI from PyPI with uv, and does nothing when it is already installed; `--upgrade` updates it. Use it in place of the Prerequisite section below. Never run `desloppify setup` or `desloppify update-skill`: they rewrite this skill and `~/.codex/AGENTS.md`, which are files in the skillz repo.
+
 <!-- desloppify-begin -->
 <!-- desloppify-skill-version: 7 -->
 
