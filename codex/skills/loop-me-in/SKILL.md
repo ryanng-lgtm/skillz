@@ -214,14 +214,16 @@ path and only claims supported by completed gates. A canary can report and conti
 without waiting for human review; stop only on its stated tripwire.
 
 End every run, finished, stopped or blocked, with `$summary` as the final reply: the
-repos touched, the merge order and what is left for Ryan.
+issues the run worked and what became of each, the repos touched, the merge order and
+what is left for Ryan.
 
 ## Required brief sections
 
 Write these in order, copying concrete facts and commands rather than linking context:
 
 1. **Title and paste line** — complete launch instruction and first worktree action.
-2. **Requirements** — CURRENT evidence, verbatim EXPECTED, authority and gate mode.
+2. **Requirements** — CURRENT evidence, verbatim EXPECTED, authority and gate mode; from
+   an `ivtg-*` plan, each row's issue number and title.
 3. **Traceability matrix** — requirements ↔ spec files ↔ phases, expected validation
    signatures, frozen semantics and mechanical-correction rules.
 4. **Ground truth** — source/worktree paths, branches, default-branch refresh, base SHA

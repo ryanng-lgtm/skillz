@@ -204,7 +204,7 @@ A wave too small to say anything substantial folds into the next wave's report. 
 - **It claims only what was verified.** Work the harness can't show, and any fix whose link to the original report is still an open question, is worded honestly or left out.
 - **It says who reviewed** in a phrase ("reviewed by codex", "self-reviewed, weaker") and names the findings log path, which carries the detail the word ceiling can't.
 - **A blocked run still reports**: what landed, what failed, that the rest is halted. Same budget.
-- **The run ends with the summary skill.** After its last report, posted or left in the findings log, whether the run finished, stopped or halted, it runs the summary skill, and that output is the session's final reply: the repos touched, the merge order, and what is left for the user. The post is for the destination; the summary is for the user when they come back to the session. Without that skill, the final reply covers the same three things, read from git and the forge.
+- **The run ends with the summary skill.** After its last report, posted or left in the findings log, whether the run finished, stopped or halted, it runs the summary skill, and that output is the session's final reply: the issues the run worked and what became of each, the repos touched, the merge order, and what is left for the user. The post is for the destination; the summary is for the user when they come back to the session. Without that skill, the final reply covers the same four things, the issues read from the brief and its source plan, the rest from git and the forge.
 - **Say which identity it posts as** where the destination tells the user apart from a bot, and authorise exactly these posts in the safety rules, so "post" does not read as permission to push or publish.
 
 ## Choosing the trigger
@@ -264,7 +264,8 @@ for internal work only.
 ## Requirements — CURRENT, EXPECTED, and the oracle
 One row each, nothing paraphrased: CURRENT (probe and recorded output, or
 capture path), EXPECTED in the user's words, its authority, the gate mode.
-No row UNSPECIFIED.
+No row UNSPECIFIED. When the source plan lists issues (an ivtg plan), each
+row names its issue by number and title, for the closing summary's recap.
 
 ## Traceability matrix
 Requirement ↔ spec files ↔ phase; per spec, its gate mode and expected

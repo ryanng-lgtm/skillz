@@ -243,7 +243,7 @@ Below 40 words there was nothing worth interrupting for; over 100 nobody reads i
 - **It may only claim what was verified.** Backend work a browser cannot show, and any fix whose link to the original report is still an open question, must be worded honestly or left out.
 - **It names the findings log path.** The word ceiling keeps the post readable; the path keeps the detail reachable.
 - **A blocked run still posts** — what landed, what failed, that the rest is halted. Same budget.
-- **The run ends with `/summary`.** After its last post, whether it finished, stopped or halted, the run invokes `/summary`, and that output is the session's final reply: the repos touched, the merge order, and what is left for Ryan. The post is for the channel; the summary is for Ryan when he comes back to the session.
+- **The run ends with `/summary`.** After its last post, whether it finished, stopped or halted, the run invokes `/summary`, and that output is the session's final reply: the issues the run worked and what became of each, the repos touched, the merge order, and what is left for Ryan. The post is for the channel; the summary is for Ryan when he comes back to the session.
 - **Authorise exactly these posts** in the safety rules, so "post" does not read as permission to push or publish.
 
 ## Choosing the trigger
@@ -304,7 +304,9 @@ its recorded output, or the live-capture path in the evidence directory);
 `EXPECTED` in Ryan's words verbatim; the **authority** EXPECTED rests on
 (his decision, a product requirement, an API contract, a compatibility
 invariant); and the gate mode. No row may be UNSPECIFIED — that is resolved
-before this brief ships, not at 3am.
+before this brief ships, not at 3am. When the source plan lists issues (an
+`ivtg-*` plan), each row names its issue by number and title, for the closing
+summary's recap.
 
 ## Traceability matrix
 Requirement ↔ spec files ↔ phase, many-to-many. Per spec: its gate mode and

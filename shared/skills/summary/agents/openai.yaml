@@ -1,4 +1,4 @@
 interface:
   display_name: "Summary"
-  short_description: "Repos touched, merge order and the user's remaining actions"
-  default_prompt: "Use $summary to give me the rundown: repos touched, merge order and what's left for me."
+  short_description: "Issues worked, repos touched, merge order and what's left"
+  default_prompt: "Use $summary to give me the rundown: the issues and what became of each, repos touched, merge order and what's left for me."

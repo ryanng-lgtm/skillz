@@ -86,9 +86,9 @@ When the plan file is complete — the user says they're out of issues, or every
 
 Run it once, on the whole file, not per issue: an issue's section is not final until its revision pass has landed.
 
-Preserve through the pass: every `<repo>/<file>:<line>` cite, every gotcha and open unknown, each issue's `**Status:**` line, and the repo list. Review verdicts and superseded plans are archaeology and may go.
+Preserve through the pass: each issue's **Reported** text verbatim, every `<repo>/<file>:<line>` cite, every gotcha and open unknown, each issue's `**Status:**` line, and the repo list. The Reported text is what the closing summary of a later run recaps the issues from. Review verdicts and superseded plans are archaeology and may go.
 
-Report the demuddied path. This is still a plan — no code.
+Report the demuddied path and the index: per issue, its number, title, one-line root cause and status. This is still a plan — no code.
 
 ## Investigator agent contract
 

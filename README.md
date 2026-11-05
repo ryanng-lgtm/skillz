@@ -83,7 +83,7 @@ Everything the plugin installs. Claude Code shows them as `/skillz:<name>`. Code
 | [`repo-sync`](shared/skills/repo-sync/SKILL.md) | Claude, Codex | Rebases the working branch and every behind MR or PR onto its target, resolving conflicts and handing uncommitted work back exactly as it was staged. |
 | [`setup-statusline`](shared/skills/setup-statusline/SKILL.md) | Claude | One-time setup. Gives Claude Code a status line with the parts you pick (model, folder, branch, context, usage limits, effort), changing only `statusLine` in `settings.json`. |
 | [`socratic-teacher`](shared/skills/socratic-teacher/SKILL.md) | Claude, Codex | Teaching mode: one guiding question per turn, never the full solution. |
-| [`summary`](shared/skills/summary/SKILL.md) | Claude, Codex | Ends a run or long session with the repos touched, their merge order and what is left for the user, every state read live. |
+| [`summary`](shared/skills/summary/SKILL.md) | Claude, Codex | Ends a run or long session with the issues it worked and what became of each, the repos touched, their merge order and what is left for the user, every state read live. |
 | [`test-audit`](shared/skills/test-audit/SKILL.md) | Claude | Gates new or changed tests on the behaviour they protect, and sweeps out low-value ones; `enforce` deletes every test that can't name the bug only it catches. |
 | [`update-knowledge-base`](shared/skills/update-knowledge-base/SKILL.md) | Claude, Codex | Folds a conversation's durable findings into the docs dir or vault the user names, each fact in the doc that owns it, and discards the session residue. |
 
