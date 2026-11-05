@@ -8,7 +8,7 @@ stays.
 ## Scope
 
 - A path: every test case under it, including cases already on the base
-  branch.
+  branch. `.` is the whole repo.
 - A commit or range: the test cases it adds.
 - Neither: the test cases the current branch adds over its merge base with
   `origin/HEAD` (then `origin/main`, then `main`). Cases already on the base
@@ -54,15 +54,35 @@ before the fix.
    the test count and test lines in scope. A case that already fails is
    reported as a possible product bug, not pruned. Done when the suite result
    is recorded.
-2. **Ledger.** Mark every case in scope: keep, with both answers, or delete,
-   with the item above it matches. Done when no case is unmarked.
-3. **Trim.** Delete the cases marked delete, fold per-value cases into the one
+2. **Split.** When the scope spans more than one package (a Go or Python
+   package, a JS workspace, a top-level source directory), group its test
+   files into lanes along production owner boundaries, as
+   [CAMPAIGN.md step 2](CAMPAIGN.md#2-lanes-and-inventory) does: each file in
+   exactly one lane, a few broad lanes rather than one per package. A scope
+   inside one package is one lane. Done when each lane lists its files.
+3. **Ledger.** Mark every case in scope: keep, with both answers, or delete,
+   with the item above it matches. With several lanes, give each lane its own
+   read-only agent when delegation is available; otherwise ledger the lanes
+   one after another. Answer 2 crosses lanes: a delete justified by a case in
+   another lane holds only once that case is marked keep, so settle those
+   references across all ledgers before trimming. Done when no case is
+   unmarked and every such reference points at a kept case.
+4. **Trim.** Delete the cases marked delete, fold per-value cases into the one
    kept, and delete testdata and test helpers that only removed cases used.
-4. **Re-check.** Run the suite and coverage again. A code line that stopped
+   With several lanes, trim and commit one lane at a time; a helper shared by
+   several lanes changes in the last lane's commit.
+5. **Re-check.** Run the suite and coverage again. A code line that stopped
    running gets back the deleted case that ran it only when that case has
    both answers; otherwise report the line as untested. Done when the suite
    passes.
-5. **Report**, as below.
+6. **Review.** Have an independent reviewer per lane compare its deleted
+   cases against the cases kept in every lane, as in
+   [CAMPAIGN.md step 6](CAMPAIGN.md#6-preservation-review); without
+   delegation, review in a separate pass and say so. A bug that lost its only
+   catching case gets that case back only when the case has both answers;
+   otherwise it goes in the report. Done when every gap a reviewer found is
+   restored or reported.
+7. **Report**, as below.
 
 ## Rules
 
@@ -77,6 +97,8 @@ before the fix.
 - each kept case with its two answers;
 - the deleted cases, grouped by why;
 - the test count and test lines before and after, and the suite result;
+- the lanes, when there were several, and each gap the review found with
+  what happened to it;
 - base duplicates left alone, untested lines, dead code and test-only seams.
 
 ## Common mistakes
