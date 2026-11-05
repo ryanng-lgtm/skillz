@@ -203,12 +203,13 @@ WT="$TMP/wt"
 A temporary worktree is always clean, so Phase 2 does not apply to it. Its detached HEAD
 (`local=none`) is expected.
 
-Then, for every unit, read-only:
+Then, for every unit, read-only (the staged diff is saved in the git dir, not the worktree):
 
 ```bash
 git -C "$WT" rev-parse HEAD          # pre-sync SHA — the undo handle
 git -C "$WT" branch --show-current   # $BRANCH
-git -C "$WT" diff --cached --name-only   # paths that were staged, to re-stage later
+PATCH="$(git -C "$WT" rev-parse --path-format=absolute --git-path syncup-index.patch)"
+git -C "$WT" diff-index -p --binary --cached --ita-invisible-in-index HEAD >"$PATCH"   # the staged hunks, for Phase 5
 git -C "$WT" status --porcelain
 ```
 
@@ -228,13 +229,23 @@ rebase/merge/cherry-pick is in progress, there is no `origin`, or `$DEF` cannot 
 Only if `git status --porcelain` is non-empty:
 
 ```bash
+EPOCH="$(date +%s)"; SUBJ="syncup-wip ${EPOCH}"; MAIL="syncup-wip-${EPOCH}@invalid"
 git -C "$WT" add -A
-git -C "$WT" commit -q --no-verify -m "syncup-wip $(date +%s)"
+git -C "$WT" -c core.hooksPath=/dev/null commit -q --no-verify --no-gpg-sign \
+  --author="syncup-wip <${MAIL}>" -m "$SUBJ"
+git -C "$WT" log -1 --format='%s%n%ae'   # must print exactly $SUBJ, then $MAIL
 ```
 
-`--no-verify` because pre-commit hooks must not block a temporary commit. `add -A` includes
-untracked files so the rebase can conflict-resolve them in one pass. Record the exact WIP subject
-line — Phase 5 refuses to unwind unless `HEAD` still carries it.
+Hooks are off because they must neither block nor rewrite a temporary commit: a
+prepare-commit-msg hook runs even with `--no-verify`. Hooks run again on each rebase pick and may
+rewrite the message, so the author email marks the commit where no hook reaches. `add -A` includes
+untracked files so the rebase can conflict-resolve them in one pass. It also stages everything, so
+save the Phase 1 patch before it: the patch is the only record of which hunks were staged. Record
+`$SUBJ` and `$MAIL` exactly — Phase 5 refuses to unwind unless `HEAD` still carries one of them.
+
+If the commit fails, run `git -C "$WT" reset -q`; if its subject or author is not exactly as set, run
+`git -C "$WT" reset -q --mixed HEAD~1`. Either way re-stage the Phase 1 patch as in Phase 5 and
+abort the unit as `needs-you`.
 
 ## Phase 3 — refresh the base
 
@@ -340,17 +351,29 @@ not pushed.
 Only if a WIP commit was made. Verify first, then unwind:
 
 ```bash
-git -C "$WT" log -1 --format=%s        # must still start with "syncup-wip"
+git -C "$WT" log -1 --format='%ae%n%B' | grep -cF -e "$MAIL" -e "$SUBJ"   # must print non-zero: HEAD is the WIP commit
 git -C "$WT" reset --mixed HEAD~1      # changes return to the worktree, unstaged
-git -C "$WT" add -- <paths that were staged in Phase 1>
+PATCH="$(git -C "$WT" rev-parse --path-format=absolute --git-path syncup-index.patch)"
+test ! -s "$PATCH" || git -C "$WT" apply --cached --whitespace=nowarn "$PATCH"   # re-stage the Phase 1 hunks
 ```
 
 `--mixed` (not `--soft`) is what restores the original shape: previously-untracked files go back to
-untracked, previously-modified files go back to modified-unstaged. Re-staging the Phase 1 paths
-restores a partial `git add` if the user had one.
+untracked, previously-modified files go back to modified-unstaged. Applying the Phase 1 patch to the
+index re-stages exactly the hunks that were staged, so a file with some hunks staged and some not
+comes back that way.
 
-If `HEAD` does **not** carry the WIP subject, the WIP commit was dropped as empty during the rebase
-— every uncommitted change was already upstream. Do not reset. Say so explicitly in the report.
+If the apply fails, the rebase changed lines that were staged. Stage each file the patch touches
+whole instead (`git -C "$WT" apply --numstat "$PATCH"` lists them, then
+`git -C "$WT" add -A -- <file>`), and put `staging approximate: <files>` on the unit's report line.
+Either way, `rm -f "$PATCH"` afterwards.
+
+`HEAD` is the WIP commit when its author email is `$MAIL` or its message holds `$SUBJ` anywhere: a
+hook run by the rebase may have rewritten the message. If `HEAD` carries neither, look further down with
+`git -C "$WT" log -F --author="$MAIL" --format=%h` and `git -C "$WT" log -F --grep="$SUBJ" --format=%h`.
+A hit means something was committed on top of the WIP commit: do not reset, keep `$PATCH`, and
+abort the unit as `needs-you`; it is never pushed. No hit means the WIP commit was dropped as empty
+during the rebase — every uncommitted change was already upstream. Do not reset; remove `$PATCH`.
+Say so explicitly in the report.
 
 ## Phase 6 — verify before claiming success
 
@@ -387,11 +410,12 @@ hooks run where dependencies are installed:
 
 ```bash
 SHA="$(git -C "$WT" rev-parse HEAD)"
-git -C "$CLONE" log -1 --format=%s "$SHA"     # must not start with "syncup-wip"
+git -C "$CLONE" log --format='%ae%n%B' "origin/${TGT}..${SHA}" | grep -cF syncup-wip   # must print 0
 git -C "$CLONE" push --force-with-lease="refs/heads/${SRC}:${PRE_REMOTE}" origin "${SHA}:refs/heads/${SRC}"
 ```
 
-The lease is the Phase 1 SHA, not the remote-tracking ref: an editor's background fetch can move
+A WIP commit anywhere in the pushed range makes the unit `needs-you`; never push it. The lease is
+the Phase 1 SHA, not the remote-tracking ref: an editor's background fetch can move
 `origin/<source>` and silently widen a bare `--force-with-lease`. A push also updates
 `origin/<source>`, which is what the restack units stacked on this one rebase onto.
 
@@ -449,7 +473,7 @@ Report the pre-sync SHA for every unit touched, including the ones that ended cl
 ## Common mistakes
 
 - **Reporting "synced" without the `merge-base --is-ancestor` check.**
-- **Pushing before Phase 6 passes, or with the WIP commit on `HEAD`.**
+- **Pushing before Phase 6 passes, or with a WIP commit anywhere in the pushed range.**
 - **Retrying a rejected lease with `--force`, or pushing with `--no-verify` past a failing hook.**
 - **Rebasing a restack unit with a plain `git rebase "origin/${TGT}"`.**
 - **Switching the user's checkout to reach an MR branch instead of using a temporary worktree.**
