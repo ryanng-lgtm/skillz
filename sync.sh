@@ -94,10 +94,16 @@ commit_changes() {
   staged="$(git diff --cached --name-status)"
   paths="$(printf '%s\n' "$staged" | cut -f2-)"
 
+  # A skill's files sit in <home>/<name>/. The homes are shared/skills and
+  # personal, plus claude/skills and codex/skills from before the move; a Codex
+  # skill can also be a lone link, codex/skills/<name>. Any other path, such as
+  # a file directly in personal/, counts as other.
+  skill_re='^((claude|codex)/skills|shared/skills|personal)/([^/]+)/'
+  link_re='^codex/skills/([^/]+)$'
   skills="$(printf '%s\n' "$paths" \
-    | sed -nE 's#^(claude|codex)/skills/([^/]+)/.*#\2#p' | sort -u)"
+    | sed -nE -e "s#${skill_re}.*#\\3#p" -e "s#${link_re}#\\1#p" | sort -u)"
   n_skills="$(printf '%s\n' "$skills" | grep -c . || true)"
-  n_other="$(printf '%s\n' "$paths" | sed -E '/^(claude|codex)\/skills\//d' \
+  n_other="$(printf '%s\n' "$paths" | grep -vE -e "$skill_re" -e "$link_re" \
     | grep -c . || true)"
 
   # One verb for the whole commit. All-new is an add, all-gone is a remove,
@@ -216,9 +222,12 @@ if [ "$(git rev-parse HEAD)" != "$before" ]; then
   # here, and one it removed leaves a dead link, until install.sh runs.
   # --links-only skips the Codex plugin step, which can hang, and the hook
   # registration. --no-renames reports a moved skill as an add and a delete,
-  # which a rename filter would miss.
-  if [ -n "$(git diff --no-renames --name-only --diff-filter=AD "$before" HEAD -- \
-    'claude/skills/*/SKILL.md' 'setup/*/SKILL.md' 'codex/skills/*')" ]; then
+  # which a rename filter would miss; M catches a Codex link retargeted in
+  # place. claude/skills and setup are where skills lived before shared/skills
+  # and personal, so the pull that brings the move relinks too.
+  if [ -n "$(git diff --no-renames --name-only --diff-filter=ADM "$before" HEAD -- \
+    'shared/skills/*/SKILL.md' 'personal/*/SKILL.md' 'codex/skills/*' \
+    'claude/skills/*/SKILL.md' 'setup/*/SKILL.md')" ]; then
     "$REPO/install.sh" --links-only >>"$LOG" 2>&1 9>&- || log "install.sh --links-only failed"
   fi
 fi

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pack the skills the README marks Agnostic yes into one plugin zip.
+"""Pack the skills the README lists under Shared skills into one plugin zip.
 
 usage: python3 -I export.py [--out FILE]
 
@@ -30,14 +30,10 @@ NAME = re.compile(r"^[a-z0-9-]{1,64}$")
 MAX_DESCRIPTION = 1024
 
 
-def agnostic():
+def shared():
     with open(os.path.join(REPO, "README.md")) as fh:
         lines = fh.read().splitlines()
-    names = []
-    for heading in ("## Skill index", "## One-time setup"):
-        rows = check.table_rows(lines, heading)
-        names += [n for n, (_, _, a) in rows.items() if a == "yes"]
-    return sorted(names)
+    return sorted(check.table_rows(lines, "## Shared skills"))
 
 
 def files(folder):
@@ -76,7 +72,7 @@ def manifest():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Pack the agnostic skills into one plugin zip.")
+    parser = argparse.ArgumentParser(description="Pack the shared skills into one plugin zip.")
     parser.add_argument(
         "--out", default=os.path.expanduser("~/Downloads/skillz.zip"),
         help="the zip to write (default: %(default)s)",
@@ -93,7 +89,7 @@ def main():
         return 1
 
     home = check.homes()
-    skills = {n: os.path.join(REPO, home[n], n) for n in agnostic()}
+    skills = {n: os.path.join(REPO, home[n], n) for n in shared()}
     problems = [p for n, f in skills.items() for p in upload_problems(n, f)]
     if problems:
         print("\n".join(problems))

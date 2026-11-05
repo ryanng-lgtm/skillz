@@ -83,6 +83,59 @@ prune() {
   done
 }
 
+# only_ignorable DIR — true when DIR holds nothing but node_modules,
+# __pycache__ and .DS_Store, at any depth.
+only_ignorable() {
+  local found
+  found="$(find "$1" \( -name node_modules -o -name __pycache__ \) -prune \
+    -o ! -type d ! -name .DS_Store -print)" || return 1
+  [ -z "$found" ]
+}
+
+# migrate_leftovers — clear what the move to shared/skills and personal left
+# behind. Skills used to live in claude/skills/<name> and setup/<name>; a pull
+# of the move takes the tracked files but leaves ignored ones, which keep the
+# old directories alive. A skill's node_modules moves to its new home when that
+# home has none. An old directory holding anything else is reported and kept.
+migrate_leftovers() {
+  local old rel name new tracked parent
+  for old in "$REPO"/claude/skills/*/ "$REPO"/setup/*/; do
+    old="${old%/}"
+    [ -d "$old" ] || continue
+    rel="${old#"$REPO"/}"
+    # Tracked files mean the directory is in use, not left over.
+    tracked="$(git -C "$REPO" ls-files -- "$rel")" || continue
+    [ -z "$tracked" ] || continue
+    name="${old##*/}"
+    [ "$name" = status-line ] && name=claude-statusline
+    new=""
+    if [ -d "$REPO/shared/skills/$name" ]; then
+      new="$REPO/shared/skills/$name"
+    elif [ -d "$REPO/personal/$name" ]; then
+      new="$REPO/personal/$name"
+    fi
+    if [ -L "$old" ] || [ -z "$new" ]; then
+      echo "  LEFTOVER $rel — no skill of that name moved; check it and remove it by hand"
+      continue
+    fi
+    if [ -d "$old/node_modules" ] && [ ! -L "$old/node_modules" ] && [ ! -e "$new/node_modules" ]; then
+      mv "$old/node_modules" "$new/node_modules"
+      echo "  MOVED $rel/node_modules → ${new#"$REPO"/}/node_modules"
+    fi
+    if only_ignorable "$old"; then
+      rm -rf "$old"
+    else
+      echo "  LEFTOVER $rel — holds files that are not in the repo; move them, then remove it"
+    fi
+  done
+  for parent in "$REPO/claude/skills" "$REPO/setup"; do
+    [ -d "$parent" ] && [ ! -L "$parent" ] || continue
+    [ -z "$(find "$parent" -mindepth 1 -maxdepth 1 ! -name .DS_Store)" ] || continue
+    rm -f "$parent/.DS_Store"
+    rmdir "$parent"
+  done
+}
+
 echo "skillz → $CLAUDE_HOME and $CODEX_HOME"
 echo
 
@@ -90,14 +143,15 @@ echo
 mkdir -p "$CLAUDE_HOME/skills"
 
 echo "Claude:"
+# Before pruning, so a link into an old directory this removes is pruned too.
+migrate_leftovers
 # Slash commands are skills; ~/.claude/commands only holds links from when
 # this repo kept them separately.
 prune "$CLAUDE_HOME/skills"
 prune "$CLAUDE_HOME/commands"
 link "$REPO/claude/CLAUDE.md" "$CLAUDE_HOME/CLAUDE.md"
 
-# setup/ holds one-time setup skills; they install the same way.
-for d in "$REPO"/claude/skills/*/ "$REPO"/setup/*/; do
+for d in "$REPO"/shared/skills/*/ "$REPO"/personal/*/; do
   name="$(basename "$d")"
   [ -f "$d/SKILL.md" ] || continue
   link "${d%/}" "$CLAUDE_HOME/skills/$name"
@@ -121,8 +175,12 @@ echo "  $linked linked, $adopted adopted, $skipped skipped"
 
 # Keep both local daemon build commands available; each selects its own GUI.
 mkdir -p "$HOME/.local/bin"
-link "$REPO/claude/skills/om-build/scripts/hosted.sh" "$HOME/.local/bin/om-hosted"
-link "$REPO/claude/skills/om-glab/scripts/hosted.sh" "$HOME/.local/bin/om-glab"
+link "$REPO/personal/om-build/scripts/hosted.sh" "$HOME/.local/bin/om-hosted"
+link "$REPO/personal/om-glab/scripts/hosted.sh" "$HOME/.local/bin/om-glab"
+
+# A statusLine that still runs the status line skill under its old name,
+# status-line, follows it to claude-statusline. Any other is left alone.
+python3 -I "$REPO/personal/claude-statusline/scripts/install.py" --migrate
 
 # ---- Work skills (not carried by this repo; relinked when present) ---------
 #
@@ -134,7 +192,7 @@ if [ -d "$WORK_SKILLS" ]; then
     name="$(basename "$d")"
     [ -f "$d/SKILL.md" ] || continue
     # A repo-owned skill of the same name wins; don't fight over it.
-    [ -e "$REPO/claude/skills/$name" ] || [ -e "$REPO/setup/$name" ] && continue
+    [ -e "$REPO/shared/skills/$name" ] || [ -e "$REPO/personal/$name" ] && continue
     link "$WORK_SKILLS/$name" "$CLAUDE_HOME/skills/$name"
     [ -e "$REPO/codex/skills/$name" ] || link "$WORK_SKILLS/$name" "$CODEX_HOME/skills/$name"
   done

@@ -5,10 +5,10 @@ usage: python3 -I check.py
 
 Prints one line per problem and exits 1 when there is any:
   layout   each skill follows templates/skill-template.md
-  links    each Codex symlink points at the Claude or setup skill of the same name
-  readme   the README skill index and one-time setup table list every skill,
-           in order, with its SKILL.md link, the agents that have it, and
-           Agnostic set to yes or no
+  links    each Codex symlink points at the shared or personal skill of the
+           same name
+  readme   the README Shared skills and Personal skills tables list every
+           skill, in order, with its SKILL.md link and the agents that have it
   paths    each ~/.claude/skills/... or ~/.codex/skills/... path a doc or
            script names exists in this repo, or in the work skills checkout
            when that is present
@@ -25,6 +25,10 @@ WORK_SKILLS = os.environ.get(
 VENDORED = {"openmarket", "om-chat", "graphify"}
 # Vendored and deliberately left out of the README.
 UNLISTED = {"openmarket", "om-chat"}
+# Where skills live: the shared plugin's skills, then Ryan's own.
+HOMES = ("shared/skills", "personal")
+# The README table that lists the skills of each home.
+TABLES = {"## Shared skills": "shared/skills", "## Personal skills": "personal"}
 SKILL_PATH = re.compile(r"~/\.(claude|codex)/skills/([A-Za-z0-9][A-Za-z0-9_.-]*)(/[A-Za-z0-9_./-]*)?")
 
 problems = []
@@ -102,7 +106,7 @@ def check_skills(home, codex):
     for name in sorted(linked):
         rel = f"codex/skills/{name}"
         target = os.readlink(os.path.join(REPO, rel))
-        want = f"../../{home[name]}/{name}" if name in home else "a Claude or setup skill"
+        want = f"../../{home[name]}/{name}" if name in home else "a shared or personal skill"
         if target != want:
             report(rel, f"links to {target}, not {want}")
     for name, base in sorted(home.items()):
@@ -126,27 +130,30 @@ def agents(name, home, codex, linked):
 
 
 def table_rows(lines, heading):
+    """Map each skill row under heading to (link, agents)."""
     if heading not in lines:
         report("README.md", f"no {heading!r} section")
         return {}
-    rows = {}
+    rows, where = {}, heading.lstrip("# ")
     for line in lines[lines.index(heading) + 1:]:
         if line.startswith("## "):
             break
-        if m := re.match(r"\| \[`([^`]+)`\]\(([^)]+)\) \| ([^|]+) \| ([^|]+) \|", line):
-            rows[m.group(1)] = (m.group(2), m.group(3).strip(), m.group(4).strip())
+        if m := re.match(r"\| \[`([^`]+)`\]\(([^)]+)\) \| ([^|]+) \|", line):
+            cells = re.split(r"(?<!\\)\|", line.strip())[1:-1]
+            if len(cells) != 3:
+                report("README.md", f"{where} row for {m.group(1)} has {len(cells)} columns, not 3")
+            rows[m.group(1)] = (m.group(2), m.group(3).strip())
     return rows
 
 
 def check_readme(home, codex, linked):
     with open(os.path.join(REPO, "README.md")) as fh:
         lines = fh.read().splitlines()
-    setup = {n for n, base in home.items() if base == "setup"}
-    tables = {
-        "## Skill index": (set(home) | set(codex)) - setup - UNLISTED,
-        "## One-time setup": setup,
-    }
-    for heading, want in tables.items():
+    for heading, base in TABLES.items():
+        want = {n for n, b in home.items() if b == base} - UNLISTED
+        if base == "personal":
+            # A Codex-only skill has no home; it is listed with Ryan's own.
+            want |= set(codex) - set(home) - UNLISTED
         rows, where = table_rows(lines, heading), heading.lstrip("# ")
         for n in sorted(want - set(rows)):
             report("README.md", f"{where} is missing {n}")
@@ -155,20 +162,18 @@ def check_readme(home, codex, linked):
         if list(rows) != sorted(rows):
             report("README.md", f"{where} is not in alphabetical order")
         for n in sorted(want & set(rows)):
-            link, cell, agnostic = rows[n]
+            link, cell = rows[n]
             path = f"{home.get(n, 'codex/skills')}/{n}/SKILL.md"
             if link != path:
                 report("README.md", f"{n} links to {link}, not {path}")
             expected = agents(n, home, codex, linked)
             if cell != expected:
                 report("README.md", f"{n} lists agents {cell!r}, not {expected!r}")
-            if agnostic not in ("yes", "no"):
-                report("README.md", f"{n} has Agnostic {agnostic!r}, not yes or no")
 
 
 def text_files():
     yield from ("README.md", "CLAUDE.md", "claude/CLAUDE.md", "codex/AGENTS.md")
-    for base in ("claude/skills", "codex/skills", "setup"):
+    for base in (*HOMES, "codex/skills"):
         base = os.path.join(REPO, base)
         for name in sorted(os.listdir(base)):
             top = os.path.join(base, name)
@@ -203,12 +208,14 @@ def check_paths(home, codex):
 
 
 def homes():
-    """Where each Claude skill lives: claude/skills, or setup for one-time setup."""
-    home = {n: "claude/skills" for n in skills("claude/skills")}
-    for n in skills("setup"):
-        if n in home:
-            report(f"setup/{n}", "a skill of the same name is in claude/skills")
-        home[n] = "setup"
+    """Where each Claude skill lives: shared/skills or personal."""
+    home = {}
+    for base in HOMES:
+        for n in skills(base):
+            if n in home:
+                report(f"{base}/{n}", f"a skill of the same name is in {home[n]}")
+            else:
+                home[n] = base
     return home
 
 

@@ -37,7 +37,7 @@ COMMAND = re.compile(r"<command-name>/?([\w:-]+)</command-name>")
 def skill_files():
     return {
         p.parent.name: p
-        for base in ("claude/skills", "setup")
+        for base in ("shared/skills", "personal")
         for p in sorted((REPO / base).glob("*/SKILL.md"))
     }
 
