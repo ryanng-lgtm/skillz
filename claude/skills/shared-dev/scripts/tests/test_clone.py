@@ -1,3 +1,4 @@
+import contextlib
 import os
 import re
 import tempfile
@@ -66,9 +67,17 @@ def checks_pass():
             patch.object(clone, "compressed_starts", return_value=[])]
 
 
+@contextlib.contextmanager
+def no_db_or_psql():
+    """If the gate under test breaks, fail here instead of reaching dev's DB or prod."""
+    with patch("sd.scratch.connect", side_effect=AssertionError("reached dev's DB")), \
+            patch.object(clone, "_psql", side_effect=AssertionError("reached psql")):
+        yield
+
+
 class RefusalTests(unittest.TestCase):
     def test_refuses_without_go(self):
-        with self.assertRaises(clone.Refused):
+        with no_db_or_psql(), self.assertRaises(clone.Refused):
             clone.run(proposal(), go=False)
 
     def test_refuses_source_tsdb0(self):
@@ -89,7 +98,7 @@ class RefusalTests(unittest.TestCase):
             clone.probe("tsdb0-long", "SELECT 1", explicit_nodes=True)
 
     def test_existing_target_refused(self):
-        with patch.object(clone, "target_exists", return_value=True):
+        with patch.object(clone, "target_exists", return_value=True), no_db_or_psql():
             with self.assertRaises(clone.Refused):
                 clone.run(proposal(), go=True)
 
@@ -201,7 +210,7 @@ class CliTests(unittest.TestCase):
             "--batch", "60", "--target", "trade_tsdb2_20261020"]
 
     def test_run_without_go_exits(self):
-        with self.assertRaises(SystemExit) as ctx:
+        with no_db_or_psql(), self.assertRaises(SystemExit) as ctx:
             clone.main(["run", *self.ARGS])
         self.assertIn("--go", str(ctx.exception.code))
 

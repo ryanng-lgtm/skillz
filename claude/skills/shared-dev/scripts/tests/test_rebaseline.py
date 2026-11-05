@@ -1,6 +1,8 @@
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -66,8 +68,10 @@ class SafetyTests(unittest.TestCase):
         self.assertEqual(rebaseline.created_objects(sql), {"a_1m", "b", "c"})
 
     def test_apply_requires_yes(self):
-        proc = subprocess.run([sys.executable, "-I", str(Path(__file__).parents[1] / "run.py"), "rebaseline", "apply"],
-                              capture_output=True, text=True)
+        # An empty HOME: if the gate breaks, apply() stops at the missing state file instead of migrating dev's public.
+        with tempfile.TemporaryDirectory() as home:
+            proc = subprocess.run([sys.executable, "-I", str(Path(__file__).parents[1] / "run.py"), "rebaseline", "apply"],
+                                  capture_output=True, text=True, env={**os.environ, "HOME": home})
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("--yes", proc.stderr)
 
