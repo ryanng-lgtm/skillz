@@ -83,10 +83,10 @@ class ClassifyTests(unittest.TestCase):
 
     def test_plan_kinds_override_the_defaults(self):
         rules = regroup.Rules({"internal/testutil/**": "test", "schema/*.sql.go": "generated",
-                               "claude/skills/*/SKILL.md": "code"})
+                               "shared/skills/*/SKILL.md": "code"})
         self.assertEqual(rules.kind("internal/testutil/db.go"), "test")
         self.assertEqual(rules.kind("schema/q.sql.go"), "generated")
-        self.assertEqual(rules.kind("claude/skills/x/SKILL.md"), "code")
+        self.assertEqual(rules.kind("shared/skills/x/SKILL.md"), "code")
         self.assertEqual(rules.kind("go.sum"), "generated")
 
     def test_unknown_kind_in_a_plan(self):

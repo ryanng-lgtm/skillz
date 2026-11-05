@@ -10,7 +10,7 @@ contain `import.bash`, `test-runner.bash`, `tests.sh`, `opts.bash`,
 Run from the repository root:
 
 ```sh
-bash claude/skills/om-build/scripts/tests/run.sh
+bash personal/om-build/scripts/tests/run.sh
 ```
 
 Tests use dummy credentials and a Bun shim. They check automatic .env loading,
@@ -31,7 +31,7 @@ the harness temporary directory through `OM_INSTALL_ROOT`; no live service runs.
 Run the read-only watch/account/Discord comparison tests with:
 
 ```sh
-python3 -m unittest discover -s claude/skills/om-build/scripts/tests -p 'test_*.py'
+python3 -m unittest discover -s personal/om-build/scripts/tests -p 'test_*.py'
 ```
 
 Before replacing a binary, the installer records the running daemon's watch
