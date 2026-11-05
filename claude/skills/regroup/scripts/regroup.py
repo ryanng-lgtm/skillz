@@ -1,9 +1,9 @@
 """Regroup a branch's commits for review without changing its code.
 
 Usage:
-  python3 -I regroup.py stats [--base REF] [--max-lines N] [--json]
-  python3 -I regroup.py apply PLAN.json [--base REF] [--max-lines N] [--dry-run]
-  python3 -I regroup.py check [--base REF] [--max-lines N] [--against REF]
+  python3 -I regroup.py stats [--base REF] [--max-commits N] [--json]
+  python3 -I regroup.py apply PLAN.json [--base REF] [--max-commits N] [--dry-run]
+  python3 -I regroup.py check [--base REF] [--max-commits N] [--against REF]
                               [--exec CMD [--link DIR ...] [--timeout S]]
 
 Run from inside the repo. The base defaults to the merge base with origin/HEAD,
@@ -15,9 +15,9 @@ A plan is JSON: {"commits": [{"message": "...", "paths": ["a.go", "b.go@<sha>"]}
 how paths are classified (code, test, testdata, docs, generated); stats and
 check read it with --plan.
 
-The layout the rules enforce: code commits grouped by concern, each within
-the line cap, then one testdata commit, one tests commit and one docs commit,
-whatever their size.
+The layout the rules enforce: at most --max-commits commits (3 by default),
+code first, then one commit with every test, testdata and docs change. A
+branch regrouped into a single commit may mix them.
 """
 
 import argparse
@@ -32,13 +32,12 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
-MAX_LINES = 600
-MAX_COMMITS = 9
+MAX_COMMITS = 3
 MIN_TEST_LINES = 100
 EMPTY = "0" * 40
 
 KINDS = ("code", "test", "testdata", "docs", "generated")
-ORDER = {"code": 0, "generated": 0, "testdata": 1, "test": 2, "docs": 3}
+SUPPORT = {"test", "testdata", "docs"}
 TESTDATA_DIRS = {"testdata", "fixtures", "__fixtures__"}
 TESTDATA_NAMES = ["*.golden"]
 TEST_DIRS = {"test", "tests", "__tests__", "spec"}
@@ -148,61 +147,61 @@ def _files(repo, a, b, rules):
     return out
 
 
-def review(repo, base, head, max_lines, rules):
-    """Per-commit size, kind and rule problems for base..head."""
+def review(repo, base, head, rules):
+    """Per-commit size, kind and rule problems for base..head.
+
+    A commit's kind is code, generated, one of the tests-and-docs kinds or
+    several of them joined with "+", or mixed when code shares it with tests
+    or docs.
+    """
+    shas = commits(repo, base, head)
     report = []
-    for sha in commits(repo, base, head):
+    for sha in shas:
         files = _files(repo, f"{sha}^", sha, rules)
         counted_files = [f for f in files if f["kind"] not in ("generated", "testdata") and not f["binary"]]
         counted = sum(f["added"] + f["deleted"] for f in counted_files)
         excluded = sum(f["added"] + f["deleted"] for f in files if f not in counted_files)
-        kinds = {f["kind"] for f in files if f["kind"] != "generated"}
-        kind = "mixed" if len(kinds) > 1 else (kinds.pop() if kinds else "generated")
-        problems, notes = [], []
-        if kind == "mixed":
-            mixed = sorted({f["kind"] for f in files} - {"generated"})
-            problems.append(f"mixes kinds ({', '.join(mixed)}); each kind goes in its own commit")
-        code_files = [f for f in counted_files if f["kind"] == "code"]
-        code_lines = sum(f["added"] + f["deleted"] for f in code_files)
-        oversize = code_lines > max_lines and len(code_files) > 1
-        if oversize:
-            problems.append(f"{code_lines} changed lines > {max_lines}")
-        elif code_lines > max_lines:
-            notes.append(f"single file over {max_lines} changed lines ({code_lines}); cannot split by path")
+        kinds = {f["kind"] for f in files} - {"generated"}
+        if not kinds:
+            kind = "generated"
+        elif kinds <= SUPPORT or kinds == {"code"}:
+            kind = "+".join(sorted(kinds))
+        else:
+            kind = "mixed"
+        problems = []
+        if kind == "mixed" and len(shas) > 1:
+            problems.append(f"mixes code with {', '.join(sorted(kinds - {'code'}))}; "
+                            "tests, testdata and docs go in their own commit")
         report.append({"sha": sha, "subject": git(repo, "log", "-1", "--format=%s", sha).strip(),
-                       "counted": counted, "excluded": excluded, "kind": kind, "oversize": oversize,
-                       "files": files, "problems": problems, "notes": notes})
+                       "counted": counted, "excluded": excluded, "kind": kind, "files": files,
+                       "problems": problems})
     return report
 
 
-def layout_problems(report):
-    """Problems with how the kinds spread over the commits and in what order."""
+def layout_problems(report, max_commits=None):
+    """Problems with the commit count (when max_commits is given), where tests and docs go, and the order."""
     out = []
-    for kind, label in (("testdata", "testdata"), ("test", "tests"), ("docs", "docs")):
-        n = sum(1 for c in report if c["kind"] == kind)
-        if n > 1:
-            out.append(f"{label} are spread over {n} commits; they go in one")
-    highest, after = -1, None
+    if max_commits is not None and len(report) > max_commits:
+        out.append(f"{len(report)} commits > {max_commits}")
+    support = [c for c in report if c["kind"] not in ("code", "generated", "mixed")]
+    if len(support) > 1:
+        out.append(f"tests, testdata and docs are spread over {len(support)} commits; they go in one")
+    seen_support = False
     for c in report:
-        if c["kind"] == "mixed":
-            continue
-        rank = ORDER[c["kind"]]
-        if rank < highest:
-            out.append(f"{c['sha'][:8]} {c['subject']}: {c['kind']} comes after a {after} commit; "
-                       "the order is code, testdata, tests, docs")
-        elif rank > highest:
-            highest, after = rank, c["kind"]
+        if c["kind"] in ("code", "generated"):
+            if seen_support:
+                out.append(f"{c['sha'][:8]} {c['subject']}: code comes after the tests and docs commit; "
+                           "code goes first")
+        elif c["kind"] != "mixed":
+            seen_support = True
     return out
 
 
-def offer_reasons(report, files, max_lines):
-    """Why to offer /regroup: too many commits, an oversize commit, or tests to trim."""
+def offer_reasons(report, files, max_commits):
+    """Why to offer /regroup: more commits than the cap, or tests to trim."""
     reasons = []
-    if len(report) > MAX_COMMITS:
-        reasons.append(f"{len(report)} commits > {MAX_COMMITS}")
-    over = sum(1 for c in report if c["oversize"])
-    if over:
-        reasons.append(f"{over} commit{'s' if over > 1 else ''} over {max_lines} changed lines")
+    if len(report) > max_commits:
+        reasons.append(f"{len(report)} commits > {max_commits}")
     tests = sum(f["added"] for f in files if f["kind"] == "test" and not f["binary"])
     if tests >= MIN_TEST_LINES:
         reasons.append(f"tests add {tests} lines; trim them to the necessary ones")
@@ -273,7 +272,7 @@ def _problems(report):
     return [f"{c['sha'][:8]} {c['subject']}: {p}" for c in report for p in c["problems"]]
 
 
-def apply(repo, plan_path, base_ref=None, max_lines=MAX_LINES, dry_run=False):
+def apply(repo, plan_path, base_ref=None, max_commits=MAX_COMMITS, dry_run=False):
     branch = subprocess.run(["git", "symbolic-ref", "-q", "--short", "HEAD"], cwd=repo, capture_output=True,
                             text=True).stdout.strip()
     if not branch:
@@ -285,8 +284,8 @@ def apply(repo, plan_path, base_ref=None, max_lines=MAX_LINES, dry_run=False):
     base = resolve_base(repo, base_ref)
     head = git(repo, "rev-parse", "HEAD").strip()
     tip = build(repo, base, head, plan)
-    report = review(repo, base, tip, max_lines, rules)
-    problems = _problems(report) + layout_problems(report)
+    report = review(repo, base, tip, rules)
+    problems = _problems(report) + layout_problems(report, max_commits)
     if problems:
         raise Refused("the regrouped commits break the rules; the branch is unchanged:\n  " + "\n  ".join(problems))
     backup = None
@@ -328,12 +327,10 @@ def run_each(repo, shas, cmd, links, timeout):
 
 def _print_review(report):
     for c in report:
-        print(f"  {c['sha'][:8]}  {c['kind']:<9} {c['counted']:>5}  {c['subject']}"
+        print(f"  {c['sha'][:8]}  {c['kind']:<13} {c['counted']:>5}  {c['subject']}"
               + (f"  (+{c['excluded']} not counted)" if c["excluded"] else ""))
         for p in c["problems"]:
             print(f"            ! {p}")
-        for n in c["notes"]:
-            print(f"            ~ {n}")
 
 
 def main(argv):
@@ -342,7 +339,7 @@ def main(argv):
     for name in ("stats", "apply", "check"):
         p = sub.add_parser(name)
         p.add_argument("--base")
-        p.add_argument("--max-lines", type=int, default=MAX_LINES)
+        p.add_argument("--max-commits", type=int, default=MAX_COMMITS)
         if name != "apply":
             p.add_argument("--plan", help="read the plan's kinds")
         if name == "stats":
@@ -359,20 +356,20 @@ def main(argv):
     repo = git(os.getcwd(), "rev-parse", "--show-toplevel").strip()
     try:
         if args.cmd == "apply":
-            out = apply(repo, args.plan, args.base, args.max_lines, args.dry_run)
+            out = apply(repo, args.plan, args.base, args.max_commits, args.dry_run)
             print(f"{'dry run: ' if args.dry_run else ''}{out['branch']} {out['old'][:8]} -> {out['new'][:8]}"
                   + (f", backup {out['backup']}" if out["backup"] else ""))
             _print_review(out["review"])
             return 0
         rules = Rules(json.loads(Path(args.plan).read_text()).get("kinds") if args.plan else None)
         base = resolve_base(repo, args.base)
-        report = review(repo, base, "HEAD", args.max_lines, rules)
-        layout = layout_problems(report)
+        report = review(repo, base, "HEAD", rules)
+        layout = layout_problems(report, None if args.cmd == "stats" else args.max_commits)
         if args.cmd == "stats":
             branch_files = _files(repo, base, "HEAD", rules)
             files = [{"path": f["path"], "kind": f["kind"], "lines": f["added"] + f["deleted"]}
                      for f in branch_files]
-            reasons = offer_reasons(report, branch_files, args.max_lines)
+            reasons = offer_reasons(report, branch_files, args.max_commits)
             if args.json:
                 print(json.dumps({"base": base, "commits": report, "offer": reasons, "layout": layout,
                                   "files": files}, indent=2))

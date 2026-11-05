@@ -82,7 +82,7 @@ Raw Grep/Glob is still fine for trivial single-file lookups where a graph query 
 
 Commit as you go: after each coherent unit of work, stage only task-owned changes and use the commit skill to create a local checkpoint without waiting for a separate request. Run the relevant checks first, state any incomplete validation honestly, and keep commits on the task branch. Do not push without explicit authorization.
 
-During a run, commit as often as TDD needs. When a run finishes with commits on a feature branch, run `python3 -I ~/.claude/skills/regroup/scripts/regroup.py stats`; if it says to offer `/regroup` (more than 9 commits over the target, a commit with over 600 changed lines of code, or 100 or more lines of tests to trim), offer it before the branch is pushed or its MR opened. If the branch is already pushed with an open MR, say that regrouping means a force push.
+During a run, commit as often as TDD needs. When a run finishes with commits on a feature branch, run `python3 -I ~/.claude/skills/regroup/scripts/regroup.py stats`; if it says to offer `/regroup` (more than 3 commits, or 100 or more lines of tests to trim), offer it before the branch is pushed or its MR opened. If the branch is already pushed with an open MR, say that regrouping means a force push.
 
 Whenever a subagent makes a git commit, it must ALWAYS: first stage its changes (`git add`), then invoke the `/commit` skill to commit what's staged — no raw `git commit` from subagents. When dispatching any subagent that may commit, include this requirement explicitly in its prompt.
 

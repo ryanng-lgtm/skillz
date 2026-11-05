@@ -98,8 +98,8 @@ class ReviewTests(unittest.TestCase):
     def setUp(self):
         self.r = Repo(self)
 
-    def review(self, max_lines=600):
-        return regroup.review(self.r.path, self.r.base, self.r.head(), max_lines, RULES)
+    def review(self):
+        return regroup.review(self.r.path, self.r.base, self.r.head(), RULES)
 
     def test_counts_exclude_generated_and_flag_mixed_commits(self):
         self.r.commit({"calc.py": lines(10), "go.sum": lines(900)}, "deps")
@@ -107,44 +107,21 @@ class ReviewTests(unittest.TestCase):
         deps, mixed = self.review()
         self.assertEqual((deps["counted"], deps["excluded"], deps["problems"]), (10, 900, []))
         self.assertEqual(mixed["kind"], "mixed")
-        self.assertIn("mixes kinds (code, test)", mixed["problems"][0])
+        self.assertIn("mixes code with test", mixed["problems"][0])
 
-    def test_docs_with_code_is_mixed(self):
-        self.r.commit({"calc.py": lines(3), "README.md": lines(2)}, "mixed")
-        self.assertIn("mixes kinds (code, docs)", self.review()[0]["problems"][0])
+    def test_a_single_commit_may_hold_everything(self):
+        self.r.commit({"calc.py": lines(3), "tests/test_calc.py": lines(2), "README.md": lines(2)}, "squash")
+        self.assertEqual(self.review()[0]["problems"], [])
 
     def test_testdata_does_not_count(self):
         self.r.commit({"pkg/testdata/big.json": lines(900), "pkg/testdata/b.json": lines(5)}, "fixtures")
         c = self.review()[0]
         self.assertEqual((c["kind"], c["counted"], c["excluded"], c["problems"]), ("testdata", 0, 905, []))
 
-    def test_oversize_is_a_problem_unless_it_is_one_file(self):
-        self.r.commit({"a.py": lines(400), "b.py": lines(300)}, "two files")
-        self.r.commit({"big.json": lines(800)}, "one file")
-        two, one = self.review()
-        self.assertIn("700 changed lines > 600", two["problems"][0])
-        self.assertEqual(one["problems"], [])
-        self.assertIn("single file over 600", one["notes"][0])
-
     def test_linguist_generated_attribute_is_excluded(self):
         (self.r.path / ".gitattributes").write_text("data/* linguist-generated\n")
         self.r.commit({"data/rates.json": lines(700), "calc.py": lines(4)}, "data")
         self.assertEqual(self.review()[-1]["counted"], 5)
-
-    def test_only_code_commits_are_capped(self):
-        self.r.commit({"tests/test_a.py": lines(400), "tests/test_b.py": lines(300)}, "tests")
-        self.r.commit({"README.md": lines(400), "docs/x.md": lines(300)}, "docs")
-        tests, docs = self.review()
-        self.assertEqual((tests["counted"], tests["problems"], tests["oversize"]), (700, [], False))
-        self.assertEqual((docs["problems"], docs["oversize"]), ([], False))
-
-    def test_the_cap_counts_the_code_in_a_mixed_commit(self):
-        self.r.commit({"a.py": lines(400), "b.py": lines(300), "tests/test_a.py": lines(50)}, "tdd")
-        self.r.commit({"c.py": lines(500), "tests/test_c.py": lines(200)}, "tdd 2")
-        big, small = self.review()
-        self.assertTrue(big["oversize"])
-        self.assertIn("700 changed lines > 600", big["problems"][1])
-        self.assertFalse(small["oversize"])
 
     def test_deletions_count(self):
         self.r.commit({"a.py": lines(400)}, "add")
@@ -165,47 +142,37 @@ class LayoutTests(unittest.TestCase):
     def setUp(self):
         self.r = Repo(self)
 
-    def layout(self):
-        return regroup.layout_problems(regroup.review(self.r.path, self.r.base, self.r.head(), 600, RULES))
+    def layout(self, max_commits=None):
+        report = regroup.review(self.r.path, self.r.base, self.r.head(), RULES)
+        return regroup.layout_problems(report, max_commits)
 
-    def test_the_intended_layout_is_clean(self):
-        self.r.commit({"a.py": lines(3)}, "a")
-        self.r.commit({"b.py": lines(3), "go.sum": lines(9)}, "b")
-        self.r.commit({"pkg/testdata/f.json": lines(3)}, "testdata")
+    def test_refactor_change_then_tests_and_docs_is_clean(self):
+        self.r.commit({"a.py": lines(3)}, "refactor")
+        self.r.commit({"b.py": lines(3), "go.sum": lines(9)}, "feat")
+        self.r.commit({"pkg/testdata/f.json": lines(3), "tests/test_a.py": lines(3), "README.md": lines(3)},
+                      "tests and docs")
+        self.assertEqual(self.layout(max_commits=3), [])
+
+    def test_tests_and_docs_go_in_one_commit(self):
         self.r.commit({"tests/test_a.py": lines(3)}, "tests")
-        self.r.commit({"README.md": lines(3)}, "docs")
-        self.assertEqual(self.layout(), [])
+        self.r.commit({"docs/x.md": lines(3)}, "docs")
+        self.assertEqual(self.layout(), ["tests, testdata and docs are spread over 2 commits; they go in one"])
 
-    def test_tests_always_go_in_one_commit(self):
-        self.r.commit({"tests/test_a.py": lines(400)}, "t1")
-        self.r.commit({"tests/test_b.py": lines(300)}, "t2")
-        self.assertEqual(self.layout(), ["tests are spread over 2 commits; they go in one"])
-
-    def test_docs_always_go_in_one_commit(self):
-        self.r.commit({"README.md": lines(3)}, "d1")
-        self.r.commit({"docs/x.md": lines(3)}, "d2")
-        self.assertEqual(self.layout(), ["docs are spread over 2 commits; they go in one"])
-
-    def test_testdata_always_goes_in_one_commit(self):
-        self.r.commit({"pkg/testdata/a.json": lines(700)}, "f1")
-        self.r.commit({"pkg/testdata/b.json": lines(700)}, "f2")
-        self.assertEqual(self.layout(), ["testdata are spread over 2 commits; they go in one"])
-
-    def test_order_is_code_testdata_tests_docs(self):
+    def test_code_goes_before_tests_and_docs(self):
         self.r.commit({"tests/test_a.py": lines(3)}, "tests first")
         late = self.r.commit({"a.py": lines(3)}, "code late")
-        self.assertEqual(self.layout(), [f"{late[:8]} code late: code comes after a test commit; "
-                                         "the order is code, testdata, tests, docs"])
+        self.assertEqual(self.layout(), [f"{late[:8]} code late: code comes after the tests and docs commit; "
+                                         "code goes first"])
 
 
 class OfferTests(unittest.TestCase):
     def test_offer_reasons(self):
         r = Repo(self)
-        for i in range(9):
-            r.commit({f"f{i}.py": lines(3)}, f"c{i}")
+        for i in range(3):
+            r.commit({f"f{i}.py": lines(300)}, f"c{i}")
         self.assertEqual(self.reasons(r), [])
-        r.commit({"a.py": lines(400), "b.py": lines(300)}, "big")
-        self.assertEqual(self.reasons(r), ["10 commits > 9", "1 commit over 600 changed lines"])
+        r.commit({"a.py": lines(3)}, "one more")
+        self.assertEqual(self.reasons(r), ["4 commits > 3"])
 
     def test_branches_that_add_tests(self):
         r = Repo(self)
@@ -215,8 +182,8 @@ class OfferTests(unittest.TestCase):
         self.assertEqual(self.reasons(r), ["tests add 100 lines; trim them to the necessary ones"])
 
     def reasons(self, r):
-        report = regroup.review(r.path, r.base, r.head(), 600, RULES)
-        return regroup.offer_reasons(report, regroup._files(r.path, r.base, r.head(), RULES), 600)
+        report = regroup.review(r.path, r.base, r.head(), RULES)
+        return regroup.offer_reasons(report, regroup._files(r.path, r.base, r.head(), RULES), regroup.MAX_COMMITS)
 
 
 class BuildTests(unittest.TestCase):
@@ -291,8 +258,8 @@ class ApplyTests(unittest.TestCase):
     def write_plan(self, commits):
         self.plan.write_text(json.dumps({"commits": commits}))
 
-    def apply(self, dry_run=False):
-        return regroup.apply(self.r.path, self.plan, base_ref="main", max_lines=600, dry_run=dry_run)
+    def apply(self, dry_run=False, max_commits=3):
+        return regroup.apply(self.r.path, self.plan, base_ref="main", max_commits=max_commits, dry_run=dry_run)
 
     def test_moves_the_branch_and_keeps_a_backup(self):
         out = self.apply()
@@ -319,9 +286,8 @@ class ApplyTests(unittest.TestCase):
             self.apply()
 
     def test_problems_keep_the_branch_where_it_was(self):
-        self.write_plan([{"message": "feat: a with tests", "paths": ["a.py", "tests/test_a.py"]}])
-        with self.assertRaisesRegex(regroup.Refused, "mixes kinds"):
-            self.apply()
+        with self.assertRaisesRegex(regroup.Refused, "2 commits > 1"):
+            self.apply(max_commits=1)
         self.assertEqual(self.r.head(), self.head)
         self.assertEqual(sh(self.r.path, "for-each-ref", "refs/regroup"), "")
 

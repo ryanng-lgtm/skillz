@@ -22,7 +22,7 @@ Agnostic is `yes` when a skill's job works in any codebase, so it can be [export
 | [`om-glab`](claude/skills/om-glab/SKILL.md) | Claude, Codex | no | Builds and installs the local daemon with the GitLab chat GUI instead of `om-build`'s GitHub default. |
 | [`panos`](claude/skills/panos/SKILL.md) | Claude | no | Reviews landed MRs the way Panos would, verifies every finding, and fixes and pushes the real ones. |
 | [`prompt-ready`](claude/skills/prompt-ready/SKILL.md) | Claude, Codex | yes | Turns raw requests into self-contained, copy-paste-ready prompts for another session. |
-| [`regroup`](claude/skills/regroup/SKILL.md) | Claude | yes | Trims a branch's tests to the necessary ones and rewrites its commits for review, leaving the code byte-identical. |
+| [`regroup`](claude/skills/regroup/SKILL.md) | Claude | yes | Trims a branch's tests to the necessary ones and rewrites its commits into three for review (refactor, change, tests and docs), leaving the code byte-identical. |
 | [`shared-dev`](claude/skills/shared-dev/SKILL.md) | Claude | no | Brings up the backend services a change needs in shared-dev, probes main against the branch with real data, and tears down. |
 | [`socratic-teacher`](claude/skills/socratic-teacher/SKILL.md) | Claude, Codex | yes | Teaching mode: one guiding question per turn, never the full solution. |
 | [`summary`](claude/skills/summary/SKILL.md) | Claude, Codex | yes | Ends a run or long session with the repos touched, their merge order and what is left for the user, every state read live. |

@@ -2,8 +2,8 @@
 name: regroup
 description: >-
   Use when a branch's commits or tests need cleaning up for review: TDD-style
-  commit noise, near-duplicate tests, or commits that mix tests and code or
-  are too big to review. Trigger: /regroup [--base REF].
+  commit noise, near-duplicate tests, or commits that mix tests and code.
+  Trigger: /regroup [N] [--base REF].
 disable-model-invocation: true
 ---
 
@@ -13,8 +13,10 @@ disable-model-invocation: true
 
 The reviewer reads the MR commit by commit, and CI runs every test the MR
 adds on every pipeline after it. `/regroup` trims the tests the branch adds
-to the absolutely necessary ones, then rewrites `base..HEAD` into commits
-that each make one step of the change, in reading order.
+to the absolutely necessary ones, then rewrites `base..HEAD` into at most
+three commits in reading order: the refactor, the change, then its tests and
+docs. `/regroup N` allows up to N instead; pass `--max-commits N` to every
+script call below when it does.
 
 **Core principle: only tests and testdata change; the script proves everything else at the tip unchanged.**
 
@@ -43,9 +45,8 @@ python3 -I $R stats          # prints the base it used
 git diff <base>..HEAD
 ```
 
-`stats` lists each commit's counted lines, kind (code, test, testdata,
-docs, generated, or mixed) and problems, then the layout problems, then
-every file the branch changes with its kind. Read what each commit does
+`stats` lists each commit's counted lines, kinds and problems, then the
+layout problems, then every file the branch changes with its kind. Read what each commit does
 from its diff: old messages like `wip fix rounding` are often wrong.
 
 ## 2. Trim the tests
@@ -102,34 +103,35 @@ Run the suite, then commit the trim on the branch with `/commit` before
 planning. The plan takes test files at the tip, so the trim folds into the
 one tests commit and `apply`'s tree check covers it.
 
-If `stats` showed no problems, the code commits each make one step and the
-trim removed nothing, say so and stop.
+If `stats` offered nothing, showed no problems, and the trim removed
+nothing, say so and stop.
 
 ## 3. Plan
 
-The layout, in this order:
+At most three commits, or N, in this order:
 
-1. **Code**, grouped by concern in reading order: schema, migrations, types
-   and refactors the change builds on first; then core logic; then its
-   callers, wiring and config. Lockfiles, vendored and generated files go
-   with the change that produced them (`go.sum` with `go.mod`) and don't
-   count toward the cap. One that no change on the branch produced gets
-   its own `chore:` commit among the code commits.
-2. **All testdata in one commit**: fixtures and golden files.
-3. **All tests in one commit**, helpers included.
-4. **All docs in one commit**.
+1. **The refactor**, when there is one: changes that keep behavior and that
+   the change builds on, such as renames, moves and extracted helpers.
+2. **The change**: the rest of the code, as `feat:` or `fix:`. Lockfiles,
+   vendored and generated files go in with it.
+3. **Tests and docs**: every test, helper, testdata file and doc in one
+   commit.
 
-Only code commits have a cap: 600 changed lines (added plus deleted).
-Testdata, tests and docs stay one commit each, whatever their size. Code
-over 600 splits by file, or by a file's version at an existing commit of
-the branch (`path@<sha>`). A single file over 600 that no existing commit
-splits stays whole: never write a partial version that never existed.
+A branch with no refactor, or no tests or docs, gets fewer commits. An N
+above three splits the change by concern in reading order: schema,
+migrations and types first; then core logic; then callers, wiring and
+config. `/regroup 1` puts everything in one commit.
+
+A file goes into an earlier commit only at a version an existing commit of
+the branch has (`path@<sha>`); never write a partial version that never
+existed. A file whose refactor no existing commit separates from the change
+goes whole into the change.
 
 When the defaults misclassify a path (a test helper package, `SKILL.md` as
 code in a skills repo), map it in the plan's `kinds` (fnmatch; `*` crosses
 `/`) and pass `--plan` to `stats` and `check`. `kinds` fixes
 misclassification only: a data file outside the test directories is code,
-and no path is remapped to get under the cap.
+and no path is remapped to move it to another commit.
 
 Messages follow the `/commit` rules: one summary line in the repo's style,
 at most 3 bullets, no AI trailer.
@@ -139,10 +141,9 @@ Write the plan to the scratchpad:
 ```json
 {
   "commits": [
-    {"message": "feat(rates): look up rates by currency", "paths": ["calc/rates.py@046056b"]},
-    {"message": "feat(rates): cache lookups", "paths": ["calc/rates.py"]},
-    {"message": "test(rates): cover lookup and cache", "paths": ["tests/test_rates.py", "internal/testutil/db.go"]},
-    {"message": "docs: describe rate lookup", "paths": ["README.md"]}
+    {"message": "refactor(rates): pull the lookup into its own function", "paths": ["calc/rates.py@046056b"]},
+    {"message": "feat(rates): cache lookups", "paths": ["calc/rates.py", "calc/cache.py"]},
+    {"message": "test(rates): cover the cache and document it", "paths": ["tests/test_rates.py", "internal/testutil/db.go", "README.md"]}
   ],
   "kinds": {"internal/testutil/**": "test"}
 }
@@ -154,14 +155,15 @@ at its tip version.
 ## 4. Apply
 
 ```bash
-python3 -I $R apply plan.json --dry-run      # until no "!" lines; "~" lines are notes
+python3 -I $R apply plan.json --dry-run      # until no "!" lines
 python3 -I $R apply plan.json
 ```
 
 `apply` builds the commits off to the side and refuses when a changed file
-is missing from the plan, the tip's tree differs from the branch, a commit
-mixes kinds or has over 600 lines of code across several files, or the
-layout is off (order; testdata, tests or docs spread over several commits).
+is missing from the plan, the tip's tree differs from the branch, the plan
+has more commits than the cap, a commit mixes code with tests or docs (unless
+it is the only one), or the layout is off (code after the tests and docs;
+tests or docs spread over several commits).
 Only then does it save the old tip as `refs/regroup/<branch>/<UTC time>`
 and move the branch.
 
@@ -219,7 +221,7 @@ Delete them with `git update-ref -d <ref>` once the MR has merged.
   value's function "has the same shape".**
 - **Trimming tests that were already on the base.**
 - **Trimming after `apply`**, so the tests land in a second tests commit.
-- **Making up a halfway version of one big file to get under 600 lines.**
+- **Making up a halfway version of a file to split the refactor from the change.**
 - **Running the test suite at every commit, then moving tests back into a
   code commit to make an intermediate commit pass.**
 - **Rewriting by hand with `reset` and `add`, without proving the tree
