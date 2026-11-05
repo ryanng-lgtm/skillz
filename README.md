@@ -151,6 +151,7 @@ My own skills: tied to my work, services or machines, or vendored from another t
 | --- | --- | --- |
 | [`bump-rc`](personal/bump-rc/SKILL.md) | Claude, Codex | Releases `@openmarket/rooms-client`, choosing the version bump from what changed, and repins both GUI consumers. |
 | [`claude-statusline`](personal/claude-statusline/SKILL.md) | Claude | Sets the Claude Code status line (model, folder, branch, context, usage limits, effort), changing only `statusLine` in `settings.json`. |
+| [`desloppify`](personal/desloppify/SKILL.md) | Claude, Codex (own copy) | Scores a codebase's health with the `desloppify` CLI and works through the cleanup plan it builds: scan, plan, fix, rescan. Vendored from [desloppify](https://github.com/peteromallet/desloppify). |
 | [`graphify`](personal/graphify/SKILL.md) | Claude, Codex (own copy) | Turns code, docs, papers, images or video into a knowledge graph to query instead of grepping. |
 | [`loop-me-in`](personal/loop-me-in/SKILL.md) | Claude, Codex (own copy) | Turns an approved plan into a brief a fresh session can run unattended and prove its own changes landed. |
 | [`om-build`](personal/om-build/SKILL.md) | Claude, Codex | Builds an OM Chat GUI from source (the daemon's `/rooms` GUI, the hosted `/chat/` fork, or the OpenFloor iOS app) and swaps it onto the live install or the simulator. |

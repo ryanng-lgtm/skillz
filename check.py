@@ -26,7 +26,7 @@ WORK_SKILLS = os.environ.get(
     "WORK_SKILLS_DIR", os.path.expanduser("~/repos/llm/skills")
 )
 # Shipped by other tools and synced in as-is, so they keep their own layout.
-VENDORED = {"openmarket", "om-chat", "graphify"}
+VENDORED = {"openmarket", "om-chat", "graphify", "desloppify"}
 # Vendored and deliberately left out of the README.
 UNLISTED = {"openmarket", "om-chat"}
 # Where skills live: the shared plugin's skills, then Ryan's own.
