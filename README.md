@@ -156,6 +156,7 @@ My own skills: tied to my work, services or machines, or vendored from another t
 | [`loop-me-in`](personal/loop-me-in/SKILL.md) | Claude, Codex (own copy) | Turns an approved plan into a brief a fresh session can run unattended and prove its own changes landed. |
 | [`om-build`](personal/om-build/SKILL.md) | Claude, Codex | Builds an OM Chat GUI from source (the daemon's `/rooms` GUI, the hosted `/chat/` fork, or the OpenFloor iOS app) and swaps it onto the live install or the simulator. |
 | [`om-glab`](personal/om-glab/SKILL.md) | Claude, Codex | Builds and installs the local daemon with the GitLab chat GUI instead of `om-build`'s GitHub default. |
+| [`om-mrs`](personal/om-mrs/SKILL.md) | Claude, Codex | Posts a piece of work's MRs and merge order to OM Chat, as a draft in `#draft-replies` or in the work's topic, always in the same format. |
 | [`panos`](personal/panos/SKILL.md) | Claude | Reviews landed MRs the way Panos would, verifies every finding, and fixes and pushes the real ones. |
 | [`shared-dev`](personal/shared-dev/SKILL.md) | Claude | Brings up the backend services a change needs in shared-dev, probes main against the branch with real data, and tears down. |
 | [`syncup`](personal/syncup/SKILL.md) | Claude, Codex | Rebases the working branch and every behind MR or PR onto its target, resolving conflicts and keeping uncommitted work. |

@@ -88,7 +88,7 @@ Whenever a subagent makes a git commit, it must ALWAYS: first stage its changes 
 
 ## Messages for other people — all projects
 
-Any message or comment written for other people to read (an OM Chat room or DM post, a reply I'll send, a Discord message, a GitLab or GitHub comment) goes through the `humanize` skill before you show it to me or post it, without my asking. That strips the jargon and AI prose and puts it in my voice. MR descriptions and commit messages are the exception: `mr-markdown` and `commit` cover them.
+Any message or comment written for other people to read (an OM Chat room or DM post, a reply I'll send, a Discord message, a GitLab or GitHub comment) goes through the `humanize` skill before you show it to me or post it, without my asking. That strips the jargon and AI prose and puts it in my voice. MR descriptions, commit messages and MR merge-order posts are the exception: `mr-markdown`, `commit` and `om-mrs` cover them.
 
 ## Skill settings
 
