@@ -79,10 +79,14 @@ def service(venue, symbols, seconds, streamd_bin, config_path):
 def writer_tables(needed_types):
     """Tables tsdb-write fills for streamd's needed types; the run copies them empty first.
 
+    kafka_offsets is always one: the writer records its consumer offsets there
+    in the same transaction as the rows. Empty is right, since the run's topics
+    are under its own prefix and no prod offset applies to them.
+
     The guard role is the backstop: a write to a table not copied fails loudly
     in tsdb-write's log, and the skill copies it and captures again.
     """
-    return [t.lower() for t in needed_types]
+    return [t.lower() for t in needed_types] + ["kafka_offsets"]
 
 
 def plan_capture(venue, symbols, seconds, streamd_bin, prefix, run_dir, **kw):

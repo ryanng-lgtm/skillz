@@ -70,8 +70,9 @@ class CaptureTests(unittest.TestCase):
             with self.assertRaises(KeyError):
                 capture.venue_block("kraken", pb)
 
-    def test_writer_tables_for_trade(self):
-        self.assertEqual(capture.writer_tables(["trade", "book_change"]), ["trade", "book_change"])
+    def test_writer_tables_include_kafka_offsets(self):
+        # tsdb-write records its offsets in kafka_offsets in the same transaction as the rows.
+        self.assertEqual(capture.writer_tables(["trade", "book_change"]), ["trade", "book_change", "kafka_offsets"])
 
 
 if __name__ == "__main__":
