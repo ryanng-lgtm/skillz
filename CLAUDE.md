@@ -34,7 +34,7 @@ On a rename or removal, also update every mention of the old name in `claude/CLA
 
 ## Editing docs
 
-`README.md`, this file, and skill bodies describe the present state, not the history of how they got there. The README is for developers installing the plugin first; Ryan's own setup comes after. Use the `writing-instructions` skill, when it is installed, for skill bodies and instruction files.
+`README.md`, this file, and skill bodies describe the present state, not the history of how they got there. The README opens with the two install paths, the plugin first and Ryan's machines second, short enough to take in at a glance; their details, the skill tables and the rest come after. Use the `writing-instructions` skill, when it is installed, for skill bodies and instruction files.
 
 ## Sync
 

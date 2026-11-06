@@ -1,10 +1,76 @@
 # skillz
 
-Skills for Claude Code and Codex that work in any codebase: commit messages and MR descriptions, plan cleanup, issue investigation, unattended dev loops, branch syncing, test audits and a few more. They install as one plugin, `skillz`. It doesn't pick up my changes by itself: Claude Code gets them once you turn on auto-update for the marketplace, which is off by default, and Codex when you upgrade it by hand. [Install](#install) has the steps.
-
-A few skills here are my own, tied to my work or my machines. They stay out of the plugin and are listed under [Ryan's machines](#ryans-machines).
+Skills for Claude Code and Codex that work in any codebase: commit messages and MR descriptions, plan cleanup, issue investigation, unattended dev loops, branch syncing, test audits and a few more. They install as one plugin, `skillz`. A few more are my own, tied to my work or my machines; they stay out of the plugin and are listed under [Personal skills](#personal-skills).
 
 ## Install
+
+### The plugin
+
+Claude Code:
+
+```bash
+claude plugin marketplace add ryanng-lgtm/skillz
+claude plugin install skillz@skillz
+```
+
+Codex:
+
+```bash
+codex plugin marketplace add ryanng-lgtm/skillz
+codex plugin add skillz@skillz
+```
+
+Claude Desktop and claude.ai: Customize > Plugins > Add > Add marketplace, with `https://github.com/ryanng-lgtm/skillz`.
+
+Then add whichever [skill settings](#skill-settings) you need. The plugin doesn't pick up my changes by itself; [Updates](#updates) has how to get them. Or paste [the install prompt](#let-your-agent-install-it) into Claude Code or Codex and let it do all of this.
+
+### The repo, on my machines
+
+```bash
+git clone git@github.com:ryanng-lgtm/skillz.git ~/Documents/github/skillz
+cd ~/Documents/github/skillz
+./install.sh
+```
+
+This links every skill, shared and personal, and my global instructions, and turns on the sync hooks. It's for my machines only: with the plugin you don't need it. [Ryan's machines](#ryans-machines) has the details.
+
+## Skill settings
+
+Some skills need something only you know, like where your plans go. They read it from a `## Skill settings` section in your global instructions: `~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex. Each setting is one `- <Key>: <value>` line, and values can have spaces. When a skill needs a setting you haven't added, it asks once and offers to add the line. It never falls back to a default of mine.
+
+| Setting | What it is | Used by | Without it |
+| --- | --- | --- | --- |
+| `Voice file` | A markdown profile of how you write. humanize's [voice template](shared/skills/humanize/references/voice-template.md) builds one from your own writing | humanize, mr-markdown | humanize asks for one when you run it yourself; otherwise it strips the AI tells and writes plainly |
+| `Plans folder` | Where plans, briefs and their evidence go, in a dated subfolder per day | ivtg, dev-loop | asks where |
+| `Prompts folder` | Where each finished prompt is saved, in a dated subfolder per day | prompt-ready | prints the prompt and saves nothing |
+| `Repo folders` | Comma-separated folders whose direct children are your clones | repo-sync | works on the current repo and the ones this session touched, and asks before scanning wider |
+| `Repo stacks` | Named groups of repos that ship together: `<stack>: <repo>, <repo>; <stack>: …` | repo-sync | no stacks |
+| `Dev-loop reports` | Where an unattended run posts its final report: a chat channel the session can post to, an issue or MR thread, or a file | dev-loop | asks; with no answer, the findings log beside the brief is the report |
+
+For example:
+
+```markdown
+## Skill settings
+
+- Voice file: ~/notes/voice.md
+- Plans folder: ~/notes/plans
+- Prompts folder: ~/notes/prompts
+- Repo folders: ~/code, ~/work repos
+- Repo stacks: web: frontend, api, shared-ui; data: ingest, warehouse
+- Dev-loop reports: the #dev-runs Slack channel
+```
+
+## More on installing
+
+### Updates
+
+Auto-update is off by default for a marketplace you add yourself. To turn it on in Claude Code, run `/plugin` in a session, open the Marketplaces tab, select skillz and select Enable auto-update. Claude Code then updates the plugin after each session starts, and the next session loads the new version. `claude plugin update skillz@skillz` updates it once, by hand.
+
+Codex doesn't update plugins for you. Run `codex plugin marketplace upgrade skillz` and then the `codex plugin add` line again whenever you want the latest.
+
+In Claude Desktop and claude.ai, select Check for updates on the marketplace, or turn on Sync automatically.
+
+### Let your agent install it
 
 Paste this into Claude Code or Codex and let it do the work:
 
@@ -31,29 +97,9 @@ Install the skillz plugin from https://github.com/ryanng-lgtm/skillz for me.
    how to run each one. In Claude Code, plugin skills run as /skillz:<name>.
 ```
 
-Or by hand. Claude Code:
+### Upload a zip instead
 
-```bash
-claude plugin marketplace add ryanng-lgtm/skillz
-claude plugin install skillz@skillz
-```
-
-Auto-update is off by default for a marketplace you add yourself. To turn it on, run `/plugin` in a session, open the Marketplaces tab, select skillz and select Enable auto-update. Claude Code then updates the plugin after each session starts, and the next session loads the new version. `claude plugin update skillz@skillz` updates it once, by hand.
-
-Codex:
-
-```bash
-codex plugin marketplace add ryanng-lgtm/skillz
-codex plugin add skillz@skillz
-```
-
-Codex doesn't update plugins for you. Run `codex plugin marketplace upgrade skillz` and then the `codex plugin add` line again whenever you want the latest.
-
-Then add whichever [skill settings](#skill-settings) you need.
-
-### Claude Desktop and claude.ai
-
-Add the repo as a marketplace at Customize > Plugins > Add > Add marketplace, with `https://github.com/ryanng-lgtm/skillz`. To get my changes, select Check for updates on it, or turn on Sync automatically. On Team and Enterprise plans an Owner decides whether members can add their own marketplaces. If you can't, build the plugin as a zip and upload it at Customize > Plugins > Add > Upload plugin:
+On Team and Enterprise plans an Owner decides whether members can add their own marketplaces in Claude Desktop and claude.ai. If you can't, build the plugin as a zip and upload it at Customize > Plugins > Add > Upload plugin:
 
 ```bash
 git clone https://github.com/ryanng-lgtm/skillz.git
@@ -92,32 +138,6 @@ Codex gets all of them, but the ones marked Claude are written for Claude Code.
 `socratic-teacher`, `docs-knowledge-base` and the skill template are adapted from [wooneusean/skills](https://github.com/wooneusean/skills).
 
 The shared plugin is MIT-licensed ([`shared/LICENSE`](shared/LICENSE)). The personal and vendored skills are not licensed for reuse.
-
-## Skill settings
-
-Some skills need something only you know, like where your plans go. They read it from a `## Skill settings` section in your global instructions: `~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex. Each setting is one `- <Key>: <value>` line, and values can have spaces. When a skill needs a setting you haven't added, it asks once and offers to add the line. It never falls back to a default of mine.
-
-| Setting | What it is | Used by | Without it |
-| --- | --- | --- | --- |
-| `Voice file` | A markdown profile of how you write. humanize's [voice template](shared/skills/humanize/references/voice-template.md) builds one from your own writing | humanize, mr-markdown | humanize asks for one when you run it yourself; otherwise it strips the AI tells and writes plainly |
-| `Plans folder` | Where plans, briefs and their evidence go, in a dated subfolder per day | ivtg, dev-loop | asks where |
-| `Prompts folder` | Where each finished prompt is saved, in a dated subfolder per day | prompt-ready | prints the prompt and saves nothing |
-| `Repo folders` | Comma-separated folders whose direct children are your clones | repo-sync | works on the current repo and the ones this session touched, and asks before scanning wider |
-| `Repo stacks` | Named groups of repos that ship together: `<stack>: <repo>, <repo>; <stack>: …` | repo-sync | no stacks |
-| `Dev-loop reports` | Where an unattended run posts its final report: a chat channel the session can post to, an issue or MR thread, or a file | dev-loop | asks; with no answer, the findings log beside the brief is the report |
-
-For example:
-
-```markdown
-## Skill settings
-
-- Voice file: ~/notes/voice.md
-- Plans folder: ~/notes/plans
-- Prompts folder: ~/notes/prompts
-- Repo folders: ~/code, ~/work repos
-- Repo stacks: web: frontend, api, shared-ui; data: ingest, warehouse
-- Dev-loop reports: the #dev-runs Slack channel
-```
 
 ## Ryan's machines
 
