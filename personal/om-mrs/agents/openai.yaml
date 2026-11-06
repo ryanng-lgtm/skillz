@@ -1,4 +1,0 @@
-interface:
-  display_name: "OM MRs"
-  short_description: "Post a work's MRs and merge order to OM Chat in one format"
-  default_prompt: "Use $om-mrs to draft the MRs and merge order for this work in OM Chat."

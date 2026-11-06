@@ -1,0 +1,4 @@
+interface:
+  display_name: "MR ready"
+  short_description: "Post a work's TLDR, MR links and merge order to OM Chat"
+  default_prompt: "Use $mr-ready to draft the TLDR, MRs and merge order for this work in OM Chat."
