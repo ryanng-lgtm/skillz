@@ -104,6 +104,6 @@ Skills from the skillz repo read their settings from this list, one `- <Key>: <v
 
 ## My skills
 
-My skills live in the skillz repo (`~/Documents/github/skillz`), linked into `~/.codex/skills`: the shared ones, which other devs install as the `skillz` plugin, and my personal ones. Its README lists both. When I mention one as `$name`, or type its slash trigger (`/name`) out of Claude habit, read and follow `~/.codex/skills/<name>/SKILL.md` before doing anything else.
+My skills live in the skillz repo (`~/Documents/github/skillz`), linked into `~/.codex/skills`: the shared ones, which other devs install as the `skillz` plugin, and my personal ones. Its README lists the shared ones, and `personal/README.md` the personal ones. When I mention one as `$name`, or type its slash trigger (`/name`) out of Claude habit, read and follow `~/.codex/skills/<name>/SKILL.md` before doing anything else.
 
 Skills written for Claude Code may name Claude tools (`AskUserQuestion`, `Agent`, `SendMessage`, `Skill`). Map them to the Codex equivalent — ask in chat, spawn a subagent or run the role inline, message the agent or re-spawn it, read the SKILL.md — and keep going; never stop because a tool name doesn't match.

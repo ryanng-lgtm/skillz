@@ -1,6 +1,6 @@
 # skillz
 
-Skills for Claude Code and Codex that work in any codebase: commit messages and MR descriptions, plan cleanup, issue investigation, unattended dev loops, branch syncing, test audits and a few more. They install as one plugin, `skillz`. A few more are my own, tied to my work or my machines; they stay out of the plugin and are listed under [Personal skills](#personal-skills).
+Skills for Claude Code and Codex that work in any codebase: commit messages and MR descriptions, plan cleanup, issue investigation, unattended dev loops, branch syncing, test audits and a few more. They install as one plugin, `skillz`. A few more are my own, tied to my work or my machines; they stay out of the plugin and are listed in [personal/README.md](personal/README.md).
 
 ## Install
 
@@ -32,7 +32,7 @@ cd ~/Documents/github/skillz
 ./install.sh
 ```
 
-This links every skill, shared and personal, and my global instructions, and turns on the sync hooks. It's for my machines only: with the plugin you don't need it. [Ryan's machines](#ryans-machines) has the details.
+This links every skill, shared and personal, and my global instructions, and turns on the sync hooks. It's for my machines only: with the plugin you don't need it. [personal/README.md](personal/README.md) has what it sets up.
 
 ## Skill settings
 
@@ -138,53 +138,6 @@ Codex gets all of them, but the ones marked Claude are written for Claude Code.
 `socratic-teacher`, `docs-knowledge-base` and the skill template are adapted from [wooneusean/skills](https://github.com/wooneusean/skills).
 
 The shared plugin is MIT-licensed ([`shared/LICENSE`](shared/LICENSE)). The personal and vendored skills are not licensed for reuse.
-
-## Ryan's machines
-
-The rest is my own setup. On a new machine:
-
-```bash
-git clone git@github.com:ryanng-lgtm/skillz.git ~/Documents/github/skillz
-cd ~/Documents/github/skillz
-./install.sh
-```
-
-`install.sh` links:
-
-- every skill in `shared/skills/` and `personal/` into `~/.claude/skills/`, and the ones in `codex/skills/` into `~/.codex/skills/`
-- `claude/CLAUDE.md` and `codex/AGENTS.md` to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`
-- `~/.claude/plans` and `~/.codex/plans` to the iCloud Obsidian folder `Claude Plans` (`PLANS_VAULT_DIR` overrides it)
-- `om-hosted` and `om-glab` into `~/.local/bin`
-- the work skills in `~/repos/llm/skills`, when that checkout is there
-
-It also registers the sync hooks and installs the caveman plugin for Codex ([yibie/caveman-codex](https://github.com/yibie/caveman-codex); only `$caveman` works from it). It doesn't install the skillz plugin, since the links already cover every skill. Re-running it is safe; `./install.sh --help` lists the flags.
-
-Two Claude Code hooks keep the machines in step. At the end of every turn `sync.sh` commits whatever is in the repo, rebases and pushes; at session start it pulls and relinks. So anything left in the working tree when a turn ends goes out. [`CLAUDE.md`](CLAUDE.md#sync) covers pausing it, failed checks and conflicts.
-
-Not in the repo: `settings.json`, `config.toml` and credentials, the work skills (they have their own remote), and sessions, logs and caches.
-
-## Personal skills
-
-My own skills: tied to my work, services or machines, or vendored from another tool. They live in `personal/` and aren't in the plugin.
-
-| Skill | Agents | What it does |
-| --- | --- | --- |
-| [`bump-rc`](personal/bump-rc/SKILL.md) | Claude, Codex | Releases `@openmarket/rooms-client`, choosing the version bump from what changed, and repins both GUI consumers. |
-| [`claude-statusline`](personal/claude-statusline/SKILL.md) | Claude | Sets the Claude Code status line (model, folder, branch, context, usage limits, effort), changing only `statusLine` in `settings.json`. |
-| [`desloppify`](personal/desloppify/SKILL.md) | Claude, Codex (own copy) | Scores a codebase's health with the `desloppify` CLI and works through the cleanup plan it builds: scan, plan, fix, rescan. Vendored from [desloppify](https://github.com/peteromallet/desloppify). |
-| [`graphify`](personal/graphify/SKILL.md) | Claude, Codex (own copy) | Turns code, docs, papers, images or video into a knowledge graph to query instead of grepping. |
-| [`loop-me-in`](personal/loop-me-in/SKILL.md) | Claude, Codex (own copy) | Turns an approved plan into a brief a fresh session can run unattended and prove its own changes landed. |
-| [`mr-ready`](personal/mr-ready/SKILL.md) | Claude, Codex | Posts a piece of work's MRs to OM Chat in one fixed format, as a draft in `#draft-replies` or in the work's topic: a short TLDR of the problem, the fix and how it was verified, then the MR links and merge order. |
-| [`om-build`](personal/om-build/SKILL.md) | Claude, Codex | Builds an OM Chat GUI from source (the daemon's `/rooms` GUI, the hosted `/chat/` fork, or the OpenFloor iOS app) and swaps it onto the live install or the simulator. |
-| [`om-glab`](personal/om-glab/SKILL.md) | Claude, Codex | Builds and installs the local daemon with the GitLab chat GUI instead of `om-build`'s GitHub default. |
-| [`panos`](personal/panos/SKILL.md) | Claude | Reviews landed MRs the way Panos would, verifies every finding, and fixes and pushes the real ones. |
-| [`shared-dev`](personal/shared-dev/SKILL.md) | Claude | Brings up the backend services a change needs in shared-dev, probes main against the branch with real data, and tears down. |
-| [`syncup`](personal/syncup/SKILL.md) | Claude, Codex | Rebases the working branch and every behind MR or PR onto its target, resolving conflicts and keeping uncommitted work. |
-| [`testing-harness`](personal/testing-harness/SKILL.md) | Claude, Codex | Proves a change in the running OM Chat GUI with cloud-versus-local visual diffs and browser probes. |
-| [`war-diary`](personal/war-diary/SKILL.md) | Claude, Codex | Turns a day's GitLab activity and Claude Code sessions into War Diaries notes and Kanban cards. |
-| [`world-todo`](personal/world-todo/SKILL.md) | Claude, Codex | Plans every OM World service change before implementation, however small. |
-
-`openmarket` and `om-chat` ship with the `om` CLI and are vendored here so both agents get the same copy; they are not listed.
 
 ## Changing this repo
 

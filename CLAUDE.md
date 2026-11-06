@@ -28,13 +28,13 @@ The repo is public and every plugin user gets all of `shared/`. A shared skill h
 1. Pick the folder: `shared/skills/` when the skill works for anyone with only Skill settings to fill in, `personal/` otherwise.
 2. Write it from the template. For a skill only the user should start, such as a one-time setup or one with side effects, set `disable-model-invocation: true` in the frontmatter and add the `agents/openai.yaml` policy the template shows, which is Codex's equivalent.
 3. If it works the same under Codex, add its `codex/skills/` link.
-4. Add its row to the `README.md` Shared skills or Personal skills table in the same change. Those tables are the only full list; a skill missing from them is invisible. The vendored `openmarket` and `om-chat` are the one exception. `export.py` zips `shared/` for Claude Desktop.
+4. Add its row to the Shared skills table in `README.md` or the Personal skills table in `personal/README.md`, in the same change. Those tables are the only full list; a skill missing from them is invisible. The vendored `openmarket` and `om-chat` are the one exception. `export.py` zips `shared/` for Claude Desktop.
 
 On a rename or removal, also update every mention of the old name in `claude/CLAUDE.md`, `codex/AGENTS.md`, and other skills, and remove the Codex symlink if there is one. `install.sh` drops the dead links it leaves under `~/.claude` and `~/.codex`.
 
 ## Editing docs
 
-`README.md`, this file, and skill bodies describe the present state, not the history of how they got there. The README opens with the two install paths, the plugin first and Ryan's machines second, short enough to take in at a glance; their details, the skill tables and the rest come after. Use the `writing-instructions` skill, when it is installed, for skill bodies and instruction files.
+`README.md`, this file, and skill bodies describe the present state, not the history of how they got there. The README opens with the two install paths, the plugin first and Ryan's machines second, short enough to take in at a glance; the plugin's details and the Shared skills table come after. What install.sh sets up and the Personal skills table are in `personal/README.md`. Use the `writing-instructions` skill, when it is installed, for skill bodies and instruction files.
 
 ## Sync
 
@@ -48,7 +48,7 @@ A Claude Code `Stop` hook runs `sync.sh` at the end of every turn. It stages eve
 
 ## Verifying a change
 
-- After changing a skill, `README.md`, or a global instruction file, run `python3 -I check.py`. It checks every skill against the template, the Codex symlinks, the README Shared skills and Personal skills tables, the `~/.claude/skills/...` paths that docs and scripts name, the plugin manifests, and `shared/` for personal markers and symlinks. It must print no problems.
+- After changing a skill, `README.md`, or a global instruction file, run `python3 -I check.py`. It checks every skill against the template, the Codex symlinks, the Shared skills and Personal skills tables, the `~/.claude/skills/...` paths that docs and scripts name, the plugin manifests, and `shared/` for personal markers and symlinks. It must print no problems.
 - After changing anything in `shared/` or a marketplace file, run `claude plugin validate .` (the marketplace) and `claude plugin validate ./shared` (the plugin). Both must end in "Validation passed". The missing `version` warning and the plugin directory's notes (license, icon) are expected, since the plugin is not submitted to that directory.
 - After adding, renaming, or removing a skill, run `./install.sh --links-only`. It must report no `SKIP` lines, and the new links under `~/.claude/skills/` and `~/.codex/skills/` must resolve into this repo. Run plain `./install.sh` after changing `install.sh` or `hook-install.sh`.
 - Before and after trimming a skill, run `python3 -I usage.py`. It reads the last 30 days of transcripts and prints how often each skill ran, how many tokens its text loads, and what its description adds to every session.

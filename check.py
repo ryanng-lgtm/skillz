@@ -7,8 +7,9 @@ Prints one line per problem and exits 1 when there is any:
   layout   each skill follows templates/skill-template.md
   links    each Codex symlink points at the shared or personal skill of the
            same name
-  readme   the README Shared skills and Personal skills tables list every
-           skill, in order, with its SKILL.md link and the agents that have it
+  readme   the Shared skills table in README.md and the Personal skills table
+           in personal/README.md list every skill, in order, with its SKILL.md
+           link and the agents that have it
   paths    each ~/.claude/skills/... or ~/.codex/skills/... path a doc or
            script names exists in this repo, or in the work skills checkout
            when that is present
@@ -31,8 +32,11 @@ VENDORED = {"openmarket", "om-chat", "graphify", "desloppify"}
 UNLISTED = {"openmarket", "om-chat"}
 # Where skills live: the shared plugin's skills, then Ryan's own.
 HOMES = ("shared/skills", "personal")
-# The README table that lists the skills of each home.
-TABLES = {"## Shared skills": "shared/skills", "## Personal skills": "personal"}
+# The file and table heading that list the skills of each home.
+TABLES = {
+    "shared/skills": ("README.md", "## Shared skills"),
+    "personal": ("personal/README.md", "## Personal skills"),
+}
 SKILL_PATH = re.compile(r"~/\.(claude|codex)/skills/([A-Za-z0-9][A-Za-z0-9_.-]*)(/[A-Za-z0-9_./-]*)?")
 # The plugin root: Claude Code and Codex copy this folder, and nothing else, into
 # every install.
@@ -147,10 +151,10 @@ def agents(name, home, codex, linked):
     return "Claude, Codex" if name in linked else "Claude, Codex (own copy)"
 
 
-def table_rows(lines, heading):
+def table_rows(doc, lines, heading):
     """Map each skill row under heading to (link, agents)."""
     if heading not in lines:
-        report("README.md", f"no {heading!r} section")
+        report(doc, f"no {heading!r} section")
         return {}
     rows, where = {}, heading.lstrip("# ")
     for line in lines[lines.index(heading) + 1:]:
@@ -159,38 +163,38 @@ def table_rows(lines, heading):
         if m := re.match(r"\| \[`([^`]+)`\]\(([^)]+)\) \| ([^|]+) \|", line):
             cells = re.split(r"(?<!\\)\|", line.strip())[1:-1]
             if len(cells) != 3:
-                report("README.md", f"{where} row for {m.group(1)} has {len(cells)} columns, not 3")
+                report(doc, f"{where} row for {m.group(1)} has {len(cells)} columns, not 3")
             rows[m.group(1)] = (m.group(2), m.group(3).strip())
     return rows
 
 
 def check_readme(home, codex, linked):
-    with open(os.path.join(REPO, "README.md")) as fh:
-        lines = fh.read().splitlines()
-    for heading, base in TABLES.items():
+    for base, (doc, heading) in TABLES.items():
+        with open(os.path.join(REPO, doc)) as fh:
+            lines = fh.read().splitlines()
         want = {n for n, b in home.items() if b == base} - UNLISTED
         if base == "personal":
             # A Codex-only skill has no home; it is listed with Ryan's own.
             want |= set(codex) - set(home) - UNLISTED
-        rows, where = table_rows(lines, heading), heading.lstrip("# ")
+        rows, where = table_rows(doc, lines, heading), heading.lstrip("# ")
         for n in sorted(want - set(rows)):
-            report("README.md", f"{where} is missing {n}")
+            report(doc, f"{where} is missing {n}")
         for n in sorted(set(rows) - want):
-            report("README.md", f"{where} lists {n}, which belongs elsewhere or does not exist")
+            report(doc, f"{where} lists {n}, which belongs elsewhere or does not exist")
         if list(rows) != sorted(rows):
-            report("README.md", f"{where} is not in alphabetical order")
+            report(doc, f"{where} is not in alphabetical order")
         for n in sorted(want & set(rows)):
             link, cell = rows[n]
-            path = f"{home.get(n, 'codex/skills')}/{n}/SKILL.md"
+            path = os.path.relpath(f"{home.get(n, 'codex/skills')}/{n}/SKILL.md", os.path.dirname(doc))
             if link != path:
-                report("README.md", f"{n} links to {link}, not {path}")
+                report(doc, f"{n} links to {link}, not {path}")
             expected = agents(n, home, codex, linked)
             if cell != expected:
-                report("README.md", f"{n} lists agents {cell!r}, not {expected!r}")
+                report(doc, f"{n} lists agents {cell!r}, not {expected!r}")
 
 
 def text_files():
-    yield from ("README.md", "CLAUDE.md", "claude/CLAUDE.md", "codex/AGENTS.md")
+    yield from ("README.md", "personal/README.md", "CLAUDE.md", "claude/CLAUDE.md", "codex/AGENTS.md")
     for base in (*HOMES, "codex/skills"):
         base = os.path.join(REPO, base)
         for name in sorted(os.listdir(base)):

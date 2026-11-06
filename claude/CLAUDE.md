@@ -100,4 +100,4 @@ Skills from the skillz repo read their settings from this list, one `- <Key>: <v
 
 ## My skills
 
-My skills live in the skillz repo (`~/Documents/github/skillz`), linked into `~/.claude/skills`: the shared ones, which other devs install as the `skillz` plugin, and my personal ones. Its README lists both.
+My skills live in the skillz repo (`~/Documents/github/skillz`), linked into `~/.claude/skills`: the shared ones, which other devs install as the `skillz` plugin, and my personal ones. Its README lists the shared ones, and `personal/README.md` the personal ones.
