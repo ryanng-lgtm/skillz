@@ -35,37 +35,46 @@ bash ~/.claude/skills/panos/scripts/mrs.sh 'tsdb-gateway!2402' ...
 ```
 
 Quote each ref (`!` expands in zsh) and pass only refs. The columns are in the
-script header. An MR the script reports as not one of Ryan's open MRs: stop
-and ask. Per MR:
+script header. From here on, `<ref>` is the `ref` column and `<repo>` is its
+path segment just before `!`. An MR the script reports as not one of Ryan's
+open MRs: stop and ask. Per MR:
 
 - `path` is `-`: `git -C <clone> worktree add
   ~/Documents/GitLab/worktrees/<source with / as ->/<repo> <source>`, and say
   so.
-- `local` must be `same`, with `fetch` = `ok`. `behind N`: `git merge
-  --ff-only`. `ahead N`: the work has not landed, so ask whether to push first
-  or review the local tip. `diverged`, `unknown`, `+dirty` or a failed fetch:
-  stop for that MR and ask. Never stash, reset or discard.
-- `behind` > 0: the MR is behind its target, so the review would run on a
-  stale base and merge-time hazards stay hidden. Ask: `/syncup` first
+- `local` must be `same`, with `fetch` = `ok`. `local` is `behind N` (the
+  worktree lags the pushed branch): `git merge --ff-only`. `ahead N`: the work
+  has not landed, so ask whether to push first or review the local tip.
+  `diverged`, `unknown`, `+dirty` or a failed fetch: stop for that MR and ask.
+  Never stash, reset or discard.
+- The `behind` column > 0: the MR is behind its target, so the review would
+  run on a stale base and merge-time hazards stay hidden. Ask: `/syncup` first
   (recommend it when the diff touches migrations, generated files, `go.mod` or
   chart values), or review as is.
 - Record `head`: it is the lease and the undo handle.
 
 ## Phase 1 — prepare each review
 
-**Run dir:** if the work has a plan, its evidence dir is the one under
-`~/.claude/plans` whose files mention the source branch (`grep -rl
-'<source>' ~/.claude/plans`); use `<evidence dir>/panos/<YYYY-MM-DD-HHMM>/`.
-Otherwise `<scratchpad>/panos/<YYYY-MM-DD-HHMM>/`.
+**Run dir:** one per run, holding every selected MR's files and the report.
+Find each MR's plan with `grep -rl '<source>' ~/.claude/plans`: its evidence
+dir is the `*-evidence/` directory the matches sit in or beside. When every
+selected MR leads to the same evidence dir, use
+`<evidence dir>/panos/<YYYY-MM-DD-HHMM>/`. Otherwise use
+`<scratchpad>/panos/<YYYY-MM-DD-HHMM>/`, where `<scratchpad>` is this
+session's scratchpad directory.
 
 **Siblings:** Ryan's open MRs with the same source branch, the MR this one is
-stacked on, and the MRs whose branches this one pins in `go.mod`.
+stacked on (its target is that MR's source branch, or its description names
+that MR as a dependency), and the MRs whose branches this one's `go.mod` pins
+or replaces with a local path. Run `mrs.sh` on each for its worktree. Phase
+0's checks apply only to the selected MRs: a sibling whose `local` is not
+`same` is listed in the block with that state.
 
 Per MR, with `<name>` = `<repo>-<iid>`:
 
 ```bash
-glab api "projects/<pid>/merge_requests/<iid>" > <name>.json             # title, description, last pipeline
-glab api "projects/<pid>/merge_requests/<iid>/versions" > <name>-versions.json  # [1].head_commit_sha = previous push
+glab api "projects/<pid>/merge_requests/<iid>" > <name>.json             # title, description, head_pipeline
+glab api "projects/<pid>/merge_requests/<iid>/versions" > <name>-versions.json  # newest first
 git -C <path> diff origin/<target>...HEAD > <name>.diff
 python3 -I ~/.claude/skills/panos/scripts/threads.py <name>-threads.md --mr <pid> <iid>
 ```
@@ -84,7 +93,7 @@ Previous push: <sha> | none
 Behind <target> by: <N>
 Last pipeline: <status> at <sha> | none
 Other MRs in this set: <ref → worktree, and how they depend on each other: pins, proto fields, stacking, merge order> | none
-Infra and bare-metal config: ~/Documents/GitLab/infrastructure, ~/Documents/GitLab/meta_repo/streamd-cex-playbook
+Infra and bare-metal config: <$HOME>/Documents/GitLab/infrastructure, <$HOME>/Documents/GitLab/meta_repo/streamd-cex-playbook
 Already verified: <fact — source (this session, or the plan's evidence)> | none
 Deliberately temporary, do not report: <e.g. a draft-only replace in go.mod> | none
 
@@ -94,6 +103,10 @@ Description:
 ~~~~
 ```
 
+"Previous push" is the versions' `[1].head_commit_sha`, or `none` when there
+is one version. "Last pipeline" is `head_pipeline`'s `status` and `sha` from
+`<name>.json`, or `none` when it is null. Every path in the block is absolute,
+with `$HOME` expanded: the Claude reviewer's Read tool takes no `~`.
 A fresh session fills "Already verified" from the plan's evidence dir, with
 the file each fact came from. MR-specific knowledge goes in this block, never
 into an edited copy of the brief.
@@ -263,8 +276,6 @@ python3 -I ~/.claude/skills/panos/scripts/threads.py <out.md>
 - Never touch production: no database, cluster or broker connections, no
   `connections.env`. A claim that needs prod numbers becomes a question for
   Ryan, with the measurement that would settle it.
-- A reviewer finding is a hypothesis. Never fix one Phase 3 has not
-  reproduced.
 - Design changes go to Ryan, not into the branch: splitting an MR, moving a
   component to its own deployment, changing rollout or merge order, changing a
   public contract.

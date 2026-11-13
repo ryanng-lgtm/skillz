@@ -32,12 +32,13 @@ Rules and Common mistakes, with these changes.
    ```
 
    It reuses a file younger than 7 days. A rebuild reads Harry's GitLab
-   threads and his #go-tasks posts and takes a few minutes. The file holds
-   teammates' words and internal links: never copy it into the skillz repo,
-   which is public.
+   threads and his #go-tasks posts and takes a few minutes. When it fails,
+   leave the "Your past reviews" line out of the prompt and say so in the
+   report. The file holds teammates' words and internal links: never copy it
+   into the skillz repo, which is public.
 2. **The prompt** is `references/harry.md`, then the panos "This MR" block
-   with two more lines right after "Deliberately temporary", both absolute
-   paths, then the panos skill's `references/contract.md`:
+   with two more lines right after "Deliberately temporary", then the panos
+   skill's `references/contract.md`:
 
    ```
    Your past reviews: <$HOME>/.cache/harry/reviews.md
@@ -45,9 +46,8 @@ Rules and Common mistakes, with these changes.
    ```
 
 3. **Names.** `harry` replaces `panos` in the run dir
-   (`<evidence dir>/harry/<YYYY-MM-DD-HHMM>/`, else the scratchpad's) and in
-   probe file names (`zz_harry_probe_*`), including the Claude reviewer's
-   prompt.
+   (`<evidence dir or scratchpad>/harry/<YYYY-MM-DD-HHMM>/`) and in probe file
+   names (`zz_harry_probe_*`), including the Claude reviewer's prompt.
 4. **Phase 3, design findings.** A finding about a duplicated rule, a moving
    part that buys nothing, a misleading comment or a test that would pass on
    the old code is verified by reading the code it cites: real when the code
