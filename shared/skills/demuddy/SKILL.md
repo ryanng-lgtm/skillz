@@ -21,9 +21,15 @@ A plan that went through many editing rounds accretes conversation archaeology. 
 
 This is deliberately the inverse of "keep only instructions and facts". Plenty of load-bearing content is neither: the reason a deliberate deviation exists, an unresolved question, a negative result, a constraint that only ever got written down inside a rejected-alternative discussion. A delete-unless-instruction rule eats all of it. **When you cannot classify a sentence, it stays.**
 
-**Editorial residue** is the short list of things you may remove: decision framing and dates that carry no applicability (`**Decision, verified:**`, "(decided 2026-07-20)" on a rule with no expiry), politeness, restatements of a rule already stated in full elsewhere, transcript back-and-forth ("good catch — updated"), process narration ("after grepping the handlers", "per your clarification") except the method, date, or revision that records how a claim was verified, and section ordering that reflects when text was added. Time-relative words are rewritten, not removed: "the new endpoint" names the endpoint, and "for now" or "temporarily" names the condition that ends it.
+**Editorial residue** is the short list of things you may remove: decision framing and dates that carry no applicability (`**Decision, verified:**`, "(decided 2026-07-20)" on a rule with no expiry), politeness and conversational asides ("as we discussed", "let me know if"), restatements of a rule already stated in full elsewhere, transcript back-and-forth ("good catch — updated"), the document narrating its own edits ("this section was added to clarify", "expanded per review", "the earlier version said"), process narration ("after grepping the handlers", "per your clarification") except the method, date, or revision that records how a claim was verified, and section ordering that reflects when text was added.
 
-A sentence is residue when a reader who never saw the conversation or the earlier drafts cannot follow it, because it points at a prior value, a search that was run, or an exchange. A `because` stays when its reason points at the system and goes when it points at the edit.
+Some residue is rewritten, not removed:
+
+- **Change narration about the plan's own drafts** becomes the value that holds now: "batch size should be 500, not 200 as in the first draft" becomes "Batch size: 500". Before-and-after statements about the *system* ("main drops these rows; after this change it keeps them") are the plan's content: keep both sides.
+- **Time-relative words** ("the new", "currently", "recently", "latest", "going forward", "soon", "for now", "temporarily") name what they point at, or anchor to a date, version or revision the plan already gives; never invent one, and leave the word when there is nothing to anchor to. "For now" and "temporarily" name the condition that ends them. "Currently" describing the system before the change is that before-state, and stays.
+- **A bare "TODO: verify this"** moves to Open questions, saying what to check. The claim it doubts is not stated as fact.
+
+A sentence is residue when a reader who never saw the conversation or the earlier drafts cannot follow it, because it points at a prior value, a search that was run, or an exchange. A `because` stays when its reason points at the system and goes when it points at the edit. Read for meaning before rewriting: "the parser should reject empty input" is a requirement, not a hedge, and "new connections are pooled" uses "new" as a domain term.
 
 ## Code comments
 
