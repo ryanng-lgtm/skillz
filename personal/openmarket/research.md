@@ -177,7 +177,7 @@ A registry strategy template is the marketplace funnel's business: `backtest_run
 | `source` | the condition source `watch_create` authors, the strategy naming `on_true` / `on_false` for the sides its level maps to | the operands' own bar cadence, `eval: closed` |
 | a band `source` | `{long: {enter, exit}, short: {enter, exit}}`; it names its own sides, so no `on_true` / `on_false`, beside a sizer that can flatten | bars, as a tree source |
 | `watch` | `{source: <feed watch slug>, ai_step: {prompt, output: {type: "verdict"}}}`, the step `watch_action_add` authors | the feed's accepted rows (`--since` / `--until`, `--hold`) |
-| an installed package | `wrun_strategy: "@scope/name"` with `params` by declared name: the target on `backtest_run`, in place of a candidate on `backtest_spec` | the window's bars on the engine's broker |
+| an installed package | `wrun_strategy: "@scope/name"` with `params` by declared name, and `stop_breaker: {max_stops?, window_secs?, max_loss_usd?}` to try a target step's breaker over the package's trades (judged at each bar's close as the live step judges its ledger rows: a trade the engine closed by its stop or trailing stop is a stop fill, every closed trade's P&L, net of fees, is realized; a trip refuses every later entry while what was open closes as the package closes it; the report's `strategy.stop_breaker` carries the trip, the entries refused, the bars stood down and the braked curve's drift from the same walk unbraked): the target on `backtest_run`, in place of a candidate on `backtest_spec` | the window's bars on the engine's broker |
 
 To simulate a hold-after-event strategy over the same occurrence set, use `om backtest spec` with a strategy source. There is no strategy-less lane: prescribe the trade-intent explicitly — an inline candidate carrying a `fixed_view` (direction 1, -1 or 0, conviction as the weight) reproduces the classic hold-after-event run without saving anything. Prefer compact JSON for agent summaries unless the user needs the full fill/equity artifact.
 
@@ -381,6 +381,9 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `auto_backfill` — Default true.
   - `open_chart` — Omitted, the run lands on the strategy's OWN workspace; pass a workspace to target it (reruns are cheap: an ai step answers from its verdict memo).
   - `compact` — Defaults TRUE for tool callers: the result carries the compact report (metrics + benchmark headline + a bounded equity_spark), never the full per-bar artifact.
+- `backtest_run` · `backtest_spec`
+  - `stop_breaker.window_secs` — The window max_stops counts in, in seconds, ending at the row; only beside max_stops; absent, the stops count from the arm.
+  - `max_llm_calls` — Default 400.
 - `backtest_run` · `backtest_sweep`
   - `window` — Lookback as `<int><ms|s|m|h|d|w>` ending at `until` (default: now), max 365d — e.g. '30d', '52w', '365d'; no y/mo unit; conflicts with an explicit `since`.
 - `backtest_run` · `backtest_spec` · `backtest_sweep`
@@ -389,8 +392,6 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `latency_bars` — Omit unless the user named it: the defaults are what users expect, and a value copied from an earlier call in this conversation may predate the user's ask.
   - `initial_cash` — Omit unless the user named it: the defaults are what users expect, and a value copied from an earlier call in this conversation may predate the user's ask.
   - `engine` — `venue` (default) or `package`: a stock strategy package trades the replay's decisions on the engine's broker, at its own costs.
-- `backtest_run` · `backtest_spec`
-  - `max_llm_calls` — Default 400.
 - `backtest_spec`
   - `watch` — Omit for a condition-source backtest (a candidate `source` + --since/--until).
   - `params` — Package params for wrun_strategy, numbers by declared name; omitted params keep the package's defaults.

@@ -214,8 +214,9 @@ What each tool here fills in when a field is omitted — the defaults and omit-r
   - `fresh` — Default is fresh-or-same-view: the same view re-plotted the same day reuses its workspace.
   - `live` — Default TRUE everywhere (a plotted view stays live).
   - `unfollow` — Control op: stop the live view on the target workspace (default: the whole view; pass `source` to drop one member).
-- `news_brief`
+- `news_brief` · `news_brief_read`
   - `limit` — list only: how many of the newest stored briefs to return, 1..60 (default: all stored).
+- `news_brief`
   - `window` — Default: since the last brief, else 24h.
   - `channel` — A configured channel's name or id, or 'default' for the user's default.
 - `news_catalog`
@@ -238,6 +239,9 @@ What a reply must carry from each result-bearing action here; the per-branch gui
 - `news_brief`
   - discloses `brief.body_md` — The briefing markdown: story-grouped items deduplicated across feeds, major developments first, with a quiet note for feeds with nothing new. Give it to the user as it is; do not re-summarize away detail. When generator=fallback it is a labeled raw per-feed fire list instead, whose '(raw rollup: ...)' first line states what THAT run did and carries no setup advice — what to do about it depends on what is configured now, so read llm_error and the user's current state before advising anything. The body's relative ages are frozen at body_ages_at (created_at on older briefs): never repeat one as though it were measured now.
   - on `not_found` — No stored brief matched: follow the error's own hint (list or re-select a stored one, or mode 'generate' when none exists); if nothing exists at all, the events live in watch_history / event_journal_search — and in alert_events on a home whose watches all shadow alerts.
+- `news_brief_read`
+  - discloses `brief.body_md` — The briefing markdown: story-grouped items deduplicated across feeds, major developments first, with a quiet note for feeds with nothing new. Give it to the user as it is; do not re-summarize away detail. When generator=fallback it is a labeled raw per-feed fire list instead, whose '(raw rollup: ...)' first line states what THAT run did and carries no setup advice — what to do about it depends on what is configured now, so read llm_error and the user's current state before advising anything. The body's relative ages are frozen at body_ages_at (created_at on older briefs): never repeat one as though it were measured now.
+  - on `not_found` — No stored brief matched: follow the error's own hint (list or re-select a stored one, or mode 'generate' when none exists); if nothing exists at all, the events live in watch_history / event_journal_search — and in alert_events on a home whose watches all shadow alerts.
 
 <!-- AUTO: END RESULT CONTRACT -->
 
@@ -254,8 +258,8 @@ Every `om` command this skill covers, one line each with its action name — che
 - `om news` (action: `news_overview`) — Show each news vendor's credential status and the user's own feeds across vendors (Fast alerts, Topics, Streams), each row with where its matches land.
 - `om news billing` (action: `news_billing`) — READ the user's Fast-alerts plan: plan name, slots used of the balance and how many are free, paused alerts, payment-failed state, a scheduled cancel or slot drop with its date, the renewal date, exempt status, and any Synoptic Streams held (billed separately).
 - `om news brief` (action: `news_brief`) — The daily brief.
-- `om news brief list` (action: `news_brief`) — List the stored daily briefs, newest first, without their bodies.
-- `om news brief show` (action: `news_brief`) — Replay one stored daily brief by id.
+- `om news brief list` (action: `news_brief_read`) — List the stored daily briefs, newest first, without their bodies.
+- `om news brief show` (action: `news_brief_read`) — Replay one stored daily brief by id.
 - `om news catalog` (action: `news_catalog`) — Browse available Synoptic streams, Fast alerts and Topics.
 - `om news package` (action: `news_package_streams`) — List a Synoptic package's member streams.
 - `om news packages` (action: `news_packages`) — Browse curated Synoptic stream packages.

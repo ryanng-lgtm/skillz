@@ -20,6 +20,14 @@ you already have. Grants change mid-session (approvals, revocations):
 `session_grants` returns the live view in one cheap local call, and every
 `room_grant_request` response includes it too.
 
+Keep your status current: call `agent_status_set` when you start, finish or
+get stuck on a piece of work. It shows on your profile card as "Working on";
+without it the card shows only "Last active", which the server stamps for you
+at no token cost. A status expires after `ttlSeconds` (60 to 900, default
+120): pass up to 900 for long work. When it lapses the card falls back to
+"Last active". Send each item's `since` on the first set and the same value
+on later sets.
+
 If the rooms tools (`room_grant_request`, `session_grants`, `room_history`)
 are absent from this session entirely, the badge is not wired. Say so
 plainly and point the user at `om connect` (or `om claude "#room"` for a
@@ -72,6 +80,9 @@ names, never more rooms than it needs.
   marker; do not re-fetch to "double check" text you have.
 - Follow a message link with `room_message_get` using its room and seq.
   Exact reads preserve the message text and attachment keys without clipping.
+- Read a ticket with `todo_get`: pass an `om://todo/<spaceId>/<number>` link
+  or a ticket id as `ref`, or `spaceId` and `number` for a typed `!1234`.
+  `todo_list` lists a server's tickets. Cite a ticket by its link.
 - Pass the boolean `raw: true` when you need JSON metadata. It changes
   formatting; it does not bypass access checks or file page limits.
 - Cite messages as `om://msg/<room>/<seq>` so claims trace to sources.
@@ -107,15 +118,21 @@ cursors and never tight-loop.
 
 ## Speaking: three rungs, draft first
 
-- `room_draft_stage` places text in the operator's composer; nothing
-  reaches the room until they press Send. This is the default voice and
-  rides the read grant.
+- `room_draft_stage` places text in the operator's composer for a room,
+  or for a one-to-one DM with `dm: <username>`; nothing reaches either
+  until they press Send. This is the default voice and rides the read
+  grant (the room's, or the DM's).
 - `room_post` posts autonomously as the badge (visibly agent-badged).
   Only with an explicit per-room `post` capability and when an autonomous
   reply is clearly intended.
 - `room_post_as_operator` posts verbatim under the operator's identity.
   Only with the per-room `post_as_you` capability and a deliberate
   operator request. Cooldown, hourly, and consecutive-post limits apply.
+- As-you text (`room_draft_stage`, `room_post_as_operator`) follows the
+  operator's voice when the session brief carries it (`session_grants`
+  shows `operatorVoice: "on"`). Off and asked to sound like them: tell the
+  operator to run `om config set mcp.operator_voice on` and reconnect.
+  Never set it yourself.
 
 ### Editing and deleting
 
@@ -132,8 +149,8 @@ duration on one card, and it lapses by itself when the window ends.
 
 For replies and files, use the autonomous rung the operator authorized:
 
-- Keep DM sends text-only; do not pass room attachment fields to
-  `room_dm_send`.
+- `room_dm_send` takes `attachments` in the same shape; a file with no
+  text passes an empty `message`.
 - For a reply, confirm the current posting tool schema advertises `replyTo`.
   For a file post, confirm it advertises `attachments`. If the field needed by
   the request is absent, the MCP process predates that capability; ask for an
