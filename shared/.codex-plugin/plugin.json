@@ -5,5 +5,15 @@
     "name": "ryanng-lgtm",
     "url": "https://github.com/ryanng-lgtm"
   },
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "skillz",
+    "shortDescription": "Dev-workflow skills for coding agents",
+    "longDescription": "Dev-workflow skills for Claude Code and Codex: commits and MR descriptions, plan cleanup, issue investigation, unattended dev loops, branch syncing, test audits, docs knowledge bases and more.",
+    "developerName": "ryanng-lgtm",
+    "category": "Developer Tools",
+    "websiteURL": "https://github.com/ryanng-lgtm/skillz",
+    "logo": "./assets/icon.svg",
+    "composerIcon": "./assets/icon.svg"
+  }
 }

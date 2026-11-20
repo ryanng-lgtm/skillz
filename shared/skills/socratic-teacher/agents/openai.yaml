@@ -1,2 +1,5 @@
+interface:
+  display_name: "Socratic teacher"
+  short_description: "Teach with one guiding question per turn"
 policy:
   allow_implicit_invocation: false

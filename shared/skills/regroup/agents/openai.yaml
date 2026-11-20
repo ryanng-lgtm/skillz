@@ -1,2 +1,5 @@
+interface:
+  display_name: "Regroup"
+  short_description: "Trim a branch's tests and regroup its commits for review"
 policy:
   allow_implicit_invocation: false

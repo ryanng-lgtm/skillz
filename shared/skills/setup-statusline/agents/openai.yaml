@@ -1,2 +1,5 @@
+interface:
+  display_name: "Status line setup"
+  short_description: "Give Claude Code a status line with the parts you pick"
 policy:
   allow_implicit_invocation: false

@@ -1,2 +1,5 @@
+interface:
+  display_name: "Graphify setup"
+  short_description: "Install graphify and build a code graph for a repo"
 policy:
   allow_implicit_invocation: false
