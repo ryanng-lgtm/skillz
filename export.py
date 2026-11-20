@@ -43,6 +43,7 @@ MAX_IDENTITY = 64
 MAX_SHORT_DESCRIPTION = 240
 # What ChatGPT requires in the Codex manifest's `interface`.
 INTERFACE_TEXT = ("displayName", "shortDescription", "longDescription", "developerName")
+INTERFACE_LISTS = ("capabilities", "defaultPrompt")
 INTERFACE_IMAGES = ("logo", "composerIcon")
 YAML_KEY = re.compile(r"^(\s*)([A-Za-z_]+):\s*(.*)$")
 
@@ -122,6 +123,12 @@ def manifest_problems(target):
     for key in INTERFACE_TEXT:
         if not str(ui.get(key, "")).strip():
             yield f"{rel}: interface.{key} is required"
+    for key in INTERFACE_LISTS:
+        value = ui.get(key)
+        if not value or not isinstance(value, list) or not all(
+            isinstance(v, str) and v.strip() for v in value
+        ):
+            yield f"{rel}: interface.{key} must be a non-empty list of strings"
     short = ui.get("shortDescription", "")
     if "\n" in short or len(short) > MAX_SHORT_DESCRIPTION:
         yield f"{rel}: interface.shortDescription must be one line of at most {MAX_SHORT_DESCRIPTION} characters"

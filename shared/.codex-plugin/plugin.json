@@ -5,6 +5,9 @@
     "name": "ryanng-lgtm",
     "url": "https://github.com/ryanng-lgtm"
   },
+  "homepage": "https://github.com/ryanng-lgtm/skillz",
+  "repository": "https://github.com/ryanng-lgtm/skillz",
+  "license": "MIT",
   "skills": "./skills/",
   "interface": {
     "displayName": "skillz",
@@ -12,8 +15,15 @@
     "longDescription": "Dev-workflow skills for Claude Code and Codex: commits and MR descriptions, plan cleanup, issue investigation, unattended dev loops, branch syncing, test audits, docs knowledge bases and more.",
     "developerName": "ryanng-lgtm",
     "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
     "websiteURL": "https://github.com/ryanng-lgtm/skillz",
+    "defaultPrompt": [
+      "Clean up this plan for handover",
+      "Rewrite this draft so it reads like I wrote it"
+    ],
+    "brandColor": "#1F2937",
+    "composerIcon": "./assets/icon.svg",
     "logo": "./assets/icon.svg",
-    "composerIcon": "./assets/icon.svg"
+    "screenshots": []
   }
 }
