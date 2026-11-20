@@ -99,13 +99,16 @@ Install the skillz plugin from https://github.com/ryanng-lgtm/skillz for me.
 
 ### Upload a zip instead
 
-On Team and Enterprise plans an Owner decides whether members can add their own marketplaces in Claude Desktop and claude.ai. If you can't, build the plugin as a zip and upload it at Customize > Plugins > Add > Upload plugin:
+On Team and Enterprise plans an Owner decides whether members can add their own marketplaces in Claude Desktop and claude.ai. If you can't, or you want the skills in ChatGPT, build the plugin as a zip and upload it:
 
 ```bash
 git clone https://github.com/ryanng-lgtm/skillz.git
 cd skillz
-python3 -I export.py   # writes ~/Downloads/skillz.zip; --out picks another path
+python3 -I export.py --claude   # writes ~/Downloads/skillz-claude.zip
+python3 -I export.py --codex    # writes ~/Downloads/skillz-codex.zip
 ```
+
+`--out` picks another path. Upload `skillz-claude.zip` in Claude Desktop or claude.ai at Customize > Plugins > Add > Upload plugin. Upload `skillz-codex.zip` in ChatGPT's New Plugin dialog, which needs a Business, Enterprise, Healthcare or Edu plan. Most of these skills expect a shell and a git checkout, so in ChatGPT chat the useful ones are the text-only ones, such as `humanize`, `demuddy`, `prompt-ready` and `llm-council`.
 
 An uploaded zip never updates. Pull, export and upload again to get newer skills. The folders under `skillz/skills/` in the zip also work as plain skills in any tool that reads a skills directory.
 

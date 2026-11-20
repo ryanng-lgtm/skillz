@@ -28,7 +28,7 @@ The repo is public and every plugin user gets all of `shared/`. A shared skill h
 1. Pick the folder: `shared/skills/` when the skill works for anyone with only Skill settings to fill in, `personal/` otherwise.
 2. Write it from the template. For a skill only the user should start, such as a one-time setup or one with side effects, set `disable-model-invocation: true` in the frontmatter and add the `agents/openai.yaml` policy the template shows, which is Codex's equivalent.
 3. If it works the same under Codex, add its `codex/skills/` link.
-4. Add its row to the Shared skills table in `README.md` or the Personal skills table in `personal/README.md`, in the same change. Those tables are the only full list; a skill missing from them is invisible. The vendored `openmarket` and `om-chat` are the one exception. `export.py` zips `shared/` for Claude Desktop.
+4. Add its row to the Shared skills table in `README.md` or the Personal skills table in `personal/README.md`, in the same change. Those tables are the only full list; a skill missing from them is invisible. The vendored `openmarket` and `om-chat` are the one exception. `export.py --claude` zips `shared/` for Claude Desktop and claude.ai, and `export.py --codex` zips it in the Codex plugin format for ChatGPT. A shared skill's `agents/openai.yaml`, when it has one, needs `interface.display_name` and `interface.short_description`, or ChatGPT rejects the upload.
 
 On a rename or removal, also update every mention of the old name in `claude/CLAUDE.md`, `codex/AGENTS.md`, and other skills, and remove the Codex symlink if there is one. `install.sh` drops the dead links it leaves under `~/.claude` and `~/.codex`.
 

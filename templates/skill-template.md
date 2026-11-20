@@ -25,9 +25,12 @@ Write the body as instructions to the agent, in the present tense, with no histo
 
 - `references/` — detail the skill reads on demand.
 - `scripts/` — code the skill runs. Tests go in `scripts/tests/` and run with `python3 -m unittest discover -s tests` from `scripts/`.
-- `agents/openai.yaml` — Codex metadata for a skill shared with Codex: its skill-list entry under `interface:` (`display_name`, `short_description`, `default_prompt`) and, for a skill only the user should start, Codex's equivalent of `disable-model-invocation`:
+- `agents/openai.yaml` — Codex metadata for a skill shared with Codex: its skill-list entry under `interface:` (`display_name` and `short_description`, which ChatGPT requires whenever the file exists, and an optional `default_prompt`) and, for a skill only the user should start, Codex's equivalent of `disable-model-invocation`:
 
   ```yaml
+  interface:
+    display_name: "Release"
+    short_description: "Tag and publish a release"
   policy:
     allow_implicit_invocation: false
   ```
