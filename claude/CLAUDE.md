@@ -90,6 +90,10 @@ Whenever a subagent makes a git commit, it must ALWAYS: first stage its changes 
 
 Any message or comment written for other people to read (an OM Chat room or DM post, a reply I'll send, a Discord message, a GitLab or GitHub comment) goes through the `humanize` skill before you show it to me or post it, without my asking. That strips the jargon and AI prose and puts it in my voice. MR descriptions, commit messages and MR-ready posts are the exception: `mr-markdown`, `commit` and `mr-ready` cover them.
 
+## Links shown to me — all projects
+
+When I ask for a link and you show it to me in the session, write the full URL as plain text, never a markdown hyperlink (`[label](url)`). A label goes on the line above the URL. Text written for other people (a message, an OM Chat post, a draft reply) is the exception and keeps its own link format.
+
 ## Skill settings
 
 Skills from the skillz repo read their settings from this list, one `- <Key>: <value>` line each. `/humanize` reads my voice from `Voice file`.
