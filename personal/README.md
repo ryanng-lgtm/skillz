@@ -24,6 +24,8 @@ My own skills: tied to my work, services or machines, or vendored from another t
 
 | Skill | Agents | What it does |
 | --- | --- | --- |
+| [`backfill-setup`](backfill-setup/SKILL.md) | Claude | Sets up a staged, resumable backend backfill: units recorded per database, a runner with one psql per unit, gated check, load, floor and expose steps, an OM Chat progress message and an hourly Grafana host check. |
+| [`be-deploy`](be-deploy/SKILL.md) | Claude | Takes a backend MR from draft to a verified ArgoCD deploy: rebase, green pipeline, merge on my word, the new image tag, the commits a sync picks up, shard-by-shard syncs and post-deploy checks. |
 | [`bump-rc`](bump-rc/SKILL.md) | Claude, Codex | Releases `@openmarket/rooms-client`, choosing the version bump from what changed, and repins both GUI consumers. |
 | [`claude-statusline`](claude-statusline/SKILL.md) | Claude | Sets the Claude Code status line (model, folder, branch, context, usage limits, effort), changing only `statusLine` in `settings.json`. |
 | [`desloppify`](desloppify/SKILL.md) | Claude, Codex (own copy) | Scores a codebase's health with the `desloppify` CLI and works through the cleanup plan it builds: scan, plan, fix, rescan. Vendored from [desloppify](https://github.com/peteromallet/desloppify). |
