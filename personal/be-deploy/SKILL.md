@@ -176,7 +176,9 @@ for those two repos.
    rebase onto `origin/<target>`; resolve; regenerate generated files from
    their sources instead of hand-merging them (tsdb-gateway:
    `bash scripts/generate-schema.bash` after a `schema.*.yaml` conflict, then
-   check that it leaves the tree clean); push with
+   check that it leaves the tree clean). Two MRs that each change one key of
+   the same anchor block in `schema.<plane>.yaml` conflict: keep both keys.
+   Push with
    `--force-with-lease=<source>:<recorded sha>`. A stacked MR goes after its
    base: `git rebase --onto origin/<base> <old base sha>`. A force push to an
    existing MR does not always start a pipeline: start one with
@@ -207,6 +209,10 @@ for those two repos.
    branch is removed on merge, GitLab retargets every MR stacked on it to the
    default branch, and those MRs still carry the base's pre-squash commits:
    rebase each onto the default branch (stage 2) before its own merge.
+   A merged change reaches an environment with the next sync of its apps,
+   whoever runs it. So an MR that is one step of a staged rollout stays a
+   draft until its gate has passed, and its merge and sync happen in one
+   sitting.
 5. **Main pipeline, then the tag.** The expected tag is
    `<pipeline build>-<first 8 chars of the landed commit>`. Wait until every
    target app's injected `image.tag` equals it (see Deploy a new build).
@@ -215,16 +221,19 @@ for those two repos.
    `git log --first-parent <running>..<landed>`. Flag anything added under
    `migrations/`, any change to the app's chart or its `values.<env>.yaml`,
    and any `schema.*.yaml` change. Commits from other MRs ship too; name
-   them in the report. Then refresh and diff (Deploy a new build) and
-   summarize the diff by resource kind: image changes only, or config too.
+   them in the report. More than one tag in `.status.summary.images` means
+   someone synced part of the app: compare per Deployment. Then refresh and
+   diff (Deploy a new build) and summarize the diff by resource kind: image
+   changes only, or config too.
 7. **Plan the order.** Per repo rules in `references/backend.md`. Default:
    one app first when the deploy runs a hook that changes the database
    (migrations, index builds), the rest after it passes; read and write sets
    of one service never in the same step; never `--prune`. A tsdb-move app
    is never synced whole: one Job at a time with `--resource`.
 8. **Sync** (consent gate: the request names the sync). Start it with
-   `--async` and poll the app (the sync call blocks through hooks). Time each
-   hook from the app's `operationState`.
+   `--async` and poll the app (the sync call blocks through hooks, and the
+   CLI exits 20 when its own wait times out while the app goes on to
+   Synced). Time each hook from the app's `operationState`.
 9. **Verify** per app: Healthy, Synced, `.status.summary.images` holds the
    expected tag, and the change's own check passes (the MR or its plan names
    it: an index valid on every chunk, a job's log line, a query result). A

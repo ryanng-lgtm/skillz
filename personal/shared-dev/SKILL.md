@@ -181,6 +181,10 @@ chat or the report; the report names the account by label only.
 - Evidence: each probe, its query and output; main against branch.
 - Warnings from `up.json`: destructive branch migrations (they ran on
   copies), index gaps against main, files not exercised locally.
+- The TimescaleDB version gap: shared-dev runs 2.29 while ore runs 2.30.2
+  (read on 2026-11-23). A probe of catalog tables or of how a watermark
+  moves (`drop_chunks`, a refresh, `TRUNCATE` on a cagg) shows 2.29's
+  behaviour only; say so next to that probe's result.
 
 ## 9. Teardown
 

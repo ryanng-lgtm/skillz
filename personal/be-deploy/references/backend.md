@@ -35,6 +35,21 @@ per environment.
   migrate hook builds. Read which refresh, compress and drop jobs will pick
   up the changed tier from their include and exclude patterns and skip
   lists in `values.<env>.yaml`, and say so in the plan.
+  - Per-plane values are anchors in `schema.<plane>.yaml`, aliased from
+    `schema.boneless.yaml`. One anchor can serve many tiers (the 1h
+    deep-history retention serves several buckets), so a change meant for
+    one tier needs an anchor of its own.
+  - A non-null aggregate policy opens the tier to the refresh jobs whose
+    patterns match it, the compress job, the invalidation refresher where it
+    has replicas, and the migrate hook's index build. A non-null retention
+    makes the drop job call `drop_chunks` on it, which recomputes a cagg's
+    watermark from its stored rows on every call. For a cagg that holds
+    loaded history, the backfill-setup skill has the order these go in.
+  - The drop job logs nothing for a tier it skips. Check it from the next
+    run's `drop_chunks(` lines in Loki per database, or from
+    `cjob --dry-run drop --mode oneshot` in the drop pod.
+  - The cjobs run from the write shards, so a schema change takes effect on
+    a database when its shard syncs, not when the read app does.
 - **Index size.** When the deploy adds an index to an existing table or
   continuous aggregate, read the table's size first
   (`hypertable_size('<storage table>')`). A large build decides the order
@@ -63,6 +78,14 @@ So, for a deploy that builds an index on a large table: sync one shard
 first, time its hook, check the index on every chunk, and only then sync
 the other shards. Shards hold different amounts of data; the first
 shard's time is an estimate, not a bound.
+
+When a build may not fit the hour, build it by hand before the deploy, on
+the owner's go per database: the same statement with the exact name the
+schema yaml produces (`<relation>_<index name>_ts`) and the same columns.
+The deploy then skips it. `IF NOT EXISTS` matches on the name only, so a
+hand-built index with other columns stays wrong without any error. A hand
+build has no deadline and can wait for a quiet window; it is not faster,
+since the time goes into reading and sorting the table.
 
 ### Checking an index on every chunk
 
@@ -115,3 +138,19 @@ A whole-app sync creates every Job the file lists. A Job that has finished
 keeps its object until its TTL, and syncing it again does not rerun it
 while that object exists. Remove finished Jobs from the values file in a
 follow-up MR so a later sync cannot start them again.
+
+Writing a load job:
+
+- Put it in `values.<env>.yaml`, not `values.yaml`: every tsdb-move MR gets
+  a staging preview app that renders `values.yaml` and
+  `values.staging.yaml` from the MR branch.
+- `replace: true` deletes the target range and inserts the source range one
+  batch per transaction, so a rerun does not duplicate rows. Without it a
+  rerun inserts again.
+- One connection serves source and target, so both tables are on the same
+  database. Storage table names (`_materialized_hypertable_<n>`) differ per
+  database: read them on each before writing the job.
+- An `interval` that is a multiple of `30d` runs calendar months.
+- Run a `dry_run: true` job first, or the binary locally with the job's
+  arguments (`--dry-run` opens no connection), and render the chart with
+  `helm template` for the target env and for staging.
