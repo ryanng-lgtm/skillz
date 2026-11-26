@@ -52,8 +52,8 @@ link, and nothing else.
    - <repo>: [!<iid>](<web_url>) <brief>
 
    Merge order:
-   1. [!<iid>](<web_url>) from <repo>
-   2. [!<iid>](<web_url>) from <repo>, <before>, then <after>
+   - [ ] [!<iid>](<web_url>) from <repo>
+   - [ ] [!<iid>](<web_url>) from <repo>, <before>, then <after>
    ```
 
    - One `MRs:` line per MR, in merge order. Two MRs in one repo are two lines.
@@ -61,11 +61,11 @@ link, and nothing else.
      a present-tense verb, lowercase, no full stop: `adds index`,
      `adds count column`. Take it from the MR's title and diff, so two MRs
      in one work get different briefs.
-   - One numbered step per MR. After `from <repo>` comes at most one clause
-     of what must be true before it merges (`after …`, `only once …`) and
-     what to do once it has (`then deploy to ore`), as short plain phrases.
-     An MR nothing gates and that gates nothing ends `, any time`. A merged
-     one ends `, already merged`.
+   - One checklist item per MR, in merge order. After `from <repo>` comes
+     at most one clause of what must be true before it merges (`after …`,
+     `only once …`) and what to do once it has (`then deploy to ore`), as
+     short plain phrases. An MR nothing gates and that gates nothing ends
+     `, any time`. A merged one is ticked, `- [x]`, with no other change.
    - Every MR named in the lists, inside a clause too, is
      `[!<iid>](<web_url>)`.
    - With one MR, the message is the TLDR and the `MRs:` section.
@@ -84,9 +84,9 @@ link, and nothing else.
    - docs: [!9](https://gitlab.com/acme/docs/-/merge_requests/9) documents the refresh window
 
    Merge order:
-   1. [!41](https://gitlab.com/acme/auth-lib/-/merge_requests/41) from auth-lib
-   2. [!118](https://gitlab.com/acme/billing/-/merge_requests/118) from billing, after bumping its auth-lib pin to [!41](https://gitlab.com/acme/auth-lib/-/merge_requests/41)'s merge commit, then deploy to staging
-   3. [!9](https://gitlab.com/acme/docs/-/merge_requests/9) from docs, any time
+   - [x] [!41](https://gitlab.com/acme/auth-lib/-/merge_requests/41) from auth-lib
+   - [ ] [!118](https://gitlab.com/acme/billing/-/merge_requests/118) from billing, after bumping its auth-lib pin to [!41](https://gitlab.com/acme/auth-lib/-/merge_requests/41)'s merge commit, then deploy to staging
+   - [ ] [!9](https://gitlab.com/acme/docs/-/merge_requests/9) from docs, any time
    ```
 
 5. **Deliver it** with the om-chat skill's room tools, posting the file's
@@ -116,5 +116,5 @@ link, and nothing else.
   out, or the files and functions changed. It is the problem, the fix and
   the proof, for a reader who was not there.
 - **Link text other than `!<iid>`**, or a bare `!<iid>` inside a clause.
-- **Making a deploy its own numbered step.** It goes in the clause of the MR
+- **Making a deploy its own checklist item.** It goes in the clause of the MR
   it follows, as `then deploy to …`.
