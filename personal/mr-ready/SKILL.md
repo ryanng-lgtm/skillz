@@ -22,10 +22,10 @@ link, and nothing else.
 
 1. **Collect the MRs** this work opened, in every repo, from the session and
    its plan or brief. Read each one live with
-   `glab mr view <iid> -R <group/project> -F json`: its `web_url`, state, and
-   project path. The link is that `web_url`, or a link the session already
-   has; never build one from a guessed path. The repo name is the project
-   path's last segment.
+   `glab mr view <iid> -R <group/project> -F json`: its `web_url`, state,
+   project path and title. The link is that `web_url`, or a link the session
+   already has; never build one from a guessed path. The repo name is the
+   project path's last segment.
 2. **Work out the merge order** from dependencies, not from the order the
    work was done: a library before the code that pins it, a producer
    deployed before the consumer that reads its new field, a migration before
@@ -49,7 +49,7 @@ link, and nothing else.
    <the TLDR>
 
    MRs:
-   - <repo>: [!<iid>](<web_url>)
+   - <repo>: [!<iid>](<web_url>) <brief>
 
    Merge order:
    1. [!<iid>](<web_url>) from <repo>
@@ -57,6 +57,10 @@ link, and nothing else.
    ```
 
    - One `MRs:` line per MR, in merge order. Two MRs in one repo are two lines.
+   - The brief says what that MR does in at most five words, starting with
+     a present-tense verb, lowercase, no full stop: `adds index`,
+     `adds count column`. Take it from the MR's title and diff, so two MRs
+     in one work get different briefs.
    - One numbered step per MR. After `from <repo>` comes at most one clause
      of what must be true before it merges (`after …`, `only once …`) and
      what to do once it has (`then deploy to ore`), as short plain phrases.
@@ -75,9 +79,9 @@ link, and nothing else.
    Anyone whose login had been refreshed in the last hour got sent back to the sign-in page when they opened billing. Billing now accepts refreshed logins, and the change in auth-lib that it needs ships first. On staging, a refreshed login opened billing without a redirect, and both repos' test suites pass.
 
    MRs:
-   - auth-lib: [!41](https://gitlab.com/acme/auth-lib/-/merge_requests/41)
-   - billing: [!118](https://gitlab.com/acme/billing/-/merge_requests/118)
-   - docs: [!9](https://gitlab.com/acme/docs/-/merge_requests/9)
+   - auth-lib: [!41](https://gitlab.com/acme/auth-lib/-/merge_requests/41) accepts refreshed tokens
+   - billing: [!118](https://gitlab.com/acme/billing/-/merge_requests/118) stops redirecting refreshed logins
+   - docs: [!9](https://gitlab.com/acme/docs/-/merge_requests/9) documents the refresh window
 
    Merge order:
    1. [!41](https://gitlab.com/acme/auth-lib/-/merge_requests/41) from auth-lib
@@ -105,7 +109,8 @@ link, and nothing else.
 ## Common mistakes
 
 - **Adding to the template**: an intro paragraph, a review request, a
-  description per MR, the reason a step waits, bold, emoji. Each run adds
+  brief past five words or a second line about an MR, the reason a step
+  waits, bold, emoji. Each run adds
   different ones, which is the drift. Ryan adds his own words when he sends it.
 - **A TLDR that retells the session**: what was suspected, tried and ruled
   out, or the files and functions changed. It is the problem, the fix and
