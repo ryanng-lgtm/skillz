@@ -199,7 +199,7 @@ rehearsal data.
 | cache | every data change of expose is finished | the reader caches each 250-bar chunk on its own, shared by every user: 24 hours with rows, 1 hour empty. Delete the type's keys and the indicator keys built from them, again after in-flight fills have ended, or let them expire as Ryan decides. Verify with a direct, cache-bypassing read on each database, then through the reader and the API: a cache hit reaches no database. |
 | handoff to the jobs | every database topped up to the last bucket the source tier holds | refresh jobs walk newest first, so at the first run the stored end must reach the start of the newest bucket it refreshes, or a gap reads as empty until a later run. After the first runs: every bucket of the last closed day, no gap at the handoff. |
 | retention back | the handoff checked; on every view and database the highest stored bucket plus one bucket equals the watermark; the chunks the drop job will remove listed (it drops whole chunks) | after the first drop run: the watermark unchanged, only the listed chunks gone. With the newest stored bucket empty, `drop_chunks` pulls the watermark back. |
-| cleanup | retention back checked | staging dropped only on Ryan's word; the load jobs removed from tsdb-move; temporary skip and exclude entries removed. |
+| cleanup | retention back checked | staging dropped only on Ryan's word, chunks first and the empty view after (see Common mistakes); the load jobs removed from tsdb-move; temporary skip and exclude entries removed. Measure the disk freed in the minutes after each database's drop, and confirm by chunk counts that nothing else changed. |
 
 Way back. Until expose, `TRUNCATE` on the real cagg (its storage table
 refuses it) returns the watermark to unset and users to what they saw
@@ -247,6 +247,19 @@ Write each step's result into the plan with its UTC time.
 - **Trusting a shared-dev rehearsal for catalog or watermark behaviour.**
   shared-dev's TimescaleDB is older than prod's (see the shared-dev skill's
   report section).
+- **Dropping a staging cagg with its chunks still in it.** `DROP
+  MATERIALIZED VIEW` on a cagg takes an `ACCESS EXCLUSIVE` lock on the table
+  the cagg reads and holds it until the drop commits. For staging built on a
+  live tier that stalls every read and refresh of that tier. Remove the
+  chunks with `drop_chunks` first (it locks only staging's own chunks), then
+  drop the empty view with `lock_timeout` of one second, only at a moment no
+  other session holds the source's storage, and with a cap on attempts. A
+  failed `DROP` still delays readers for the whole timeout, so never loop it.
+- **Judging "is the table free" from `pg_stat_activity`.** Role `tsdb` sees
+  the reader service's sessions with no `xact_start`, state or query, so a
+  filter on transaction age ignores every chart read. Count the other
+  holders in `pg_locks` alone. On a database that serves chart readers the
+  live 1m storage is free for a second or two per minute at best.
 - **Retrying a write after a dropped connection.** The old backend can still
   be running and commit. Wait for it in `pg_stat_activity` first, as the
   runner does.
