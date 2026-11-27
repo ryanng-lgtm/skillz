@@ -23,6 +23,19 @@ Rule of thumb: compress the scaffolding, not the delivery.
 
 If you (or a subagent) produce **2 bugs of the same class** or take **more than 3 iterations** on one problem, **STOP. Do not apply a 4th patch.** The mental model or architecture is wrong — step back, re-derive the model from the actual code/behavior, and say so, instead of patching again.
 
+## Scope and guards — all projects
+
+Do what was asked, the way the surrounding code already does it, and stop there. Every branch you add is one more thing to review and keep working, so it has to earn its place.
+
+- **Read the surrounding code before you change it**: where its inputs come from, what the callers and the producer already guarantee, and how the module already handles errors, validation and empty values. Follow those patterns rather than adding your own.
+- **A check goes at the boundary, once**: where an outside value first enters (a request handler, a parser, a config loader, a constructor), not at the line you happened to be editing. If the boundary already rules a case out, add nothing; if it should and doesn't, fix it there.
+- **Guard only cases you can name.** If you can't say which input or path produces the bad state, don't add a nil check, a try/except, a fallback default or a retry for it. Trust the types and invariants the code has, and let a state that should be impossible fail loudly.
+- **A review finding is a claim, not an order.** Before adding the check a reviewer asks for, find the path that produces the case. When the code already rules it out, reply with the invariant that does, and add nothing.
+- **Fix the cause where it is produced**, not where the symptom showed up.
+- **Leave out what wasn't asked for**: new options, flags, abstractions, compatibility shims, cleanups of neighbouring code. Mention them in your report instead.
+- **Triage the bugs you find.** Fix now what breaks the task, loses or corrupts data, or opens a security hole. Anything else goes in your report as a follow-up, not into this change.
+- **Data-critical code is the exception**: ingestion, backfills, migrations, any other code whose bug would write wrong data that is hard to repair, and anything that moves money. There, validate every field at the boundary, handle each case you find, and fail closed rather than writing a guessed value.
+
 ## Model, effort, and sessions — all projects
 
 - Use medium effort for well-scoped daily work.
